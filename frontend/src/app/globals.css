@@ -1,0 +1,180 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* The Void - Color Palette */
+  --void-900: #030712;
+  --void-800: #0B1121;
+  --void-700: #151E32;
+
+  /* Starlight - Text */
+  --starlight-100: #E2E8F0;
+  --starlight-400: #94A3B8;
+
+  /* Accents */
+  --cyber-teal: #2DD4BF;
+  --cyber-sky: #0EA5E9;
+  --neon-cyan: #06B6D4;
+  --neon-teal: #22D3EE;
+
+  /* Spacing */
+  --space-unit: 8px;
+
+  /* Typography */
+  --font-sans: 'Inter', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+@layer base {
+  html {
+    font-size: 14px; /* Reduced baseline from 16px */
+  }
+
+  body {
+    @apply bg-void-900 text-starlight-100 antialiased;
+    font-family: var(--font-sans);
+    line-height: 1.5; /* Slightly tighter line height */
+    font-size: 1rem; /* 14px baseline */
+  }
+
+  h1 {
+    @apply text-starlight-100 font-bold tracking-tight; /* Reduced from font-black */
+    font-size: clamp(1.75rem, 4vw, 2.5rem); /* Scaled down */
+    line-height: 1.1;
+  }
+
+  h2 {
+    @apply text-starlight-100 font-bold tracking-tight;
+    font-size: clamp(1.25rem, 3vw, 1.75rem); /* Scaled down */
+    line-height: 1.2;
+  }
+
+  h3 {
+    @apply text-starlight-100 font-bold tracking-tight;
+    font-size: 1.125rem; /* 15.75px */
+    line-height: 1.3;
+  }
+
+  p {
+    line-height: 1.5;
+  }
+
+  input, select, textarea {
+    font-size: 1rem;
+  }
+}
+
+@layer components {
+  .text-body {
+    font-size: 1rem; /* 14px */
+    line-height: 1.5;
+  }
+
+  .text-body-large {
+    font-size: 1.0625rem; /* ~15px */
+    line-height: 1.5;
+  }
+
+  .text-secondary {
+    font-size: 0.925rem; /* ~13px */
+    line-height: 1.5;
+  }
+
+  .text-caption {
+    font-size: 0.85rem; /* ~12px */
+    line-height: 1.4;
+  }
+
+  .text-mono-label {
+    font-family: var(--font-mono);
+    font-size: 0.75rem; /* 10.5px */
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  .glass-panel {
+    @apply bg-void-800/70 backdrop-blur-md border border-white/10 shadow-[inset_0_0_20px_rgba(255,255,255,0.02)];
+  }
+
+  .glass-card {
+    @apply glass-panel rounded-2xl p-6 transition-all duration-300 ease-out hover:border-primary/50 hover:-translate-y-1 hover:shadow-[0_20px_40px_-12px_rgba(45,212,191,0.15)];
+  }
+
+  .btn-reactor {
+    @apply bg-gradient-cyber text-void-900 px-6 py-3 rounded-lg font-bold shadow-[0_0_20px_rgba(45,212,191,0.3)] transition-all duration-300 hover:brightness-110 active:scale-95 disabled:opacity-50;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .btn-ghost {
+    @apply bg-transparent text-starlight-100 border border-white/15 px-6 py-3 rounded-lg font-medium transition-all duration-300 hover:bg-white/5 active:scale-95;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .container-atlas {
+    @apply max-w-[1720px] mx-auto px-8 md:px-16 lg:px-24;
+  }
+
+  .text-gradient-cyber {
+    @apply bg-gradient-cyber bg-clip-text text-transparent;
+  }
+
+  .text-gradient-cyan {
+    @apply bg-gradient-cyan bg-clip-text text-transparent;
+  }
+
+  /* IDE Scrollbars */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.05);
+    border: 3px solid transparent;
+    background-clip: padding-box;
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border: 3px solid transparent;
+    background-clip: padding-box;
+  }
+
+  .editor-gutter-active {
+    background: rgba(255, 255, 255, 0.02);
+  }
+}
+
+/* Motion Physics */
+.animate-in {
+  animation: fade-in-up 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

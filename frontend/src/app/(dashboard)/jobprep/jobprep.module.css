@@ -1,0 +1,553 @@
+/* Job Prep Clean Light Theme - Inspired by Analytics design */
+
+.jobprep-theme {
+  /* Clean light background */
+  background-color: #f9fafb !important;
+  color: #0f172a !important;
+  min-height: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  border-radius: 1rem;
+  overflow: hidden;
+}
+
+/* ========================================
+   COLOR OVERRIDES - Fix text visibility
+   ======================================== */
+
+/* Strategy: Set dark text for light backgrounds,
+   white text for dark/gradient backgrounds */
+
+/* Step 1: Default dark text for light backgrounds */
+.jobprep-theme h1:not([class*="text-blue"]):not([class*="text-white"]),
+.jobprep-theme h2:not([class*="text-blue"]):not([class*="text-white"]),
+.jobprep-theme h3:not([class*="text-blue"]):not([class*="text-white"]),
+.jobprep-theme h4:not([class*="text-blue"]):not([class*="text-white"]),
+.jobprep-theme h5:not([class*="text-blue"]):not([class*="text-white"]),
+.jobprep-theme h6:not([class*="text-blue"]):not([class*="text-white"]) {
+  color: #020617;
+}
+
+.jobprep-theme p:not([class*="text-blue"]):not([class*="text-white"]) {
+  color: #475569;
+}
+
+.jobprep-theme th,
+.jobprep-theme td {
+  color: #020617;
+}
+
+/* Step 2: Force text-slate-950 to be dark */
+.jobprep-theme [class*="text-slate-950"] {
+  color: #020617 !important;
+}
+
+/* Step 3: White text on dark backgrounds (higher specificity) */
+.jobprep-theme .bg-slate-900,
+.jobprep-theme .bg-blue-600,
+.jobprep-theme .bg-red-600,
+.jobprep-theme [class*="bg-gradient"] {
+  color: white;
+}
+
+/* Step 4: Children of dark backgrounds inherit white */
+.jobprep-theme .bg-slate-900 h1,
+.jobprep-theme .bg-slate-900 h2,
+.jobprep-theme .bg-slate-900 h3,
+.jobprep-theme .bg-slate-900 h4,
+.jobprep-theme .bg-slate-900 p:not([class*="text-"]),
+.jobprep-theme .bg-slate-900 span:not([class*="text-"]) {
+  color: inherit;
+}
+
+.jobprep-theme .bg-blue-600 *:not([class*="text-"]),
+.jobprep-theme .bg-red-600 *:not([class*="text-"]) {
+  color: inherit;
+}
+
+/* Step 5: Gradient backgrounds */
+.jobprep-theme [class*="bg-gradient"] h1,
+.jobprep-theme [class*="bg-gradient"] h2,
+.jobprep-theme [class*="bg-gradient"] h3,
+.jobprep-theme [class*="bg-gradient"] h4,
+.jobprep-theme [class*="bg-gradient"] p:not([class*="text-"]),
+.jobprep-theme [class*="bg-gradient"] span:not([class*="text-"]),
+.jobprep-theme [class*="bg-gradient"] button:not([class*="text-"]) {
+  color: inherit;
+}
+
+/* ========================================
+   TOP NAVIGATION BAR
+   ======================================== */
+
+.topNav {
+  background-color: white;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.topNavLeft {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.topNavLogo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.topNavLogo svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  color: #2563eb;
+}
+
+.topNavTitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #020617;
+}
+
+.topNavLink {
+  color: #020617;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.topNavLink:hover {
+  color: #2563eb;
+}
+
+.topNavRight {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.iconButton {
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s;
+}
+
+.iconButton:hover {
+  background-color: #f3f4f6;
+}
+
+.iconButton svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #020617;
+}
+
+/* Action Buttons */
+.btnPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.btnPrimary:hover {
+  background-color: #1d4ed8;
+}
+
+.btnSecondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: white;
+  color: #020617;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.btnSecondary:hover {
+  background-color: #f9fafb;
+}
+
+.btnPurple {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: #7c3aed;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.btnPurple:hover {
+  background-color: #6d28d9;
+}
+
+.btnSuccess {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: #10b981;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.btnSuccess:hover {
+  background-color: #059669;
+}
+
+.btnDanger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.btnDanger:hover {
+  background-color: #dc2626;
+}
+
+/* ========================================
+   TAB NAVIGATION
+   ======================================== */
+
+.tabNav {
+  background-color: white;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  overflow-x: auto;
+}
+
+.tabItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 0.25rem;
+  border-bottom: 2px solid transparent;
+  color: #334155;
+  /* slate-700 - readable for inactive */
+  font-weight: 700;
+  cursor: pointer;
+  transition: none;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  white-space: nowrap;
+}
+
+.tabItem:hover {
+  color: #0f172a;
+  /* slate-900 - confident hover */
+}
+
+.tabItem.active {
+  color: #2563eb;
+  /* blue-600 - authoritative active */
+  border-bottom-color: #2563eb;
+  opacity: 1;
+}
+
+.tabItem svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* ========================================
+   MAIN LAYOUT
+   ======================================== */
+
+.mainContent {
+  flex: 1;
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+/* ========================================
+   CARDS & GRIDS
+   ======================================== */
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.statCard {
+  background-color: white;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.statLabel {
+  font-size: 0.875rem;
+  color: #020617;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.statValue {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #020617;
+}
+
+.card {
+  background-color: white;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  border: 1px solid #e5e7eb;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.cardTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #020617;
+  margin-bottom: 1.25rem;
+}
+
+.cardSubtitle {
+  font-size: 0.875rem;
+  color: #020617;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+/* ========================================
+   SECTIONS SPECIFIC
+   ======================================== */
+
+/* Role Card */
+.roleCard {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.roleCard:hover {
+  border-color: #2563eb;
+  background-color: #eff6ff;
+}
+
+.roleCard.active {
+  border-color: #2563eb;
+  background-color: #eff6ff;
+  outline: 1px solid #2563eb;
+}
+
+/* Skill Progress */
+.skillRow {
+  margin-bottom: 1.25rem;
+}
+
+.skillHeader {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.skillName {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #020617;
+}
+
+.skillLevel {
+  font-size: 0.875rem;
+  color: #020617;
+  font-weight: 600;
+}
+
+.progressBar {
+  height: 0.5rem;
+  background-color: #f3f4f6;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background-color: #2563eb;
+  border-radius: 9999px;
+}
+
+/* AI Assistant Box */
+.aiAssistant {
+  background-color: #eff6ff;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  border: 1px solid #bfdbfe;
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.aiAssistantIcon {
+  width: 2.5rem;
+  height: 2.5rem;
+  background-color: #dbeafe;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.aiAssistantIcon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #2563eb;
+}
+
+.aiAssistantContent h4 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #020617;
+  margin-bottom: 0.25rem;
+}
+
+.aiAssistantContent p {
+  font-size: 0.875rem;
+  color: #020617;
+  font-weight: 500;
+}
+
+/* ========================================
+   RESPONSIVE ADJUSTMENTS
+   ======================================== */
+
+@media (max-width: 1024px) {
+  .topNav {
+    padding: 0.75rem 1rem;
+  }
+
+  .tabNav {
+    gap: 1rem;
+    padding: 0 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .topNavLeft div:last-child {
+    display: none;
+    /* Hide non-essential links on mobile */
+  }
+
+  .mainContent {
+    padding: 1rem;
+  }
+
+  .statsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Premium Animations & Transitions */
+.jobprep-theme * {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Placement Mode Overrides */
+.placementMode .card {
+  border-color: #fee2e2;
+}
+
+.placementMode .topNav {
+  border-bottom-color: #fca5a5;
+}
+
+.placementMode .tabNav {
+  border-bottom-color: #fca5a5;
+}
+
+/* Utility */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.badgeBlue {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.badgeGreen {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.badgePurple {
+  background-color: #f3e8ff;
+  color: #6b21a8;
+}
+
+.badgeAmber {
+  background-color: #fef3c7;
+  color: #92400e;
+}

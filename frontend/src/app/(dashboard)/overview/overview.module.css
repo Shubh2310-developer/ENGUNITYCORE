@@ -1,0 +1,468 @@
+/* ==============================================
+   OVERVIEW WHITE THEME
+   Scope: .overview-light (Overview route only)
+   Philosophy: Calm, readable, neutral, executive-grade
+   ============================================== */
+
+/* ========================================
+   1. PAGE CONTAINER
+======================================== */
+
+.overviewLight {
+    background-color: #F8FAFC;
+    color: #334155;
+    min-height: 100%;
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    border-radius: 1rem;
+    overflow-y: auto;
+    padding: 2rem 2.5rem;
+}
+
+/* ========================================
+   2. TYPOGRAPHY HIERARCHY
+======================================== */
+
+/* Page Title */
+.pageTitle {
+    color: #0F172A;
+    font-size: 1.75rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin: 0;
+}
+
+/* Section Headers */
+.sectionHeader {
+    color: #1E293B;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Primary Text */
+.textPrimary {
+    color: #334155;
+}
+
+/* Secondary Labels */
+.textSecondary {
+    color: #64748B;
+}
+
+/* Meta / Timestamps */
+.textMeta {
+    color: #94A3B8;
+    font-size: 0.75rem;
+}
+
+/* ========================================
+   3. TOP STATUS BAR (Calm, Professional)
+======================================== */
+
+.statusBar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 1.5rem;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid #E2E8F0;
+}
+
+.statusLeft {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.statusRight {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    color: #64748B;
+    font-size: 0.8125rem;
+}
+
+.statusDot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: #22C55E;
+}
+
+/* ========================================
+   4. METRIC CARDS (Financial Dashboard Style)
+======================================== */
+
+.metricsGrid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.25rem;
+    margin-bottom: 2.5rem;
+}
+
+@media (max-width: 1024px) {
+    .metricsGrid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .metricsGrid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.metricCard {
+    background-color: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    transition: border-color 0.15s;
+}
+
+.metricCard:hover {
+    border-color: #CBD5E1;
+}
+
+/* Accent variants - thin left border */
+.metricCardChats {
+    border-left: 3px solid #2563EB;
+}
+
+.metricCardDocs {
+    border-left: 3px solid #16A34A;
+}
+
+.metricCardNotebooks {
+    border-left: 3px solid #7C3AED;
+}
+
+.metricCardCode {
+    border-left: 3px solid #D97706;
+}
+
+.metricLabel {
+    color: #64748B;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.5rem;
+}
+
+.metricValue {
+    color: #0F172A;
+    font-size: 1.75rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+
+.metricSub {
+    color: #94A3B8;
+    font-size: 0.75rem;
+    margin-left: 0.5rem;
+}
+
+/* ========================================
+   5. CONTENT GRID (Two Columns)
+======================================== */
+
+.contentGrid {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 2.5rem;
+}
+
+@media (max-width: 1024px) {
+    .contentGrid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ========================================
+   6. ACTIVE WORK LIST (Task List Style)
+======================================== */
+
+.sectionContainer {
+    margin-bottom: 2rem;
+}
+
+.sectionHeaderRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #E2E8F0;
+    margin-bottom: 1rem;
+}
+
+.viewAllLink {
+    color: #2563EB;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    text-decoration: none;
+    transition: color 0.15s;
+}
+
+.viewAllLink:hover {
+    color: #1D4ED8;
+}
+
+.workList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.workItem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.875rem 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.workItem:hover {
+    background-color: #F1F5F9;
+}
+
+.workItemLeft {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.workIcon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background-color: #F1F5F9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.workIconChat {
+    color: #2563EB;
+}
+
+.workIconCode {
+    color: #D97706;
+}
+
+.workIconResearch {
+    color: #7C3AED;
+}
+
+.workTitle {
+    color: #0F172A;
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-bottom: 0.125rem;
+}
+
+.workMeta {
+    color: #64748B;
+    font-size: 0.75rem;
+}
+
+.workItemRight {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+/* Status text-only with dot */
+.statusRunning {
+    color: #2563EB;
+    font-size: 0.75rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.statusRunning::before {
+    content: '';
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background-color: #2563EB;
+}
+
+.statusDraft {
+    color: #64748B;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.statusComplete {
+    color: #16A34A;
+    font-size: 0.75rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.statusComplete::before {
+    content: '';
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background-color: #16A34A;
+}
+
+/* ========================================
+   7. RIGHT COLUMN PANELS
+======================================== */
+
+.rightColumn {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+/* ========================================
+   8. INTELLIGENCE SIGNALS (Informational)
+======================================== */
+
+.signalsPanel {
+    background-color: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 1.25rem;
+}
+
+.signalsList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+}
+
+.signalItem {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.signalItem:hover .signalText {
+    color: #0F172A;
+}
+
+.signalBar {
+    width: 3px;
+    min-height: 1rem;
+    height: 100%;
+    border-radius: 2px;
+    background-color: #CBD5E1;
+    flex-shrink: 0;
+    margin-top: 0.125rem;
+}
+
+.signalBarInfo {
+    background-color: #2563EB;
+}
+
+.signalBarWarning {
+    background-color: #D97706;
+}
+
+.signalBarError {
+    background-color: #DC2626;
+}
+
+.signalText {
+    color: #64748B;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    transition: color 0.15s;
+}
+
+/* ========================================
+   9. RECENT ACTIVITY (Audit Trail Style)
+======================================== */
+
+.activityPanel {
+    background-color: transparent;
+}
+
+.activityList {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+}
+
+.activityItem {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.8125rem;
+}
+
+.activityTime {
+    color: #94A3B8;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.6875rem;
+    min-width: 60px;
+}
+
+.activityAction {
+    color: #0F172A;
+    font-weight: 600;
+}
+
+.activityTarget {
+    color: #64748B;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 150px;
+}
+
+/* ========================================
+   10. FOOTER
+======================================== */
+
+.footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 2rem;
+    margin-top: 2rem;
+    border-top: 1px solid #E2E8F0;
+    color: #CBD5E1;
+    font-size: 0.75rem;
+}
+
+/* ========================================
+   11. SCROLLBAR
+======================================== */
+
+.overviewLight::-webkit-scrollbar {
+    width: 6px;
+}
+
+.overviewLight::-webkit-scrollbar-track {
+    background-color: transparent;
+}
+
+.overviewLight::-webkit-scrollbar-thumb {
+    background-color: #E2E8F0;
+    border-radius: 3px;
+}
+
+.overviewLight::-webkit-scrollbar-thumb:hover {
+    background-color: #CBD5E1;
+}
