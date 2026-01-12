@@ -39,27 +39,32 @@ class GroqClient:
     ):
         """
         Initialize Groq client.
-        
+
         Args:
             model: Groq model identifier
             max_tokens: Maximum tokens in response
             temperature: Sampling temperature (0.0-2.0)
-        
-        Raises:
-            ValueError: If GROQ_API_KEY is not set
         """
-        if not settings.GROQ_API_KEY:
-            raise ValueError(
-                "GROQ_API_KEY not found in environment variables. "
-                "Please set it in your .env file. "
-                "Get your key from https://console.groq.com"
-            )
-        
-        self.client = AsyncGroq(api_key=settings.GROQ_API_KEY)
         self.model = model
         self.max_tokens = max_tokens
         self.temperature = temperature
-        
+        self.clients = []
+        self.current_client_index = 0
+
+        # Load API keys from config
+        api_keys = []
+        if settings.GROQ_API_KEYS:
+            api_keys = [k.strip() for k in settings.GROQ_API_KEYS.split(",") if k.strip()]
+        elif settings.GROQ_API_KEY:
+            api_keys = [settings.GROQ_API_KEY]
+
+        if not api_keys:
+            print("WARNING: No GROQ_API_KEY found. AI features will be disabled.")
+        else:
+            for key in api_keys:
+                self.clients.append(AsyncGroq(api_key=key))
+            print(f"INFO: GroqClient initialized with {len(self.clients)} API keys for rotation.")
+
         # System prompt for Engunity AI
         self.system_prompt = (
             "You are Engunity AI, an expert assistant specializing in:\n"
@@ -73,78 +78,81 @@ class GroqClient:
             "Explain complex concepts with examples when appropriate."
         )
 
+    def _get_next_client(self) -> AsyncGroq:
+        """
+        Round-robin selection of the next available Groq client.
+        """
+        if not self.clients:
+            raise Exception("Groq AI is disabled: No API keys available.")
+
+        client = self.clients[self.current_client_index]
+        self.current_client_index = (self.current_client_index + 1) % len(self.clients)
+        return client
+
     async def get_completion(
-        self, 
+        self,
         messages: List[Dict[str, str]],
         temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None
+        max_tokens: Optional[int] = None,
+        model: Optional[str] = None
     ) -> str:
         """
-        Get chat completion from Groq API.
-        
-        Args:
-            messages: List of message dicts with 'role' and 'content'
-                     Example: [{"role": "user", "content": "Explain async/await"}]
-            temperature: Override default temperature (optional)
-            max_tokens: Override default max_tokens (optional)
-        
-        Returns:
-            Generated text response from the model
-        
-        Raises:
-            Exception: If API call fails with descriptive error message
-        
-        Example:
-            >>> messages = [
-            ...     {"role": "user", "content": "What is FastAPI?"}
-            ... ]
-            >>> response = await groq_client.get_completion(messages)
-            >>> print(response)
+        Get chat completion from Groq API with key rotation.
         """
-        try:
-            # Inject system prompt if not present
-            if not any(msg.get("role") == "system" for msg in messages):
-                messages_with_system = [
-                    {"role": "system", "content": self.system_prompt},
-                    *messages
-                ]
-            else:
-                messages_with_system = messages
-            
-            # Use provided overrides or defaults
-            temp = temperature if temperature is not None else self.temperature
-            max_tok = max_tokens if max_tokens is not None else self.max_tokens
-            
-            # Call Groq API
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=messages_with_system,
-                max_tokens=max_tok,
-                temperature=temp,
-                stream=False  # Can be changed to True for streaming
-            )
-            
-            # Extract and return content
-            content = response.choices[0].message.content
-            
-            if not content:
-                raise Exception("Groq API returned empty response")
-            
-            return content
-            
-        except Exception as e:
-            # Enhanced error handling
-            error_msg = f"Groq API error: {str(e)}"
-            
-            # Add helpful context
-            if "api_key" in str(e).lower():
-                error_msg += " - Please check your GROQ_API_KEY in .env file"
-            elif "rate_limit" in str(e).lower():
-                error_msg += " - Rate limit exceeded. Please wait and try again"
-            elif "quota" in str(e).lower():
-                error_msg += " - API quota exceeded. Check your Groq account"
-            
-            raise Exception(error_msg)
+        if not self.clients:
+            raise Exception("Groq AI is disabled: No API keys available.")
+
+        # Try multiple clients in case of rate limits
+        attempts = 0
+        max_attempts = len(self.clients)
+        last_error = None
+
+        while attempts < max_attempts:
+            client = self._get_next_client()
+            try:
+                # Inject system prompt if not present
+                if not any(msg.get("role") == "system" for msg in messages):
+                    messages_with_system = [
+                        {"role": "system", "content": self.system_prompt},
+                        *messages
+                    ]
+                else:
+                    messages_with_system = messages
+
+                # Use provided overrides or defaults
+                temp = temperature if temperature is not None else self.temperature
+                max_tok = max_tokens if max_tokens is not None else self.max_tokens
+                target_model = model if model is not None else self.model
+
+                # Call Groq API
+                response = await client.chat.completions.create(
+                    model=target_model,
+                    messages=messages_with_system,
+                    max_tokens=max_tok,
+                    temperature=temp,
+                    stream=False
+                )
+
+                # Extract and return content
+                content = response.choices[0].message.content
+
+                if not content:
+                    raise Exception("Groq API returned empty response")
+
+                return content
+
+            except Exception as e:
+                last_error = str(e)
+                # If it's a rate limit or quota error, try next key
+                if any(x in last_error.lower() for x in ["rate_limit", "quota", "429"]):
+                    print(f"WARNING: Key {attempts} rate limited, rotating to next key...")
+                    attempts += 1
+                    continue
+                else:
+                    # For other errors, re-raise immediately
+                    raise Exception(f"Groq API error: {last_error}")
+
+        raise Exception(f"All {len(self.clients)} Groq API keys failed. Last error: {last_error}")
 
     async def get_streaming_completion(
         self,
@@ -153,23 +161,15 @@ class GroqClient:
         max_tokens: Optional[int] = None
     ):
         """
-        Get streaming chat completion from Groq API.
-        
-        This method returns an async generator that yields response chunks
-        as they're generated by the model.
-        
-        Args:
-            messages: Conversation history
-            temperature: Sampling temperature (optional)
-            max_tokens: Maximum tokens (optional)
-        
-        Yields:
-            str: Response chunks as they arrive
-        
-        Example:
-            >>> async for chunk in groq_client.get_streaming_completion(messages):
-            ...     print(chunk, end="", flush=True)
+        Get streaming chat completion from Groq API with key rotation.
+        Note: Rotation for streaming is handled at the start of the stream.
         """
+        if not self.clients:
+            raise Exception("Groq AI is disabled: No API keys available.")
+
+        # For streaming, we pick a client and stick with it for that request
+        client = self._get_next_client()
+
         try:
             # Inject system prompt
             if not any(msg.get("role") == "system" for msg in messages):
@@ -179,24 +179,27 @@ class GroqClient:
                 ]
             else:
                 messages_with_system = messages
-            
+
             temp = temperature if temperature is not None else self.temperature
             max_tok = max_tokens if max_tokens is not None else self.max_tokens
-            
+
             # Stream response
-            stream = await self.client.chat.completions.create(
+            stream = await client.chat.completions.create(
                 model=self.model,
                 messages=messages_with_system,
                 max_tokens=max_tok,
                 temperature=temp,
                 stream=True
             )
-            
+
             async for chunk in stream:
                 if chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
-                    
+
         except Exception as e:
+            # Handle rate limit at start of stream
+            if any(x in str(e).lower() for x in ["rate_limit", "quota", "429"]):
+                 raise Exception(f"Groq streaming rate limit: {str(e)}. Try again to rotate keys.")
             raise Exception(f"Groq streaming error: {str(e)}")
 
 

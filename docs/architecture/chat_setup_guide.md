@@ -17,19 +17,19 @@ Make `/home/agentrogue/Engunity/frontend/src/app/(dashboard)/chat` **fully funct
 # Create/update .env file in project root
 cat > /home/agentrogue/Engunity/.env << 'EOF'
 # Database Configuration
-DATABASE_URL=postgresql://postgres.amddbmoltlwqsrwwdyvc:Meghal0987@23@aws-1-ap-south-1.pooler.supabase.com:5432/postgres
+DATABASE_URL=postgresql://user:password@host:port/database
 
 # JWT Secret
-SECRET_KEY=YC2RymwNNsvEVLtKfBnnSsNag1IrQFjQnHKOsF0V4WAC4pbdFLdQjn8aohGCfWfBqu7ey5EvT9V5X2Anuj/Z5A==
+SECRET_KEY=your_secret_key_here
 ACCESS_TOKEN_EXPIRE_MINUTES=11520
 
 # Supabase Configuration
-SUPABASE_URL=https://amddbmoltlwqsrwwdyvc.supabase.co
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtZGRibW9sdGx3cXNyd3dkeXZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc1MzQ5MDcsImV4cCI6MjA4MzExMDkwN30.62w7IMWGQdOEgyO8gTf-EfYhfh9qnGQSpwqvpGxgGiI
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtZGRibW9sdGx3cXNyd3dkeXZjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NzUzNDkwNywiZXhwIjoyMDgzMTEwOTA3fQ.keRKJ1dqpv3eBQfAw_q_WC6IAgDKSmS6Riz5TV4MCVA
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 # AI Configuration - ⚠️ REQUIRED: Get your key from https://console.groq.com
-GROQ_API_KEY=gsk_YOUR_ACTUAL_GROQ_API_KEY_HERE
+GROQ_API_KEY=gsk_your_actual_api_key_here
 
 # Redis (optional for caching)
 REDIS_URL=redis://localhost:6379/0
@@ -54,8 +54,8 @@ EOF
 ```bash
 cat > /home/agentrogue/Engunity/frontend/.env.local << 'EOF'
 NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
-NEXT_PUBLIC_SUPABASE_URL=https://amddbmoltlwqsrwwdyvc.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFtZGRibW9sdGx3cXNyd3dkeXZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc1MzQ5MDcsImV4cCI6MjA4MzExMDkwN30.62w7IMWGQdOEgyO8gTf-EfYhfh9qnGQSpwqvpGxgGiI
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 EOF
 ```
 

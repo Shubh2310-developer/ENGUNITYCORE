@@ -18,11 +18,16 @@ import {
   Bot,
   ChevronLeft,
   ChevronRight,
+  RotateCcw,
   X,
-  LogOut
+  LogOut,
+  Shield,
+  Zap
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useRouter } from 'next/navigation';
+import { useAuthStore } from '@/stores/authStore';
 import { chatService, Message } from '@/services/chat';
 import { documentService } from '@/services/document';
 import styles from './chat.module.css';
@@ -68,6 +73,8 @@ const CodeBlock = ({ children, lang }: { children: string, lang: string }) => {
 };
 
 export default function ChatPage() {
+  const router = useRouter();
+  const { user } = useAuthStore();
   const [input, setInput] = useState('');
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Partial<Message>[]>([]);
@@ -77,10 +84,18 @@ export default function ChatPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+  const [now, setNow] = useState(new Date());
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Update "now" every minute to refresh relative timestamps
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Load latest session on mount
   useEffect(() => {
@@ -125,7 +140,8 @@ export default function ChatPage() {
       {
         role: 'assistant',
         content: '👋 Welcome to **Engunity AI Chat**!\n\nI\'m your AI assistant, ready to help with:\n\n- 💻 **Programming & Development** - Code architecture, debugging, best practices\n- 🏗️ **System Design** - Scalability, microservices, cloud platforms\n- 📊 **Data Engineering** - Database design, pipelines, analytics\n- 🔧 **DevOps** - CI/CD, containerization, infrastructure\n\nHow can I assist you today?',
-        id: 'initial'
+        id: 'initial',
+        timestamp: new Date().toISOString()
       }
     ]);
   };
@@ -144,39 +160,161 @@ export default function ChatPage() {
     }
   }, [input]);
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  const handleSend = async (overrideInput?: string) => {
+    const textToSend = overrideInput || input;
+    if (!textToSend.trim() || isLoading) return;
 
-    const userMessage = {
-      role: 'user' as const,
-      content: input,
-      id: Date.now().toString()
+    // Handle Slash Commands
+    let processedText = textToSend;
+    if (textToSend.startsWith('/')) {
+      const parts = textToSend.split(' ');
+      const command = parts[0].toLowerCase();
+      const args = parts.slice(1).join(' ');
+
+      if (command === '/clear') {
+        clearCanvas();
+        setInput('');
+        return;
+      } else if (command === '/explain') {
+        processedText = `Please explain the following in detail, focusing on concepts and implementation: \n\n${args}`;
+      } else if (command === '/summarize') {
+        processedText = `Please provide a concise summary of the following: \n\n${args}`;
+      } else if (command === '/code') {
+        processedText = `Please help me write or refactor the following code: \n\n${args}`;
+      }
+    }
+
+    const userMessageId = Date.now().toString();
+    const userMessage: Message = {
+      role: 'user',
+      content: processedText,
+      id: userMessageId,
+      timestamp: new Date().toISOString(),
+      status: 'done'
     };
 
     setMessages(prev => [...prev, userMessage]);
-    const currentInput = input;
-    setInput('');
+    if (!overrideInput) setInput('');
     setIsLoading(true);
 
-    try {
-      const response = await chatService.sendMessage(currentInput, activeSessionId || undefined);
-      setMessages(prev => [...prev, response]);
+    // Add a placeholder for the assistant response
+    const assistantMessageId = (Date.now() + 1).toString();
+    const placeholderAssistantMessage: Message = {
+      role: 'assistant',
+      content: '',
+      id: assistantMessageId,
+      timestamp: new Date().toISOString(),
+      status: 'streaming'
+    };
 
-      if (!activeSessionId) {
-        const sessions = await chatService.getSessions();
-        if (sessions.length > 0) {
-          setActiveSessionId(sessions[0].id);
+    setMessages(prev => [...prev, placeholderAssistantMessage]);
+
+    let currentSessionId = activeSessionId;
+
+    try {
+      await chatService.streamMessage(
+        processedText,
+        activeSessionId || undefined,
+        (chunk) => {
+          setMessages(prev => prev.map(msg =>
+            msg.id === assistantMessageId
+              ? { ...msg, content: (msg.content || '') + chunk }
+              : msg
+          ));
+        },
+        (metadata) => {
+          if (metadata.session_id) {
+            currentSessionId = metadata.session_id;
+            if (!activeSessionId) {
+              setActiveSessionId(metadata.session_id);
+              // Refresh sessions list to show the new session
+              chatService.getSessions().then(sessions => {
+                const formattedSessions = sessions.map((s: any, index: number) => ({
+                  id: s.id,
+                  title: s.title || `Chat ${index + 1}`,
+                  lastMessage: '',
+                  timestamp: new Date(s.updated_at || s.created_at || Date.now()),
+                  messageCount: s.message_count || 0,
+                  isActive: s.id === metadata.session_id
+                }));
+                setChatSessions(formattedSessions);
+              });
+            }
+          }
+          if (metadata.retrieved_docs) {
+            setMessages(prev => prev.map(msg =>
+              msg.id === assistantMessageId
+                ? { ...msg, retrieved_docs: metadata.retrieved_docs }
+                : msg
+            ));
+          }
+        },
+        (messageId, title) => {
+          setMessages(prev => prev.map(msg =>
+            msg.id === assistantMessageId
+              ? { ...msg, id: messageId, status: 'done' }
+              : msg
+          ));
+          setIsLoading(false);
+
+          // Update the sidebar with the latest message, timestamp, count, and title if provided
+          setChatSessions(prev => {
+            const exists = prev.find(s => s.id === currentSessionId);
+            if (exists) {
+              return prev.map(s =>
+                s.id === currentSessionId
+                  ? {
+                      ...s,
+                      title: title || s.title,
+                      lastMessage: textToSend,
+                      timestamp: new Date(),
+                      messageCount: s.messageCount + 2 // User + Assistant
+                    }
+                  : s
+              );
+            }
+            return prev;
+          });
+        },
+        (error) => {
+          console.error('Streaming error:', error);
+          setMessages(prev => prev.map(msg =>
+            msg.id === assistantMessageId
+              ? { ...msg, content: (msg.content || '') + '\n\n❌ Error: ' + error, status: 'error' }
+              : msg
+          ));
+          setIsLoading(false);
         }
-      }
+      );
     } catch (error) {
-      console.error('Failed to send message:', error);
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: '❌ Sorry, I encountered an error. Please try again.',
-        id: Date.now().toString()
-      }]);
-    } finally {
+      console.error('Failed to initiate stream:', error);
+      setMessages(prev => prev.map(msg =>
+        msg.id === assistantMessageId
+          ? { ...msg, content: '❌ Failed to start chat session. Please try again.', status: 'error' }
+          : msg
+      ));
       setIsLoading(false);
+    }
+  };
+
+  const copyMessage = (content: string, id: string) => {
+    navigator.clipboard.writeText(content);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const regenerateLastMessage = () => {
+    const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+    if (lastUserMsg && lastUserMsg.content) {
+      // Remove last assistant message if it failed or was being generated
+      setMessages(prev => {
+        const last = prev[prev.length - 1];
+        if (last && last.role === 'assistant') {
+          return prev.slice(0, -1);
+        }
+        return prev;
+      });
+      handleSend(lastUserMsg.content);
     }
   };
 
@@ -186,7 +324,7 @@ export default function ChatPage() {
 
     setIsUploading(true);
     try {
-      const doc = await documentService.upload(file);
+      const doc = await documentService.upload(file, undefined, 'note', activeSessionId || undefined);
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: `📄 **File uploaded successfully!**\n\n**Filename:** ${doc.filename}\n**Size:** ${(doc.size / 1024).toFixed(1)} KB\n\nI've indexed this document into your research context.`,
@@ -208,7 +346,7 @@ export default function ChatPage() {
   const clearCanvas = async () => {
     setIsLoading(true);
     try {
-      const newSession = await chatService.createSession("New Conversation " + new Date().toLocaleTimeString());
+      const newSession = await chatService.createSession("New Conversation");
       setActiveSessionId(newSession.id);
       setMessages([
         {
@@ -226,7 +364,7 @@ export default function ChatPage() {
 
   const createNewChat = async () => {
     try {
-      const newSession = await chatService.createSession("New Chat " + new Date().toLocaleTimeString());
+      const newSession = await chatService.createSession("New Chat");
       setActiveSessionId(newSession.id);
       setChatSessions(prev => [
         {
@@ -263,14 +401,38 @@ export default function ChatPage() {
     }
   };
 
-  const formatTimestamp = (date: Date) => {
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const hours = diff / (1000 * 60 * 60);
+  const handleDeleteSession = async (e: React.MouseEvent, sessionId: string) => {
+    e.stopPropagation(); // Prevent switching to the session being deleted
 
-    if (hours < 1) return 'Just now';
-    if (hours < 24) return `${Math.floor(hours)}h ago`;
-    if (hours < 48) return 'Yesterday';
+    try {
+      await chatService.deleteSession(sessionId);
+
+      // Update local state
+      setChatSessions(prev => prev.filter(s => s.id !== sessionId));
+
+      // If we deleted the active session, clear the messages and reset active session
+      if (sessionId === activeSessionId) {
+        setActiveSessionId(null);
+        setInitialMessage();
+      }
+    } catch (error) {
+      console.error('Failed to delete session:', error);
+      alert('Failed to delete session. Please try again.');
+    }
+  };
+
+  const formatTimestamp = (date: Date) => {
+    const isToday = date.toDateString() === now.toDateString();
+    if (isToday) {
+      return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    }
+
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) {
+      return 'Yesterday';
+    }
+
     return date.toLocaleDateString();
   };
 
@@ -278,8 +440,41 @@ export default function ChatPage() {
     session.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const shouldShowDivider = (idx: number) => {
+    if (idx === 0) return true;
+    const prevMsg = messages[idx - 1];
+    const currMsg = messages[idx];
+    if (!prevMsg.timestamp || !currMsg.timestamp) return false;
+
+    const prevDate = new Date(prevMsg.timestamp).toLocaleDateString();
+    const currDate = new Date(currMsg.timestamp).toLocaleDateString();
+    return prevDate !== currDate;
+  };
+
+  const getDividerText = (timestamp?: string) => {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+
+    if (date.toLocaleDateString() === today.toLocaleDateString()) return 'Today';
+    if (date.toLocaleDateString() === yesterday.toLocaleDateString()) return 'Yesterday';
+    return date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+  };
+
   const MarkdownComponents = {
-    p: ({ children }: any) => <p className="text-slate-700 leading-relaxed mb-4 last:mb-0">{children}</p>,
+    p: ({ children }: any) => {
+      // If children contains a CodeBlock (div), render a div instead of a p to avoid hydration errors
+      const hasDiv = React.Children.toArray(children).some(
+        (child: any) => child?.type === CodeBlock || (typeof child === 'object' && child?.props?.lang !== undefined)
+      );
+
+      if (hasDiv) {
+        return <div className="text-slate-700 leading-relaxed mb-4 last:mb-0">{children}</div>;
+      }
+      return <p className="text-slate-700 leading-relaxed mb-4 last:mb-0">{children}</p>;
+    },
     h1: ({ children }: any) => <h1 className="text-xl font-bold text-slate-900 mb-4 mt-6">{children}</h1>,
     h2: ({ children }: any) => <h2 className="text-lg font-bold text-slate-900 mb-3 mt-5">{children}</h2>,
     h3: ({ children }: any) => <h3 className="text-base font-bold text-slate-900 mb-2 mt-4">{children}</h3>,
@@ -367,12 +562,25 @@ export default function ChatPage() {
                 onClick={() => switchToSession(session.id)}
                 className={`${styles.sessionItem} ${session.isActive ? styles.sessionItemActive : ''}`}
               >
-                <h3 className={styles.sessionTitle}>{session.title}</h3>
+                <div className="flex justify-between items-start gap-2">
+                  <h3 className={styles.sessionTitle}>{session.title}</h3>
+                  <button
+                    onClick={(e) => handleDeleteSession(e, session.id)}
+                    className={styles.sessionDeleteBtn}
+                    title="Delete conversation"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
                 <div className={styles.sessionMeta}>
-                  <Clock className="w-3 h-3 inline mr-1" />
-                  {formatTimestamp(session.timestamp)}
-                  <span className="mx-1">•</span>
-                  {session.messageCount} messages
+                  {session.messageCount > 0 && (
+                    <>
+                      <Clock className="w-3 h-3 inline mr-1" />
+                      {formatTimestamp(session.timestamp)}
+                      <span className="mx-1">•</span>
+                      {session.messageCount} messages
+                    </>
+                  )}
                 </div>
               </div>
             ))
@@ -385,12 +593,9 @@ export default function ChatPage() {
             <User className="w-4 h-4" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className={styles.userName}>User</p>
-            <p className={styles.userEmail}>user@example.com</p>
+            <p className={styles.userName}>{user?.email?.split('@')[0] || 'User'}</p>
+            <p className={styles.userEmail}>{user?.email || 'user@example.com'}</p>
           </div>
-          <button className={styles.iconBtn}>
-            <Settings className="w-4 h-4" />
-          </button>
         </div>
       </div>
 
@@ -416,6 +621,21 @@ export default function ChatPage() {
           </div>
 
           <div className={styles.headerRight}>
+            {messages.length > 5 && (
+              <button
+                onClick={() => {
+                  const lastUserMessage = [...messages].reverse().find(m => m.role === 'user')?.content || '';
+                  const sessionTitle = chatSessions.find(s => s.id === activeSessionId)?.title || 'Chat Decision';
+                  router.push(`/decisionvault?source=chat&title=${encodeURIComponent(sessionTitle)}&problem=${encodeURIComponent(lastUserMessage.slice(0, 200))}`);
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all text-xs font-bold mr-2"
+                title="Convert this conversation to a structured decision"
+              >
+                <Shield className="w-3.5 h-3.5" />
+                <span>Convert to Decision</span>
+              </button>
+            )}
+
             <div className={styles.statusBadge}>
               <span className={`${styles.statusDot} ${styles.statusLive}`}></span>
               <span>Live</span>
@@ -438,32 +658,100 @@ export default function ChatPage() {
         {/* Messages */}
         <div ref={scrollRef} className={styles.messagesContainer}>
           {messages.map((msg, idx) => (
-            <div key={msg.id || idx} className={styles.messageBubble}>
-              {msg.role === 'assistant' ? (
-                <div className={styles.messageAssistant}>
-                  <div className={styles.messageAvatar}>
-                    <Bot className={styles.messageAvatarIcon} />
-                  </div>
-                  <div className={styles.messageAssistantContent}>
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={MarkdownComponents}
-                    >
-                      {msg.content || ''}
-                    </ReactMarkdown>
-                  </div>
-                </div>
-              ) : (
-                <div className={styles.messageUser}>
-                  <div className={styles.messageUserContent}>
-                    <p className="whitespace-pre-wrap">{msg.content}</p>
-                  </div>
+            <React.Fragment key={msg.id || idx}>
+              {shouldShowDivider(idx) && (
+                <div className={styles.timeDivider}>
+                  <div className={styles.timeDividerLine}></div>
+                  <span className={styles.timeDividerText}>
+                    {getDividerText(msg.timestamp || undefined)}
+                  </span>
                 </div>
               )}
-            </div>
+
+              <div className={styles.messageBubble}>
+                {/* Message Interaction Toolbar */}
+                <div className={styles.messageToolbar}>
+                  <button
+                    onClick={() => copyMessage(msg.content || '', msg.id || idx.toString())}
+                    className={styles.toolbarBtn}
+                    title="Copy message"
+                  >
+                    {copiedId === (msg.id || idx.toString()) ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                  {msg.role === 'assistant' && idx === messages.length - 1 && (
+                    <button
+                      onClick={regenerateLastMessage}
+                      className={styles.toolbarBtn}
+                      title="Regenerate response"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      router.push(`/decisionvault?source=chat&title=${encodeURIComponent(chatSessions.find(s => s.id === activeSessionId)?.title || 'Decision')}&problem=${encodeURIComponent(msg.content?.slice(0, 200) || '')}`);
+                    }}
+                    className={styles.toolbarBtn}
+                    title="Save to Decision Vault"
+                  >
+                    <Shield className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {msg.role === 'assistant' ? (
+                  <div className={styles.messageAssistant}>
+                    <div className={styles.messageAvatar}>
+                      <Bot className={styles.messageAvatarIcon} />
+                    </div>
+                    <div className={styles.messageAssistantContent}>
+                      <div className={styles.messageContent}>
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={MarkdownComponents}
+                        >
+                          {msg.content || ''}
+                        </ReactMarkdown>
+                      </div>
+
+                      {msg.retrieved_docs && msg.retrieved_docs.length > 0 && (
+                        <div className={styles.ragStatus}>
+                          <p className={styles.ragLabel}>Sources utilized:</p>
+                          {msg.retrieved_docs.map((doc, i) => (
+                            <div key={i} className={styles.ragBadge}>
+                              <Shield className="w-3 h-3" />
+                              <span>{doc}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {msg.status === 'streaming' && (
+                        <div className={`${styles.messageStatus} ${styles.streaming}`}>
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          AI is thinking...
+                        </div>
+                      )}
+
+                      {msg.status === 'error' && (
+                        <div className={`${styles.messageStatus} ${styles.error}`}>
+                          <X className="w-3 h-3" />
+                          Connection error
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className={styles.messageUser}>
+                    <div className={styles.messageUserContent}>
+                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </React.Fragment>
           ))}
 
-          {isLoading && (
+          {isLoading && !messages.find(m => m.status === 'streaming') && (
             <div className={styles.messageBubble}>
               <div className={styles.messageAssistant}>
                 <div className={styles.messageAvatar}>
@@ -529,19 +817,6 @@ export default function ChatPage() {
                 >
                   {isLoading ? <Loader2 className="animate-spin" /> : <Send />}
                 </button>
-              </div>
-
-              <div className={styles.inputFooter}>
-                <div className={styles.inputHints}>
-                  <span className={styles.kbd}>Enter</span>
-                  <span>to send</span>
-                  <span className="text-slate-300 mx-1">•</span>
-                  <span className={styles.kbd}>Shift + Enter</span>
-                  <span>for new line</span>
-                </div>
-                <div>
-                  <span>{input.length} chars</span>
-                </div>
               </div>
             </div>
           </div>

@@ -217,19 +217,21 @@ def get_db():
 
 ```bash
 # Database
-DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/engunity
+DATABASE_URL=postgresql://user:password@localhost:5432/engunity
 
 # Supabase (Production)
-SUPABASE_URL=https://amddbmoltlwqsrwwdyvc.supabase.co
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 # JWT
-SECRET_KEY=YC2RymwNNsvEVLtKfBnnSsNag1IrQFjQnHKOsF0V4WAC4pbdFLdQjn8aohGCfWfBqu7ey5EvT9V5X2Anuj/Z5A==
+SECRET_KEY=your_secret_key_here
 ACCESS_TOKEN_EXPIRE_MINUTES=11520
 
 # AI Services
 GROQ_API_KEY=gsk_your_groq_api_key_here
+# OR use multiple keys for rotation (comma-separated)
+GROQ_API_KEYS=key1,key2,key3
 PHI2_LOCAL_PATH=/path/to/phi2/model  # Optional
 
 # Redis

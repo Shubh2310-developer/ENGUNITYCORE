@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Search,
   Globe,
@@ -11,6 +12,7 @@ import {
   ArrowUpRight,
   Sparkles,
   ShieldCheck,
+  Shield,
   Network,
   FileText,
   Layers,
@@ -23,6 +25,7 @@ import {
   MoreVertical,
   Check,
   FileQuestion,
+  AlertCircle,
   Tag,
   GitCompare,
   Eye,
@@ -35,6 +38,7 @@ import {
 import styles from './research.module.css';
 
 export default function ResearchPage() {
+  const router = useRouter();
   const [showShareModal, setShowShareModal] = useState(false);
   const [currentPhase, setCurrentPhase] = useState(1);
   const [citationStyle, setCitationStyle] = useState('APA 7th');
@@ -86,7 +90,7 @@ export default function ResearchPage() {
 
   const aiSuggestions = [
     { id: 1, type: 'Citation', text: 'Consider citing Vaswani et al. (2017) here to support the Transformer claim.', color: '#2563eb' },
-    { id: 2, type: 'Rewrite', text: 'This sentence is complex. Would you like to simplify it for better readability?', color: '#8b5cf6' },
+    { id: 2, type: 'Rewrite', text: 'This sentence is complex. Would you like to simplify it for better readability?', color: '#3b82f6' },
   ];
 
   /* TOOLS MAPPING BY PHASE */
@@ -105,60 +109,69 @@ export default function ResearchPage() {
       bg: '#eff6ff',
       description: 'Side-by-side analysis of algorithms and datasets.',
       content: (
-        <div className="space-y-6">
-          <div className="flex justify-end mb-4">
+        <div className="space-y-6 text-slate-800">
+          <div className="flex items-center justify-between mb-4">
+            <h5 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Competitive Matrix</h5>
             <div className="flex bg-slate-100 rounded-lg p-1">
               <button className="px-3 py-1 text-xs font-bold bg-white shadow-sm rounded-md text-slate-700">Table</button>
               <button className="px-3 py-1 text-xs font-bold text-slate-500">Diff</button>
             </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs uppercase bg-slate-50 text-slate-500">
-                <tr>
-                  <th className="px-4 py-3">Feature</th>
-                  <th className="px-4 py-3 font-bold text-blue-600">Transformer v2</th>
-                  <th className="px-4 py-3">Attention-X</th>
-                  <th className="px-4 py-3">Baseline</th>
+          <div className="overflow-hidden border border-slate-200 rounded-2xl shadow-sm bg-white">
+            <table className="w-full text-sm text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50/50 border-b border-slate-200">
+                  <th className="px-5 py-4 font-bold text-slate-500 uppercase text-[10px] tracking-wider">Parameter</th>
+                  <th className="px-5 py-4 bg-blue-50/50 border-x border-slate-200">
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-blue-700">Transformer v2</span>
+                      <span className="px-1.5 py-0.5 bg-blue-600 text-[8px] text-white rounded-full uppercase font-black">Lead</span>
+                    </div>
+                  </th>
+                  <th className="px-5 py-4 font-bold text-slate-600">Attention-X</th>
+                  <th className="px-5 py-4 font-bold text-slate-600">Baseline</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                <tr>
-                  <td className="px-4 py-3 font-medium">Complexity</td>
-                  <td className="px-4 py-3 text-blue-600">O(n log n)</td>
-                  <td className="px-4 py-3">O(n²)</td>
-                  <td className="px-4 py-3">O(n²)</td>
+                <tr className="hover:bg-slate-50/50 transition-colors">
+                  <td className="px-5 py-4 font-bold text-slate-700 text-xs">Complexity</td>
+                  <td className="px-5 py-4 bg-blue-50/30 border-x border-slate-100 font-black text-blue-600">O(n log n)</td>
+                  <td className="px-5 py-4 text-slate-500 italic">O(n²)</td>
+                  <td className="px-5 py-4 text-slate-500 italic">O(n²)</td>
                 </tr>
-                <tr>
-                  <td className="px-4 py-3 font-medium">Memory Usage</td>
-                  <td className="px-4 py-3 text-blue-600">Adaptive</td>
-                  <td className="px-4 py-3">Fixed 4GB</td>
-                  <td className="px-4 py-3">Variable</td>
+                <tr className="hover:bg-slate-50/50 transition-colors">
+                  <td className="px-5 py-4 font-bold text-slate-700 text-xs">Memory</td>
+                  <td className="px-5 py-4 bg-blue-50/30 border-x border-slate-100 font-black text-blue-600">Adaptive</td>
+                  <td className="px-5 py-4 text-slate-600 font-medium">Fixed 4GB</td>
+                  <td className="px-5 py-4 text-slate-500 italic">Variable</td>
                 </tr>
-                <tr>
-                  <td className="px-4 py-3 font-medium">Accuracy</td>
-                  <td className="px-4 py-3 text-blue-600">94.2%</td>
-                  <td className="px-4 py-3">91.8%</td>
-                  <td className="px-4 py-3">88.5%</td>
+                <tr className="hover:bg-slate-50/50 transition-colors">
+                  <td className="px-5 py-4 font-bold text-slate-700 text-xs">Accuracy</td>
+                  <td className="px-5 py-4 bg-blue-50/30 border-x border-slate-100 font-black text-blue-600">94.2%</td>
+                  <td className="px-5 py-4 text-slate-600 font-medium">91.8%</td>
+                  <td className="px-5 py-4 text-slate-600 font-medium">88.5%</td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <div className={styles.diffView}>
-            <div className={styles.diffColumn}>
-              <h5 className="text-xs font-bold uppercase text-slate-400 mb-2">Contradictions</h5>
-              <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-xs text-red-800">
-                <strong>Vaswani (2017)</strong> claims global attention is required, while <strong>Oord (2018)</strong> enables local approximations.
-              </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-4 bg-red-50/50 border border-red-100 rounded-xl">
+              <h6 className="text-[10px] font-black uppercase text-red-500 mb-2 tracking-widest flex items-center gap-1.5">
+                <AlertCircle className="w-3 h-3" /> Contradiction Found
+              </h6>
+              <p className="text-xs text-red-900 leading-relaxed">
+                <strong>Vaswani (2017)</strong> claims global attention is strictly required, but <strong>Oord (2018)</strong> enables local approximations with comparable BLEU scores.
+              </p>
             </div>
-          </div>
-
-          <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
-            <h5 className="font-bold text-blue-900 text-sm mb-2">Synthesis Insight</h5>
-            <p className="text-sm text-slate-700 leading-relaxed">
-              The Transformer v2 architecture shows a 15% efficiency gain in latent mapping without sacrificing attention depth. Recommend merging its weights with local nodes.
-            </p>
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl shadow-sm shadow-blue-100/50">
+              <h6 className="text-[10px] font-black uppercase text-blue-600 mb-2 tracking-widest flex items-center gap-1.5">
+                <Sparkles className="w-3 h-3" /> Synthesis Insight
+              </h6>
+              <p className="text-xs text-slate-700 leading-relaxed font-medium">
+                The Transformer v2 architecture achieves a 15% efficiency gain in latent mapping without depth sacrifice. Recommend merging weights with local attention nodes.
+              </p>
+            </div>
           </div>
         </div>
       )
@@ -194,8 +207,8 @@ export default function ResearchPage() {
     assumption: {
       title: 'Assumption Extractor',
       icon: <FileQuestion className="w-6 h-6" />,
-      color: '#8b5cf6',
-      bg: '#f3e8ff',
+      color: '#3b82f6',
+      bg: '#eff6ff',
       description: 'Highlight explicit and implicit constraints.',
       content: (
         <div className="space-y-4">
@@ -279,8 +292,8 @@ export default function ResearchPage() {
     argument: {
       title: 'Argument Builder',
       icon: <Scale className="w-6 h-6" />,
-      color: '#6366f1',
-      bg: '#e0e7ff',
+      color: '#2563eb',
+      bg: '#eff6ff',
       description: 'Link claims to evidence and build logic.',
       content: (
         <div className="space-y-4">
@@ -332,8 +345,8 @@ export default function ResearchPage() {
     coherence: {
       title: 'Coherence Flow',
       icon: <GitMerge className="w-6 h-6" />,
-      color: '#8b5cf6',
-      bg: '#ede9fe',
+      color: '#3b82f6',
+      bg: '#dbeafe',
       description: 'Visualize narrative flow and transitions.',
       content: (
         <div className={styles.flowMap}>
@@ -435,6 +448,19 @@ export default function ResearchPage() {
             <Database className={styles.statIcon} />
             <span>4.2GB indexed</span>
           </div>
+
+          <button
+            onClick={() => {
+              const activeNodeLabel = graphNodes.find(n => n.id === activeNode)?.label || 'Research Topic';
+              router.push(`/decisionvault?source=research&title=${encodeURIComponent(`Methodology: ${activeNodeLabel}`)}&problem=${encodeURIComponent('Investigating optimal approach for ' + activeNodeLabel)}`);
+            }}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 transition-all text-xs font-bold"
+            title="Log Methodology Decision"
+          >
+            <Shield className="w-3.5 h-3.5" />
+            <span>Log Decision</span>
+          </button>
+
           <button className={`${styles.statBadge} ${styles.newProjectBtn}`}>
             <Plus className="w-4 h-4" />
             <span>New Project</span>

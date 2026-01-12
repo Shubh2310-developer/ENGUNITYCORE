@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
+import { useUIStore } from '@/stores/uiStore';
 import {
   ArrowRight,
   Code,
@@ -25,10 +26,12 @@ import {
 export default function LandingPage() {
   const router = useRouter();
   const { status } = useAuthStore();
+  const { setEnteringWorkspace } = useUIStore();
 
   const handleStartWorking = (e: React.MouseEvent) => {
     e.preventDefault();
     if (status === 'authenticated') {
+      setEnteringWorkspace(true);
       router.push('/overview');
     } else {
       router.push('/login');

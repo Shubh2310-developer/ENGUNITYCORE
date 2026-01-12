@@ -203,7 +203,7 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
-  background-color: #7c3aed;
+  background-color: #2563eb;
   color: white;
   border: none;
   border-radius: 0.5rem;
@@ -214,7 +214,7 @@
 }
 
 .btnPurple:hover {
-  background-color: #6d28d9;
+  background-color: #1d4ed8;
 }
 
 .btnSuccess {
@@ -543,8 +543,8 @@
 }
 
 .badgePurple {
-  background-color: #f3e8ff;
-  color: #6b21a8;
+  background-color: #dbeafe;
+  color: #1e40af;
 }
 
 .badgeAmber {

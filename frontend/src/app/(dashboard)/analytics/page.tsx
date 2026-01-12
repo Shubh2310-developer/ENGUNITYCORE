@@ -2446,7 +2446,7 @@ FROM dataset`;
                     </div>
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${column.type === 'numeric' ? 'bg-blue-100 text-blue-800' :
                       column.type === 'categorical' ? 'bg-green-100 text-green-800' :
-                        column.type === 'datetime' ? 'bg-purple-100 text-purple-800' :
+                        column.type === 'datetime' ? 'bg-blue-100 text-blue-800' :
                           'bg-gray-100 text-gray-800'
                       }`}>
                       {column.type}
@@ -2856,7 +2856,7 @@ FROM dataset`;
         );
 
       case 'pie':
-        const professionalColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#f97316'];
+        const professionalColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#06b6d4', '#84cc16', '#f97316'];
         return (
           <ResponsiveContainer {...commonProps}>
             <RechartsPie>
@@ -2919,8 +2919,8 @@ FROM dataset`;
               />
               <Scatter
                 dataKey="y"
-                fill="#8b5cf6"
-                stroke="#7c3aed"
+                fill="#3b82f6"
+                stroke="#2563eb"
                 strokeWidth={2}
                 shape="circle"
                 r={4}
@@ -2966,7 +2966,7 @@ FROM dataset`;
         );
 
       case 'donut':
-        const donutColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+        const donutColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#06b6d4'];
         return (
           <ResponsiveContainer {...commonProps}>
             <RechartsPie>
@@ -3620,7 +3620,7 @@ FROM dataset`;
                 }}
                 disabled={!sqlQuery.trim()}
                 title="Show query execution plan"
-                className="flex items-center gap-2 bg-purple-100 hover:bg-purple-200 text-purple-700 px-3 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Eye className="w-4 h-4" />
                 Explain
@@ -3685,7 +3685,7 @@ FROM dataset`;
             </button>
             <button
               onClick={() => setNlqQuery('Show me outliers in the data')}
-              className="px-3 py-1 text-xs bg-purple-100 hover:bg-purple-200 text-purple-800 rounded-full transition-colors"
+              className="px-3 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-full transition-colors"
             >
               🎯 Find outliers
             </button>
@@ -3837,10 +3837,10 @@ FROM dataset`;
             )}
 
             {/* AI Insights and Transparency Panel */}
-            <div className="border-t border-slate-200 bg-gradient-to-r from-blue-50 to-purple-50">
+            <div className="border-t border-slate-200 bg-gradient-to-r from-blue-50 to-blue-50">
               <div className="p-4">
                 <div className="flex items-center gap-2 mb-3">
-                  <Sparkles className="w-5 h-5 text-purple-600" />
+                  <Sparkles className="w-5 h-5 text-blue-600" />
                   <h4 className="font-semibold text-slate-800">AI Assistant Analysis</h4>
                 </div>
 
@@ -3930,10 +3930,10 @@ FROM dataset`;
                     )}
 
                     {/* Follow-up Suggestions and Actions */}
-                    <div className="bg-white rounded-lg p-3 border border-purple-200">
+                    <div className="bg-white rounded-lg p-3 border border-blue-200">
                       <div className="flex items-center gap-2 mb-2">
-                        <Lightbulb className="w-4 h-4 text-purple-600" />
-                        <span className="text-sm font-medium text-purple-800">Suggestions & Actions</span>
+                        <Lightbulb className="w-4 h-4 text-blue-600" />
+                        <span className="text-sm font-medium text-blue-800">Suggestions & Actions</span>
                       </div>
                       <div className="space-y-2">
                         {(() => {
@@ -3952,13 +3952,13 @@ FROM dataset`;
                           return (
                             <>
                               {suggestions.slice(0, 2).map((suggestion, idx) => (
-                                <div key={idx} className="text-xs text-purple-700">
+                                <div key={idx} className="text-xs text-blue-700">
                                   {suggestion}
                                 </div>
                               ))}
 
                               {/* Fallback to SQL Editor */}
-                              <div className="pt-2 border-t border-purple-100">
+                              <div className="pt-2 border-t border-blue-100">
                                 <button
                                   onClick={() => {
                                     if (queryResults.sql) {
@@ -4044,7 +4044,7 @@ FROM dataset`;
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${insight.type === 'correlation' ? 'bg-blue-100 text-blue-600' :
                       insight.type === 'anomaly' ? 'bg-red-100 text-red-600' :
                         insight.type === 'trend' ? 'bg-green-100 text-green-600' :
-                          'bg-purple-100 text-purple-600'
+                          'bg-blue-100 text-blue-600'
                       }`}>
                       {insight.type === 'correlation' ? <LineChart className="w-4 h-4" /> :
                         insight.type === 'anomaly' ? <AlertTriangle className="w-4 h-4" /> :
@@ -4122,7 +4122,7 @@ FROM dataset`;
             </div>
 
             <button
-              className="w-full py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={handleGeneratePredictions}
               disabled={isLoading.prediction || !currentFileId || !predictionTarget}
             >
@@ -4144,8 +4144,8 @@ FROM dataset`;
             <h3 className="text-lg font-semibold text-slate-800 mb-4">Prediction Results</h3>
             <div className="space-y-4">
               {/* Model Performance */}
-              <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4 border border-purple-200">
-                <h4 className="font-semibold text-purple-800 mb-2">Model Performance</h4>
+              <div className="bg-gradient-to-r from-blue-50 to-blue-50 rounded-lg p-4 border border-blue-200">
+                <h4 className="font-semibold text-blue-800 mb-2">Model Performance</h4>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-slate-600">Prediction Type:</span>
@@ -4159,7 +4159,7 @@ FROM dataset`;
                     <span className="text-slate-600">
                       {predictionResults.prediction_type === 'regression' ? 'R² Score:' : 'Accuracy:'}
                     </span>
-                    <span className="ml-2 font-bold text-purple-700">
+                    <span className="ml-2 font-bold text-blue-700">
                       {predictionResults.prediction_type === 'regression'
                         ? `${(predictionResults.model_performance.r2_score * 100).toFixed(1)}%`
                         : `${(predictionResults.model_performance.accuracy * 100).toFixed(1)}%`
@@ -4178,7 +4178,7 @@ FROM dataset`;
                       <span className="text-sm font-medium text-slate-600 w-20">{feature.feature}</span>
                       <div className="flex-1 bg-slate-200 rounded-full h-2">
                         <div
-                          className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                           style={{ width: `${feature.importance * 100}%` }}
                         ></div>
                       </div>
@@ -4901,7 +4901,7 @@ FROM dataset`;
             {/* Modal Header */}
             <div className="flex items-center justify-between p-6 border-b border-slate-200">
               <div className="flex items-center gap-3">
-                <FileText className="w-6 h-6 text-purple-600" />
+                <FileText className="w-6 h-6 text-blue-600" />
                 <h2 className="text-xl font-bold text-slate-900">Saved Analysis Sessions</h2>
               </div>
               <button
@@ -4927,7 +4927,7 @@ FROM dataset`;
                   {savedSessions.map((session) => (
                     <div
                       key={session.id}
-                      className="border border-slate-200 rounded-lg p-4 hover:border-purple-300 transition-colors"
+                      className="border border-slate-200 rounded-lg p-4 hover:border-blue-300 transition-colors"
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -4973,7 +4973,7 @@ FROM dataset`;
                           <button
                             onClick={() => session.id && restoreAnalysisSession(session.id)}
                             disabled={isLoading.analysis || !session.id}
-                            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {isLoading.analysis ? (
                               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>

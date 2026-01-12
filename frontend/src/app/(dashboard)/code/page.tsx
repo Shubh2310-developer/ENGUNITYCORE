@@ -10,7 +10,9 @@ import {
   Sparkles,
   ChevronLeft,
   ChevronRight,
-  Code2
+  Code2,
+  Shield,
+  Zap
 } from 'lucide-react';
 import { FileExplorer } from '@/components/code-lab/FileExplorer';
 import { GlobalSearch } from '@/components/code-lab/GlobalSearch';
@@ -23,9 +25,11 @@ import { AIRefinePanel } from '@/components/code-lab/AIRefinePanel';
 import { NotificationOverlay } from '@/components/code-lab/NotificationOverlay';
 import { CommandPalette } from '@/components/code-lab/CommandPalette';
 import { useCodeStore } from '@/stores/codeStore';
+import { useRouter } from 'next/navigation';
 import styles from './codelab.module.css';
 
 export default function CodeLabPage() {
+  const router = useRouter();
   const {
     isAIRefineOpen,
     setAIRefineOpen,
@@ -150,6 +154,20 @@ export default function CodeLabPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                const activeFile = activeFileId || 'Code Change';
+                router.push(`/decisionvault?source=code&title=${encodeURIComponent(`Refactor: ${activeFile}`)}&problem=${encodeURIComponent(`Architectural decision required for ${activeFile}`)}`);
+              }}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-all text-xs font-bold"
+              title="Log Architecture Decision"
+            >
+              <Shield className="w-3.5 h-3.5" />
+              <span>Log Decision</span>
+            </button>
+
+            <div className="h-4 w-[1px] bg-[#E2E8F0] mx-1" />
+
             <button
               onClick={handleRunProject}
               className={styles['button-primary']}

@@ -166,6 +166,8 @@ DATABASE_URL=postgresql://user:password@localhost:5432/engunity
 
 # AI Services
 GROQ_API_KEY=your_groq_api_key_here
+# Use multiple keys for rotation to avoid rate limits (comma-separated)
+GROQ_API_KEYS=key1,key2,key3
 
 # JWT Secret
 SECRET_KEY=your_secret_key_here

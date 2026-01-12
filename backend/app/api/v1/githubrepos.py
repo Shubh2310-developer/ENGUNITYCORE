@@ -1,228 +1,129 @@
-from typing import Any, List, Dict
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Any, List, Dict, Optional
+from fastapi import APIRouter, Depends, HTTPException, Body
+from sqlalchemy.orm import Session
 from app.api.v1.auth import get_current_user
+from app.core.database import get_db
+from app.core.mongodb import mongodb
 from app.models.user import User
-from pydantic import BaseModel
+from app.models.github import GitHubRepository
+from app.schemas.github import GitHubRepository as GitHubRepositorySchema, GitHubRepositoryCreate, GitHubRepositoryUpdate
 from app.services.code_execution.sandbox import sandbox_simulator
+from app.services.ai.logger import ai_logger
+from datetime import datetime
+import uuid
 
 router = APIRouter()
 
-class RepositorySchema(BaseModel):
-    id: str
-    name: str
-    owner: str
-    description: str
-    language: str
-    langColor: str
-    stars: int
-    forks: int
-    visibility: str
-    lastUpdated: str
-    qualityScore: str
-
-@router.get("/")
+@router.get("/", response_model=List[GitHubRepositorySchema])
 def get_repositories(
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """
-    Retrieve GitHub repositories for the current user.
+    Retrieve GitHub repositories for the current user from Postgres.
     """
-    # For MVP, returning mock data that matches the frontend expected structure
-    # In a full implementation, this would fetch from a database or GitHub API
-    return [
-        {
-            "id": "1",
-            "name": "transformer-optimization",
-            "owner": "research-labs",
-            "description": "Efficient implementation of transformer models with focus on memory-efficient attention mechanisms.",
-            "language": "Python",
-            "langColor": "#3572A5",
-            "stars": 1240,
-            "forks": 320,
-            "visibility": "Public",
-            "lastUpdated": "2 hours ago",
-            "qualityScore": "A+"
-        },
-        {
-            "id": "2",
-            "name": "neural-network-from-scratch",
-            "owner": "jamie-dev",
-            "description": "Educational repository building deep neural networks using only NumPy for better understanding of backprop.",
-            "language": "Python",
-            "langColor": "#3572A5",
-            "stars": 850,
-            "forks": 150,
-            "visibility": "Public",
-            "lastUpdated": "1 day ago",
-            "qualityScore": "B+"
-        },
-        {
-            "id": "3",
-            "name": "fastapi-ml-serving",
-            "owner": "engunity-core",
-            "description": "Production-ready template for serving machine learning models using FastAPI and Docker.",
-            "language": "TypeScript",
-            "langColor": "#3178C6",
-            "stars": 520,
-            "forks": 85,
-            "visibility": "Public",
-            "lastUpdated": "3 days ago",
-            "qualityScore": "A"
-        }
-    ]
+    repos = db.query(GitHubRepository).filter(GitHubRepository.user_id == current_user.id).all()
+    return repos
+
+@router.post("/", response_model=GitHubRepositorySchema)
+def create_repository(
+    *,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    repo_in: GitHubRepositoryCreate,
+) -> Any:
+    """
+    Register a new GitHub repository in the metadata store.
+    """
+    db_obj = GitHubRepository(
+        **repo_in.model_dump(),
+        user_id=current_user.id
+    )
+    db.add(db_obj)
+    db.commit()
+    db.refresh(db_obj)
+    return db_obj
 
 @router.get("/{repo_id}")
-def get_repository_details(
+async def get_repository_details(
     repo_id: str,
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """
     Retrieve detailed information for a specific repository.
+    Metadata from Postgres, AI analysis results from MongoDB.
     """
-    # For MVP, returning detailed mock data for all tabs
+    repo = db.query(GitHubRepository).filter(GitHubRepository.id == repo_id, GitHubRepository.user_id == current_user.id).first()
+    if not repo:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    # Fetch AI analysis from MongoDB
+    analysis_results = {}
+    if mongodb.db is not None:
+        analysis = await mongodb.db.repo_analysis.find_one({"repo_id": repo_id}, sort=[("timestamp", -1)])
+        if analysis:
+            analysis_results = analysis.get("results", {})
+
     return {
-        "id": repo_id,
-        "analysis_status": "completed",
-        "summary": "This repository provides an efficient implementation of transformer models with focus on memory-efficient attention mechanisms.",
-        "quality_score": "A+",
-        "security_score": 98,
-        "research_papers": [
-            {
-                "title": "Attention Is All You Need",
-                "arxiv_id": "1706.03762",
-                "authors": "Vaswani et al.",
-                "year": 2017,
-                "relevance": "Foundational paper for the Transformer architecture.",
-                "mappings": [
-                    {"symbol": "ScaledDotProductAttention", "file": "models/attention.py", "line": 42}
-                ]
-            },
-            {
-                "title": "FlashAttention: Fast and Memory-Efficient Exact Attention",
-                "arxiv_id": "2205.14135",
-                "authors": "Dao et al.",
-                "year": 2022,
-                "relevance": "Optimization technique for attention layers.",
-                "mappings": [
-                    {"symbol": "FlashAttention", "file": "ops/flash_attn.py", "line": 12}
-                ]
-            }
-        ],
-        "code_intelligence": {
-            "entry_points": ["main.py", "train.py"],
-            "key_modules": [
-                {"name": "models/", "description": "Core architecture definitions"},
-                {"name": "data/", "description": "Data loading and preprocessing"},
-                {"name": "ops/", "description": "Optimized CUDA operations"}
-            ],
-            "file_tree": [
-                {"name": "src", "type": "dir", "children": [
-                    {"name": "models", "type": "dir", "children": [
-                        {"name": "attention.py", "type": "file"},
-                        {"name": "transformer.py", "type": "file"}
-                    ]},
-                    {"name": "main.py", "type": "file"}
-                ]},
-                {"name": "requirements.txt", "type": "file"},
-                {"name": "README.md", "type": "file"}
-            ]
-        },
-        "security_audit": {
-            "vulnerabilities": 0,
-            "secrets": "None",
-            "maintenance": "High",
-            "warnings": [
-                {"issue": "Cyclomatic complexity high in `trainer.py:120`", "risk": "Low"},
-                {"issue": "Missing docstring in `utils/helpers.py:45`", "risk": "Low"}
-            ]
-        },
-        "activity_metrics": {
-            "commit_history": [40, 70, 45, 90, 65, 80, 50, 40, 30, 85, 95, 75],
-            "latest_commit": {
-                "message": "Optimize self-attention kernels for H100",
-                "author": "research-lead",
-                "time": "2 hours ago"
-            },
-            "contributors": 12,
-            "engagement_trend": "+15%"
+        "metadata": repo,
+        "analysis": analysis_results or {
+            "status": "pending",
+            "summary": "AI analysis has not been performed yet."
         }
     }
 
 @router.post("/{repo_id}/analyze")
-def trigger_repository_analysis(
+async def trigger_repository_analysis(
     repo_id: str,
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """
     Trigger a fresh AI analysis of a repository.
+    Logs the event and stores (mock) analysis in MongoDB.
     """
+    repo = db.query(GitHubRepository).filter(GitHubRepository.id == repo_id, GitHubRepository.user_id == current_user.id).first()
+    if not repo:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    # 1. Log the analysis trigger
+    await ai_logger.log_event(
+        event_type="repo_analysis_triggered",
+        user_id=current_user.id,
+        details={"repo_id": repo_id, "repo_name": repo.name}
+    )
+
+    # 2. Store a "completed" analysis in MongoDB (Mock for now)
+    if mongodb.db is not None:
+        mock_analysis = {
+            "repo_id": repo_id,
+            "timestamp": datetime.now(),
+            "results": {
+                "status": "completed",
+                "summary": f"AI analysis of {repo.name} completed. High quality code with good documentation.",
+                "quality_score": "A",
+                "security_score": 95,
+                "vulnerabilities": 0
+            }
+        }
+        await mongodb.db.repo_analysis.insert_one(mock_analysis)
+
     return {"status": "queued", "message": "Analysis started successfully."}
 
 @router.post("/{repo_id}/execute")
 async def execute_repository_code(
     repo_id: str,
     use_gpu: bool = False,
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """
     Simulate execution of repository code in a sandbox.
     """
-    # In a real app, we'd lookup the repo name by ID
-    repo_names = {
-        "1": "transformer-optimization",
-        "2": "neural-network-from-scratch",
-        "3": "fastapi-ml-serving"
-    }
-    repo_name = repo_names.get(repo_id, "unknown-repository")
+    repo = db.query(GitHubRepository).filter(GitHubRepository.id == repo_id, GitHubRepository.user_id == current_user.id).first()
+    if not repo:
+        raise HTTPException(status_code=404, detail="Repository not found")
 
-    logs = await sandbox_simulator.run_example(repo_name, use_gpu=use_gpu)
+    logs = await sandbox_simulator.run_example(repo.name, use_gpu=use_gpu)
     return {"status": "completed", "logs": logs}
-
-class BulkAnalysisSchema(BaseModel):
-    repo_ids: List[str]
-
-@router.post("/bulk/analyze")
-async def bulk_trigger_analysis(
-    data: BulkAnalysisSchema,
-    current_user: User = Depends(get_current_user),
-) -> Any:
-    """
-    Trigger AI analysis for multiple repositories.
-    """
-    return {
-        "status": "queued",
-        "message": f"Intelligence analysis triggered for {len(data.repo_ids)} repositories.",
-        "repo_ids": data.repo_ids
-    }
-
-@router.post("/{repo_id}/ai-tool")
-async def run_ai_tool(
-    repo_id: str,
-    tool_type: str,
-    current_user: User = Depends(get_current_user),
-) -> Any:
-    """
-    Simulate AI-powered code analysis tools.
-    """
-    # Simulated responses based on tool type
-    responses = {
-        "explain": {
-            "title": "Module Explanation",
-            "content": "This module implements a multi-head attention mechanism as described in 'Attention Is All You Need'. It uses scaled dot-product attention and supports masked attention for causal modeling. The implementation is optimized for memory efficiency by using custom kernels for the attention scoring."
-        },
-        "trace": {
-            "title": "Data Flow Trace",
-            "content": "Input Tensor [B, L, D] -> Linear Projection (Q, K, V) -> Scaled Dot-Product -> Softmax -> Weighted Sum -> Output Projection -> LayerNorm."
-        },
-        "bottleneck": {
-            "title": "Performance Audit",
-            "content": "Found potential bottleneck in `attention.py:112`. The softmax operation on high-dimensional tensors may cause significant memory pressure. Recommendation: Consider using FlashAttention or a fused kernel for this operation."
-        },
-        "dead_code": {
-            "title": "Dead Code Detection",
-            "content": "No significant dead code found. Two unused imports detected in `utils/helpers.py`: `math`, `os`."
-        }
-    }
-
-    result = responses.get(tool_type, {"title": "Analysis Result", "content": "Analysis completed successfully."})
-    return {"status": "completed", "result": result}

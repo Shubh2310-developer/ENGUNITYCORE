@@ -997,7 +997,7 @@
 
 /* Activity & Insights */
 .activityTab .card {
-  border-left: 4px solid #8b5cf6;
+  border-left: 4px solid #3b82f6;
 }
 
 .chartContainer {
@@ -1060,15 +1060,15 @@
 }
 
 .insightCard:hover {
-  border-color: #8b5cf6;
+  border-color: #3b82f6;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
 }
 
 .insightIcon {
   width: 2.5rem;
   height: 2.5rem;
-  background-color: #f5f3ff;
-  color: #8b5cf6;
+  background-color: #eff6ff;
+  color: #3b82f6;
   border-radius: 0.75rem;
   display: flex;
   align-items: center;

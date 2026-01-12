@@ -167,7 +167,7 @@ const JobPrepHub = () => {
         return (
           <div className="space-y-8">
             {/* Hero Section */}
-            <div className={`rounded-2xl p-8 text-white relative overflow-hidden shadow-lg transition-colors duration-500 ${placementMode ? 'bg-slate-900' : 'bg-gradient-to-br from-blue-600 to-indigo-700'}`}>
+            <div className={`rounded-2xl p-8 text-white relative overflow-hidden shadow-lg transition-colors duration-500 ${placementMode ? 'bg-slate-900' : 'bg-gradient-to-br from-blue-600 to-blue-700'}`}>
               <div className="relative z-10 max-w-2xl">
                 <div className="flex items-center gap-2 mb-4">
                   {placementMode && <ShieldAlert className="text-red-400 animate-pulse" size={20} />}
@@ -206,8 +206,8 @@ const JobPrepHub = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className={styles.card}>
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-purple-50 rounded-lg">
-                    <Compass className="w-6 h-6 text-purple-600" />
+                  <div className="p-2 bg-blue-50 rounded-lg">
+                    <Compass className="w-6 h-6 text-blue-600" />
                   </div>
                   <h3 className="font-bold text-lg">Role Intelligence</h3>
                 </div>
@@ -497,7 +497,7 @@ const JobPrepHub = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {[
                 { title: "Concept Stress Tests", icon: Zap, color: "blue", desc: "Deep conceptual challenges focusing on 'Why' over 'How'." },
-                { title: "Technical Problems", icon: Code2, color: "purple", desc: "Multi-step problems that mirror real-world ambiguity." },
+                { title: "Technical Problems", icon: Code2, color: "blue", desc: "Multi-step problems that mirror real-world ambiguity." },
                 { title: "Explain-Why Drills", icon: MessageSquare, color: "green", desc: "Train your ability to articulate complex trade-offs clearly." }
               ].map((mode) => (
                 <div key={mode.title} className={`${styles.card} hover:border-blue-200 transition-all cursor-pointer group`}>

@@ -491,9 +491,9 @@ if __name__ == "__main__":
                         <div className="text-xs text-blue-600 font-bold uppercase">Security</div>
                         <div className="text-2xl font-bold text-blue-700">98/100</div>
                       </div>
-                      <div className="p-3 bg-purple-50 rounded-lg border border-purple-100">
-                        <div className="text-xs text-purple-600 font-bold uppercase">Research</div>
-                        <div className="text-2xl font-bold text-purple-700">12 Papers</div>
+                      <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
+                        <div className="text-xs text-blue-600 font-bold uppercase">Research</div>
+                        <div className="text-2xl font-bold text-blue-700">12 Papers</div>
                       </div>
                       <div className="p-3 bg-amber-50 rounded-lg border border-amber-100">
                         <div className="text-xs text-amber-600 font-bold uppercase">Complexity</div>

@@ -7,11 +7,14 @@ class ChatMessageBase(BaseModel):
     content: str
 
 class ChatMessageCreate(ChatMessageBase):
+    role: Optional[str] = "user"
     session_id: Optional[str] = None
 
 class ChatMessage(ChatMessageBase):
     id: str
     timestamp: datetime
+    status: Optional[str] = "done"  # sending, streaming, done, error
+    retrieved_docs: Optional[List[str]] = []
 
     class Config:
         from_attributes = True
@@ -26,6 +29,7 @@ class ChatSession(ChatSessionBase):
     id: str
     created_at: datetime
     updated_at: datetime
+    message_count: Optional[int] = 0
     messages: List[ChatMessage] = []
 
     class Config:
