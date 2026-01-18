@@ -45,7 +45,6 @@ async def get_analytics_dashboard(
         })
 
     return {
-        "user_email": current_user.email,
         "postgres_stats": {
             "documents": doc_count,
             "decisions": decision_count,
@@ -53,5 +52,5 @@ async def get_analytics_dashboard(
             "code_projects": code_count
         },
         "mongodb_stats": ai_stats,
-        "summary": f"Dashboard for {current_user.email} with {doc_count} docs and {ai_stats['total_completions']} AI interactions."
+        "summary": f"Dashboard with {doc_count} docs and {ai_stats['total_completions']} AI interactions."
     }

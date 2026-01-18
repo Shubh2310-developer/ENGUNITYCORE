@@ -51,7 +51,7 @@ export const useCodeStore = create<CodeState>((set) => ({
   files: [
     { id: '1', name: 'ai-core', type: 'folder', isOpen: true },
     { id: '2', name: 'embeddings', type: 'folder', parentId: '1', isOpen: true },
-    { id: '3', name: 'generator.py', type: 'file', parentId: '2', language: 'python', content: 'from typing import List, Union\nimport numpy as np\n\nclass EmbeddingGenerator:\n    """Generates embeddings for text chunks."""\n    def __init__(self, model_name: str = "all-MiniLM-L6-v2"):\n        self.model_name = model_name\n        self.model = None\n\n    def generate(self, text: Union[str, List[str]]) -> np.ndarray:\n        self._load_model()\n        # TODO: Implement parallel encoding', isDirty: false },
+    { id: '3', name: 'generator.py', type: 'file', parentId: '2', language: 'python', content: 'from typing import List, Union\nimport numpy as np\n\nclass EmbeddingGenerator:\n    """Generates embeddings for text chunks."""\n    def __init__(self, model_name: str = "BAAI/bge-large-en-v1.5"):\n        self.model_name = model_name\n        self.model = None\n\n    def generate(self, text: Union[str, List[str]]) -> np.ndarray:\n        self._load_model()\n        # TODO: Implement parallel encoding', isDirty: false },
     { id: '4', name: 'rag', type: 'folder', parentId: '1' },
     { id: '5', name: 'api', type: 'folder' },
     { id: '6', name: 'frontend', type: 'folder' },

@@ -119,6 +119,12 @@ class GroqClient:
                 else:
                     messages_with_system = messages
 
+                # Sanitize messages for Groq API (only keep role and content)
+                sanitized_messages = [
+                    {k: v for k, v in msg.items() if k in ["role", "content", "name"]}
+                    for msg in messages_with_system
+                ]
+
                 # Use provided overrides or defaults
                 temp = temperature if temperature is not None else self.temperature
                 max_tok = max_tokens if max_tokens is not None else self.max_tokens
@@ -127,7 +133,7 @@ class GroqClient:
                 # Call Groq API
                 response = await client.chat.completions.create(
                     model=target_model,
-                    messages=messages_with_system,
+                    messages=sanitized_messages,
                     max_tokens=max_tok,
                     temperature=temp,
                     stream=False
@@ -180,13 +186,19 @@ class GroqClient:
             else:
                 messages_with_system = messages
 
+            # Sanitize messages for Groq API (only keep role and content)
+            sanitized_messages = [
+                {k: v for k, v in msg.items() if k in ["role", "content", "name"]}
+                for msg in messages_with_system
+            ]
+
             temp = temperature if temperature is not None else self.temperature
             max_tok = max_tokens if max_tokens is not None else self.max_tokens
 
             # Stream response
             stream = await client.chat.completions.create(
                 model=self.model,
-                messages=messages_with_system,
+                messages=sanitized_messages,
                 max_tokens=max_tok,
                 temperature=temp,
                 stream=True

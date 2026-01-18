@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     # AI Services
     GROQ_API_KEY: Optional[str] = None
     GROQ_API_KEYS: Optional[str] = None # Comma-separated list for rotation
+    GEMINI_API_KEY: Optional[str] = None
+    OPENROUTER_API_KEY: Optional[str] = None
     PHI2_LOCAL_PATH: Optional[str] = None
 
     # Redis
@@ -28,6 +30,6 @@ class Settings(BaseSettings):
     MONGODB_URL: Optional[str] = None
     MONGODB_DB_NAME: str = "engunity"
 
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra='ignore')
 
 settings = Settings()

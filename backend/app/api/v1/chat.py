@@ -9,7 +9,7 @@ from app.models.user import User
 from app.models.chat import ChatSession
 from app.schemas.chat import ChatMessageCreate, ChatMessage, ChatSession as ChatSessionSchema, ChatSessionCreate
 from app.services.ai.router import ai_router
-from app.services.chat.context import build_context
+from app.services.storage.supabase import storage_service
 from datetime import datetime
 import uuid
 import json
@@ -87,13 +87,71 @@ async def get_chat_session(
     if mongodb.db is not None:
         cursor = mongodb.db.chat_messages.find({"session_id": session_id}).sort("timestamp", 1)
         async for msg in cursor:
+            # Refresh signed URLs for images if they exist
+            image_urls = msg.get("image_urls", [])
+            images_data = []
+
+            image_ids = msg.get("image_ids", [])
+            if image_ids:
+                from app.models.image import Image
+                refreshed_urls = []
+                for img_id in image_ids:
+                    db_img = db.query(Image).filter(Image.id == img_id).first()
+                    if db_img:
+                        # Refresh signed URL for original
+                        original_url = await storage_service.get_file_url("images", db_img.storage_path)
+                        refreshed_urls.append(original_url)
+
+                        # Prepare full image data with variants
+                        variants_data = []
+                        for variant in db_img.variants:
+                            variant_url = await storage_service.get_file_url("images", variant.storage_path)
+                            variants_data.append({
+                                "variant_type": variant.variant_type,
+                                "public_url": variant_url,
+                                "width": variant.width,
+                                "height": variant.height,
+                                "file_size": variant.file_size,
+                                "format": variant.format
+                            })
+
+                        images_data.append({
+                            "id": str(db_img.id),
+                            "filename": db_img.filename,
+                            "mime_type": db_img.mime_type,
+                            "width": db_img.width,
+                            "height": db_img.height,
+                            "file_size": db_img.file_size,
+                            "public_url": original_url,
+                            "variants": variants_data,
+                            "scene_description": db_img.scene_description,
+                            "detected_text": db_img.detected_text,
+                            "processing_status": db_img.processing_status,
+                            "created_at": db_img.created_at
+                        })
+
+                if refreshed_urls:
+                    image_urls = refreshed_urls
+
             # Prepare for response schema
             msg_data = {
                 "id": str(msg.get("_id") or msg.get("id")),
                 "role": msg["role"],
                 "content": msg["content"],
+                "image_urls": image_urls,
+                "images": images_data,
                 "timestamp": msg.get("timestamp") or datetime.now(),
-                "retrieved_docs": msg.get("retrieved_docs", [])
+                "retrieved_docs": msg.get("retrieved_docs", []),
+                # Load all enhanced metadata fields
+                "complexity": msg.get("complexity"),
+                "strategy": msg.get("strategy"),
+                "used_web_search": msg.get("used_web_search", False),
+                "hyde_doc": msg.get("hyde_doc"),
+                "confidence": msg.get("confidence"),
+                "critique": msg.get("critique"),
+                "multi_queries": msg.get("multi_queries", []),
+                "memory_active": msg.get("memory_active", False),
+                "memory_summary": msg.get("memory_summary")
             }
             messages.append(msg_data)
 
@@ -167,6 +225,8 @@ async def send_message(
         "user_id": current_user.id,
         "role": "user",
         "content": message_in.content,
+        "image_urls": message_in.image_urls,
+        "image_ids": message_in.image_ids,
         "timestamp": datetime.now()
     }
 
@@ -174,7 +234,7 @@ async def send_message(
         await mongodb.db.chat_messages.insert_one(user_msg_data)
 
     # 3. Build context for AI
-    context, retrieved_docs = await build_context(
+    context, retrieved_docs, context_meta = await build_context(
         session_id=session_id,
         user_id=current_user.id,
         query=message_in.content
@@ -185,7 +245,10 @@ async def send_message(
         assistant_reply = await ai_router.route_request(
             context,
             user_id=current_user.id,
-            session_id=session_id
+            session_id=session_id,
+            image_urls=message_in.image_urls,
+            image_ids=message_in.image_ids,
+            db=db
         )
     except Exception as e:
         assistant_reply = f"I apologize, but I encountered an error: {str(e)}"
@@ -197,7 +260,8 @@ async def send_message(
         "role": "assistant",
         "content": assistant_reply,
         "timestamp": datetime.now(),
-        "retrieved_docs": retrieved_docs
+        "retrieved_docs": retrieved_docs,
+        **context_meta # Persist hierarchical memory metadata
     }
 
     if mongodb.db is not None:
@@ -251,6 +315,8 @@ async def stream_message(
         "user_id": current_user.id,
         "role": "user",
         "content": message_in.content,
+        "image_urls": message_in.image_urls,
+        "image_ids": message_in.image_ids,
         "timestamp": datetime.now(),
         "status": "done"
     }
@@ -259,7 +325,7 @@ async def stream_message(
         await mongodb.db.chat_messages.insert_one(user_msg_data)
 
     # 3. Build context for AI
-    context, retrieved_docs = await build_context(
+    context, retrieved_docs, context_meta = await build_context(
         session_id=session_id,
         user_id=current_user.id,
         query=message_in.content
@@ -269,13 +335,16 @@ async def stream_message(
     async def event_generator():
         full_content = ""
         try:
-            # Yield initial metadata including retrieved docs for RAG visualization
-            yield f"data: {json.dumps({'type': 'metadata', 'session_id': session_id, 'retrieved_docs': retrieved_docs})}\n\n"
+            # Yield initial metadata including retrieved docs and memory status
+            yield f"data: {json.dumps({'type': 'metadata', 'session_id': session_id, 'retrieved_docs': retrieved_docs, **context_meta})}\n\n"
 
             async for chunk in ai_router.stream_request(
                 context,
                 user_id=current_user.id,
-                session_id=session_id
+                session_id=session_id,
+                image_urls=message_in.image_urls,
+                image_ids=message_in.image_ids,
+                db=db
             ):
                 full_content += chunk
                 yield f"data: {json.dumps({'type': 'content', 'content': chunk})}\n\n"
@@ -288,7 +357,8 @@ async def stream_message(
                 "content": full_content,
                 "timestamp": datetime.now(),
                 "status": "done",
-                "retrieved_docs": retrieved_docs
+                "retrieved_docs": retrieved_docs,
+                **context_meta # Persist hierarchical memory metadata
             }
 
             if mongodb.db is not None:
@@ -306,6 +376,7 @@ async def stream_message(
                     session.title = generated_title
                 except Exception:
                     session.title = message_in.content[:50]
+                    generated_title = session.title
 
             session.updated_at = datetime.now()
             db.commit()

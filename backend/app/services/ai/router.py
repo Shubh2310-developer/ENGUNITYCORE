@@ -9,8 +9,26 @@ class AIRouter:
         messages: List[Dict[str, str]],
         user_id: Optional[int] = None,
         session_id: Optional[str] = None,
-        preference: str = "performance"
+        preference: str = "performance",
+        image_urls: Optional[List[str]] = None,
+        image_ids: Optional[List[str]] = None,
+        db = None
     ) -> str:
+        # 0. Visual Perception
+        visual_context = ""
+        if image_urls or image_ids:
+            from app.services.ai.image_processor import image_processor
+            visual_context = await image_processor.get_visual_context(
+                image_urls=image_urls,
+                image_ids=image_ids,
+                db=db
+            )
+
+        if visual_context:
+            # Prepend visual context to the last user message
+            if messages and messages[-1]["role"] == "user":
+                messages[-1]["content"] = f"{visual_context}\n\nUser Question: {messages[-1]['content']}"
+
         # 1. Check Redis cache first
         cached_response = await ai_cache.get(messages)
         if cached_response:
@@ -48,12 +66,31 @@ class AIRouter:
         self,
         messages: List[Dict[str, str]],
         user_id: Optional[int] = None,
-        session_id: Optional[str] = None
+        session_id: Optional[str] = None,
+        image_urls: Optional[List[str]] = None,
+        image_ids: Optional[List[str]] = None,
+        db = None
     ):
         """
         Route request for streaming completion.
         Returns an async generator that yields content chunks.
         """
+        # 0. Visual Perception
+        visual_context = ""
+        if image_urls or image_ids:
+            from app.services.ai.image_processor import image_processor
+            yield "🔍 *Analyzing images...*\n\n"
+            visual_context = await image_processor.get_visual_context(
+                image_urls=image_urls,
+                image_ids=image_ids,
+                db=db
+            )
+
+        if visual_context:
+            # Prepend visual context to the last user message
+            if messages and messages[-1]["role"] == "user":
+                messages[-1]["content"] = f"{visual_context}\n\nUser Question: {messages[-1]['content']}"
+
         full_content = ""
 
         async for chunk in groq_client.get_streaming_completion(messages):

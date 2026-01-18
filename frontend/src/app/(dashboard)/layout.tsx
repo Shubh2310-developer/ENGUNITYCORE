@@ -147,7 +147,7 @@ export default function DashboardLayout({
           </Link>
 
           <div className={`glass-panel p-2 rounded-2xl border-white/5 flex items-center gap-3 transition-all duration-300 ${isCollapsed ? 'bg-transparent border-0 justify-center' : 'p-4'}`}>
-            <div className="w-10 h-10 rounded-full bg-gradient-cyber p-[1px] flex-shrink-0 cursor-pointer" title={user?.email}>
+            <div className="w-10 h-10 rounded-full bg-gradient-cyber p-[1px] flex-shrink-0 cursor-pointer">
               <div className="w-full h-full rounded-full bg-void-900 flex items-center justify-center overflow-hidden">
                 <User className="w-5 h-5 text-starlight-400" />
               </div>

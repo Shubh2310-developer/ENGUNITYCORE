@@ -20,7 +20,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setAuth(user, token);
         } catch (error) {
           console.error('Auth initialization failed:', error);
-          clearAuth();
+          // Only clear auth if it's an authentication error, not a connection error
+          if (error instanceof TypeError && error.message === 'Failed to fetch') {
+            console.warn('Backend connection failed. Please ensure the backend server is running on the correct port.');
+            // Don't clear auth on connection errors - let user retry
+            setStatus('unauthenticated');
+          } else {
+            // Clear auth for actual authentication failures
+            clearAuth();
+          }
         }
       } else if (status === 'idle' && !token) {
         setStatus('unauthenticated');

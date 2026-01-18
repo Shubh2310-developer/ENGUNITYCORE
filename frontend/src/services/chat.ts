@@ -1,4 +1,5 @@
 import { useAuthStore } from '@/stores/authStore';
+import { ImageResponse } from './image';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -8,7 +9,21 @@ export interface Message {
   content: string;
   timestamp: string;
   status?: 'sending' | 'streaming' | 'done' | 'error';
+  image_urls?: string[];
+  image_ids?: string[];
+  images?: ImageResponse[];
   retrieved_docs?: string[];
+  complexity?: string;
+  strategy?: string;
+  used_web_search?: boolean;
+  hyde_doc?: string;
+  confidence?: number;
+  critique?: string;
+  multi_queries?: string[];
+  memory_active?: boolean;
+  memory_summary?: string;
+  context_compressed?: boolean;
+  latency?: number;
 }
 
 export interface ChatSession {
@@ -20,7 +35,7 @@ export interface ChatSession {
 }
 
 export const chatService = {
-  async sendMessage(content: string, sessionId?: string) {
+  async sendMessage(content: string, sessionId?: string, imageUrls?: string[], imageIds?: string[]) {
     const token = useAuthStore.getState().token;
 
     try {
@@ -30,7 +45,12 @@ export const chatService = {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ content, session_id: sessionId }),
+        body: JSON.stringify({
+          content,
+          session_id: sessionId,
+          image_urls: imageUrls,
+          image_ids: imageIds
+        }),
       });
 
       if (response.ok) {
@@ -111,6 +131,8 @@ export const chatService = {
   async streamMessage(
     content: string,
     sessionId?: string,
+    imageUrls?: string[],
+    imageIds?: string[],
     onChunk?: (chunk: string) => void,
     onMetadata?: (metadata: { session_id: string, retrieved_docs?: string[] }) => void,
     onDone?: (messageId: string, title?: string) => void,
@@ -125,7 +147,12 @@ export const chatService = {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ content, session_id: sessionId }),
+        body: JSON.stringify({
+          content,
+          session_id: sessionId,
+          image_urls: imageUrls,
+          image_ids: imageIds
+        }),
       });
 
       if (!response.ok) {

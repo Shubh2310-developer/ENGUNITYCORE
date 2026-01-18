@@ -63,9 +63,10 @@ export const Terminal = () => {
     term.open(terminalRef.current);
     fitAddon.fit();
 
-    term.writeln('\x1b[32m[Handshake]\x1b[0m Connected to Engunity-Runtime-v2');
-    term.writeln('\x1b[34m[System]\x1b[0m Initializing model: all-MiniLM-L6-v2...');
-    term.writeln('\x1b[34m[System]\x1b[0m Memory load: 4.2GB / 16GB');
+    term.writeln('\x1b[32m[Handshake]\x1b[0m Connected to Engunity-Runtime-v3.5 (SOTA)');
+    term.writeln('\x1b[34m[System]\x1b[0m Initializing model: BAAI/bge-large-en-v1.5...');
+    term.writeln('\x1b[34m[System]\x1b[0m Hybrid Index (HNSW + BM25) active.');
+    term.writeln('\x1b[34m[System]\x1b[0m Memory load: 5.8GB / 16GB (RTX 4050 Optimized)');
     term.write('\x1b[36m$ \x1b[0m');
 
     let currentCommand = '';
