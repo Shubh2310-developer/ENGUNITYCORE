@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Image from 'next/image';
 import {
   Send,
@@ -93,7 +93,7 @@ export default function ChatPage() {
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [communities, setCommunities] = useState<any[]>([]);
   const [isRefreshingGraph, setIsRefreshingGraph] = useState(false);
-  const [selectedStrategy, setSelectedStrategy] = useState<'adaptive' | 'vector_rag' | 'graph_rag'>('adaptive');
+  const [selectedStrategy, setSelectedStrategy] = useState<'adaptive' | 'vector_rag' | 'graph_rag' | 'recursive_intensive'>('adaptive');
   const [now, setNow] = useState(new Date());
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [stagedImages, setStagedImages] = useState<ImageResponse[]>([]);
@@ -299,7 +299,8 @@ export default function ChatPage() {
                     memory_summary: event.memory_summary || msg.memory_summary,
                     context_compressed: event.context_compressed !== undefined ? event.context_compressed : msg.context_compressed,
                     confidence: event.confidence !== undefined ? event.confidence : msg.confidence,
-                    critique: event.critique || msg.critique
+                    critique: event.critique || msg.critique,
+                    steps: event.steps || msg.steps
                   }
                 : msg
             ));
@@ -365,13 +366,13 @@ export default function ChatPage() {
     }
   };
 
-  const copyMessage = (content: string, id: string) => {
+  const copyMessage = useCallback((content: string, id: string) => {
     navigator.clipboard.writeText(content);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
-  };
+  }, []);
 
-  const regenerateLastMessage = () => {
+  const regenerateLastMessage = useCallback(() => {
     const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
     if (lastUserMsg && lastUserMsg.content) {
       // Remove last assistant message if it failed or was being generated
@@ -384,7 +385,7 @@ export default function ChatPage() {
       });
       handleSend(lastUserMsg.content);
     }
-  };
+  }, [messages]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -430,9 +431,9 @@ export default function ChatPage() {
     }
   };
 
-  const removeStagedImage = (id: string) => {
+  const removeStagedImage = useCallback((id: string) => {
     setStagedImages(prev => prev.filter(img => img.id !== id));
-  };
+  }, []);
 
   const clearCanvas = async () => {
     setIsLoading(true);
@@ -531,8 +532,11 @@ export default function ChatPage() {
     return date.toLocaleDateString();
   };
 
-  const filteredSessions = chatSessions.filter(session =>
-    session.title.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredSessions = useMemo(
+    () => chatSessions.filter(session =>
+      session.title.toLowerCase().includes(searchQuery.toLowerCase())
+    ),
+    [chatSessions, searchQuery]
   );
 
   const shouldShowDivider = (idx: number) => {
@@ -580,6 +584,26 @@ export default function ChatPage() {
       <blockquote className="border-l-4 border-blue-500 pl-4 my-4 italic text-slate-600">
         {children}
       </blockquote>
+    ),
+    table: ({ children }: any) => (
+      <table className="min-w-full divide-y divide-slate-200 my-4 border border-slate-200 rounded-lg overflow-hidden">
+        {children}
+      </table>
+    ),
+    thead: ({ children }: any) => (
+      <thead className="bg-slate-50">{children}</thead>
+    ),
+    tbody: ({ children }: any) => (
+      <tbody className="bg-white divide-y divide-slate-200">{children}</tbody>
+    ),
+    tr: ({ children }: any) => <tr>{children}</tr>,
+    th: ({ children }: any) => (
+      <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider border-r border-slate-200 last:border-r-0">
+        {children}
+      </th>
+    ),
+    td: ({ children }: any) => (
+      <td className="px-4 py-2 text-sm text-slate-700 border-r border-slate-200 last:border-r-0">{children}</td>
     ),
     code: ({ node, inline, className, children, ...props }: any) => {
       const match = /language-(\w+)/.exec(className || '');
@@ -985,6 +1009,27 @@ export default function ChatPage() {
                         </div>
                       )}
 
+                      {msg.steps && msg.steps.length > 0 && (
+                        <div className="mb-4 space-y-3">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Recursive Reasoning Process</p>
+                          {msg.steps.map((step: any, sIdx: number) => (
+                            <details key={sIdx} className="bg-slate-100/50 border border-slate-200 rounded-lg overflow-hidden text-[11px]">
+                              <summary className="px-3 py-2 cursor-pointer hover:bg-slate-200/50 font-semibold text-slate-700 flex items-center gap-2">
+                                <span className="w-4 h-4 rounded-full bg-blue-500 text-white flex items-center justify-center text-[8px]">{sIdx + 1}</span>
+                                Step {sIdx + 1}: {step.thought.slice(0, 60)}...
+                              </summary>
+                              <div className="px-3 py-3 border-t border-slate-200 space-y-2">
+                                <div className="text-slate-600 italic">&quot;{step.thought}&quot;</div>
+                                <div className="bg-slate-900 text-green-400 p-2 rounded font-mono text-[10px] overflow-x-auto">
+                                  <div className="text-slate-500 mb-1"># REPL Output:</div>
+                                  {step.output}
+                                </div>
+                              </div>
+                            </details>
+                          ))}
+                        </div>
+                      )}
+
                       {msg.hyde_doc && (
                         <details className="mb-3 bg-slate-50 border border-slate-100 rounded-lg overflow-hidden text-[11px]">
                           <summary className="px-2 py-1.5 cursor-pointer hover:bg-slate-100 font-semibold text-slate-600 flex items-center gap-2">
@@ -1211,6 +1256,7 @@ export default function ChatPage() {
                     <option value="adaptive">Adaptive</option>
                     <option value="vector_rag">Vector RAG</option>
                     <option value="graph_rag">Graph RAG</option>
+                    <option value="recursive_intensive">Recursive (Long Context)</option>
                   </select>
                 </div>
 
