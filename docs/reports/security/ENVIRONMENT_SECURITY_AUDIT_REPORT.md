@@ -101,7 +101,7 @@ echo ".env.backup.*" >> .gitignore
 
 **Exposed Credentials in Script:**
 ```python
-GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxhzUl
+GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 GEMINI_API_KEY=AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 OPENROUTER_API_KEY=sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 MONGODB_URL=mongodb+srv://YOUR_DB_USER:YOUR_PASSWORD@your-cluster.mongodb.net/
