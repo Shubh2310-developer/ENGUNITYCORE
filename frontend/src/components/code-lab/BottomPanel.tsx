@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Terminal as TerminalIcon, Info, AlertCircle, ListTodo, ChevronUp, ChevronDown, X } from 'lucide-react';
+import { Terminal as TerminalIcon, Info, AlertCircle, ListTodo, ChevronUp, ChevronDown, X, Bug } from 'lucide-react';
 import { Terminal } from './Terminal';
+import { DebugConsole } from './DebugConsole';
 import { useCodeStore } from '@/stores/codeStore';
 
 export const BottomPanel = () => {
@@ -25,6 +26,7 @@ export const BottomPanel = () => {
 
   const tabs = [
     { id: 'terminal', label: 'Terminal', icon: TerminalIcon },
+    { id: 'debug_console', label: 'Debug Console', icon: Bug },
     { id: 'console', label: 'Console', icon: Info },
     { id: 'errors', label: 'Errors', icon: AlertCircle },
     { id: 'tasks', label: 'Tasks', icon: ListTodo },
@@ -60,53 +62,52 @@ export const BottomPanel = () => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden">
-        {activeBottomTab === 'terminal' && <Terminal />}
-        {activeBottomTab === 'console' && (
-          <div className="p-4 font-mono text-xs space-y-1">
-            <div className="flex gap-2 text-starlight-400/40">
-              <span>[14:20:01]</span>
-              <span className="text-blue-400">INFO</span>
-              <span>DevServer started on http://localhost:3000</span>
-            </div>
-            <div className="flex gap-2 text-starlight-400/40">
-              <span>[14:20:05]</span>
-              <span className="text-primary">DONE</span>
-              <span>Compiled successfully in 1240ms</span>
-            </div>
-            <div className="pt-2 animate-pulse text-primary/40">_</div>
+      <div className="flex-1 overflow-hidden relative">
+        <div className={`h-full w-full absolute inset-0 ${activeBottomTab === 'terminal' ? 'opacity-100 z-10' : 'opacity-0 pointer-events-none z-0'}`}>
+          <Terminal />
+        </div>
+        <div className={`h-full w-full absolute inset-0 ${activeBottomTab === 'debug_console' ? 'opacity-100 z-10' : 'opacity-0 pointer-events-none z-0'}`}>
+          <DebugConsole />
+        </div>
+        <div className={`h-full w-full absolute inset-0 p-4 font-mono text-xs space-y-1 ${activeBottomTab === 'console' ? 'opacity-100 z-10' : 'opacity-0 pointer-events-none z-0'}`}>
+          <div className="flex gap-2 text-starlight-400/40">
+            <span>[14:20:01]</span>
+            <span className="text-blue-400">INFO</span>
+            <span>DevServer started on http://localhost:3000</span>
           </div>
-        )}
-        {activeBottomTab === 'errors' && (
-          <div className="p-4 font-mono text-xs text-starlight-400/60 flex flex-col gap-3">
-            <div className="flex items-center gap-2 text-green-500 bg-green-500/5 border border-green-500/10 p-2 rounded-lg w-fit">
-              <span className="text-lg">✓</span> No problems detected in the workspace.
-            </div>
-            <div className="text-[10px] text-starlight-400/20 uppercase tracking-widest pl-1">
-              Last scan: 2 minutes ago
-            </div>
+          <div className="flex gap-2 text-starlight-400/40">
+            <span>[14:20:05]</span>
+            <span className="text-primary">DONE</span>
+            <span>Compiled successfully in 1240ms</span>
           </div>
-        )}
-        {activeBottomTab === 'tasks' && (
-          <div className="p-4 font-mono text-xs text-starlight-400/60 space-y-4">
-            <div className="space-y-2">
-              <div className="flex items-center gap-3 group">
-                <div className="w-4 h-4 rounded border border-white/10 flex items-center justify-center group-hover:border-primary/50 transition-colors">
-                  <div className="w-2 h-2 rounded-sm bg-primary/20" />
-                </div>
-                <span className="text-starlight-100">Implement parallel encoding in generator.py</span>
-                <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-starlight-400/40">TODO</span>
+          <div className="pt-2 animate-pulse text-primary/40">_</div>
+        </div>
+        <div className={`h-full w-full absolute inset-0 p-4 font-mono text-xs text-starlight-400/60 flex flex-col gap-3 ${activeBottomTab === 'errors' ? 'opacity-100 z-10' : 'opacity-0 pointer-events-none z-0'}`}>
+          <div className="flex items-center gap-2 text-green-500 bg-green-500/5 border border-green-500/10 p-2 rounded-lg w-fit">
+            <span className="text-lg">✓</span> No problems detected in the workspace.
+          </div>
+          <div className="text-[10px] text-starlight-400/20 uppercase tracking-widest pl-1">
+            Last scan: 2 minutes ago
+          </div>
+        </div>
+        <div className={`h-full w-full absolute inset-0 p-4 font-mono text-xs text-starlight-400/60 space-y-4 ${activeBottomTab === 'tasks' ? 'opacity-100 z-10' : 'opacity-0 pointer-events-none z-0'}`}>
+          <div className="space-y-2">
+            <div className="flex items-center gap-3 group">
+              <div className="w-4 h-4 rounded border border-white/10 flex items-center justify-center group-hover:border-primary/50 transition-colors">
+                <div className="w-2 h-2 rounded-sm bg-primary/20" />
               </div>
-              <div className="flex items-center gap-3 opacity-40">
-                <div className="w-4 h-4 rounded border border-primary bg-primary flex items-center justify-center">
-                  <span className="text-[10px] text-void-950 font-bold">✓</span>
-                </div>
-                <span className="text-starlight-100 line-through">Initialize model weights</span>
-                <span className="text-[10px] bg-primary/10 px-1.5 py-0.5 rounded text-primary">DONE</span>
+              <span className="text-starlight-100">Implement parallel encoding in generator.py</span>
+              <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-starlight-400/40">TODO</span>
+            </div>
+            <div className="flex items-center gap-3 opacity-40">
+              <div className="w-4 h-4 rounded border border-primary bg-primary flex items-center justify-center">
+                <span className="text-[10px] text-void-950 font-bold">✓</span>
               </div>
+              <span className="text-starlight-100 line-through">Initialize model weights</span>
+              <span className="text-[10px] bg-primary/10 px-1.5 py-0.5 rounded text-primary">DONE</span>
             </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

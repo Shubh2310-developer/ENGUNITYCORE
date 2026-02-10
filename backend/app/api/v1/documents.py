@@ -9,7 +9,7 @@ from app.models.user import User
 from app.models.document import Document, DocumentLink
 from app.schemas.document import Document as DocumentSchema, DocumentCreate, DocumentUpdate, ThinkingTrace as ThinkingTraceSchema, ThinkingTraceCreate, DocumentLink as DocumentLinkSchema, DocumentLinkCreate
 from app.services.storage.supabase import storage_service
-from app.services.ai.vector_store import vector_store
+from app.services.ai.dependencies import get_vector_store
 from app.services.ai.document_processor import document_processor
 from app.core.mongodb import mongodb
 from datetime import datetime
@@ -170,7 +170,8 @@ async def delete_document(
 
     # Delete from FAISS vector store
     try:
-        vector_store.delete_document(document_id)
+        vs = get_vector_store()
+        vs.delete_document(document_id)
     except Exception as e:
         print(f"FAISS deletion error: {e}")
 

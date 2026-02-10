@@ -1,0 +1,40 @@
+# Use a Python base image
+FROM python:3.10-slim
+
+# Install system dependencies and multiple language runtimes
+RUN apt-get update && apt-get install -y \
+    curl \
+    build-essential \
+    gcc \
+    g++ \
+    make \
+    nodejs \
+    npm \
+    golang-go \
+    default-jdk \
+    ruby \
+    php-cli \
+    git \
+    libmagic1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy minimal requirements for Code Studio and install
+COPY backend/requirements.code.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt --timeout=300
+
+# Copy the necessary source code for the backend
+COPY backend/app ./app
+
+# Environment Variables
+ENV PYTHONPATH=/app
+ENV PORT=8001
+ENV ENABLE_AI=True
+
+# Expose the custom port
+EXPOSE 8001
+
+# Run the backend focusing on the code router
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]

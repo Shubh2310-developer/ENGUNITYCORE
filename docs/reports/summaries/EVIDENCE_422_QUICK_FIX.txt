@@ -1,0 +1,45 @@
+================================================================================
+           JOBPREP EVIDENCE 422 ERROR - FIXED
+================================================================================
+
+ISSUE: POST /api/v1/jobprep/skills/{skill_id}/evidence
+       Returns: 422 (Unprocessable Entity)
+
+ROOT CAUSE:
+  Schema expected 'skill_id' in request body, but frontend only sends:
+  {
+    "evidence_type": "project",
+    "title": "...",
+    "description": "..."
+  }
+
+SOLUTION:
+  Removed 'skill_id' from JobPrepSkillEvidenceCreate schema.
+  The skill_id comes from URL path parameter instead.
+
+FILES CHANGED:
+  ✅ backend/app/schemas/jobprep.py
+     - Removed skill_id field from JobPrepSkillEvidenceCreate
+     - Added validation: min/max lengths
+     - Added XSS protection: HTML tag stripping
+     - Added URL format validation
+  
+  ✅ backend/app/services/jobprep/jobprep_service.py
+     - Added security: verify skill belongs to user profile
+     - Prevents cross-user evidence injection
+
+TESTING:
+  ✓ Schema imports successfully
+  ✓ Validation working correctly
+  ✓ Service security enhanced
+
+STATUS: ✅ FIXED - Ready to test in browser
+
+NEXT STEP:
+  Restart backend server and test in frontend:
+  1. Go to JobPrep page
+  2. Add a skill
+  3. Add evidence to that skill
+  4. Should now work without 422 error
+
+================================================================================

@@ -7,7 +7,7 @@ from datetime import datetime
 from PIL import Image
 from fastapi import UploadFile
 from app.services.storage.supabase import storage_service
-from app.services.ai.vector_store import vector_store
+# vector_store imported lazily when needed
 from app.core.config import settings
 from typing import List, Dict, Any, Optional
 from ultralytics import YOLO
@@ -221,8 +221,10 @@ class ImageProcessorService:
                     indexing_text += f"Extracted text: {detected_text}"
 
                 if indexing_text.strip():
+                    from app.services.ai.dependencies import get_vector_store
+                    vs = get_vector_store()
                     public_url = await storage_service.get_file_url(bucket, image_record.storage_path)
-                    vector_store.add_texts(
+                    vs.add_texts(
                         texts=[indexing_text],
                         metadatas=[{
                             "type": "image",

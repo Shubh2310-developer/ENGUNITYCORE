@@ -33,7 +33,12 @@ export interface ImageResponse {
 
 class ImageService {
   private get baseUrl() {
-    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+    let url = API_URL;
+    if (!url.includes('/api/v1')) {
+      url = url.endsWith('/') ? `${url}api/v1` : `${url}/api/v1`;
+    }
+    return url;
   }
 
   private get headers() {

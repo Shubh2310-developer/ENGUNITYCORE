@@ -1,5 +1,6 @@
 from typing import Optional, List, Dict
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, AliasGenerator
+from pydantic.alias_generators import to_camel
 from datetime import datetime
 
 class GitHubRepositoryBase(BaseModel):
@@ -14,6 +15,12 @@ class GitHubRepositoryBase(BaseModel):
     last_updated: Optional[str] = None
     quality_score: Optional[str] = None
     repository_url: Optional[str] = None
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+        from_attributes=True
+    )
 
 class GitHubRepositoryCreate(GitHubRepositoryBase):
     pass
@@ -31,10 +38,31 @@ class GitHubRepositoryUpdate(BaseModel):
     quality_score: Optional[str] = None
     repository_url: Optional[str] = None
 
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True
+    )
+
+class GitHubRepositoryImport(BaseModel):
+    owner: str
+    repo_name: str
+    github_token: Optional[str] = None
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True
+    )
+
+class GitHubBulkAnalyze(BaseModel):
+    repo_ids: List[str]
+
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True
+    )
+
 class GitHubRepository(GitHubRepositoryBase):
     id: str
     user_id: int
     created_at: datetime
     updated_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)

@@ -4,7 +4,6 @@ import io
 from typing import List, Dict, Any
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_experimental.text_splitter import SemanticChunker
-from app.services.ai.vector_store import vector_store
 from app.services.ai.ocr_client import ocr_client
 
 class SentenceTransformerWrapper:
@@ -24,13 +23,9 @@ class DocumentProcessor:
             length_function=len,
             is_separator_regex=False,
         )
-
-        # Advanced Semantic Chunker (State-of-the-art)
-        # It uses the same embedding model as vector_store for consistency
-        self.semantic_splitter = SemanticChunker(
-            SentenceTransformerWrapper(vector_store.model),
-            breakpoint_threshold_type="percentile"
-        )
+        
+        # Semantic splitter will be initialized lazily when needed
+        self._semantic_splitter = None
 
     def extract_text(self, file_content: bytes, file_name: str) -> str:
         text = ""
@@ -70,6 +65,18 @@ class DocumentProcessor:
                 text = ""
         return text
 
+    @property
+    def semantic_splitter(self):
+        """Lazy load semantic splitter only when needed"""
+        if self._semantic_splitter is None:
+            from app.services.ai.dependencies import get_vector_store
+            vs = get_vector_store()
+            self._semantic_splitter = SemanticChunker(
+                SentenceTransformerWrapper(vs.model),
+                breakpoint_threshold_type="percentile"
+            )
+        return self._semantic_splitter
+
     async def process_and_index(self, file_content: bytes, file_name: str, metadata: Dict[str, Any], use_semantic: bool = True):
         text = self.extract_text(file_content, file_name)
         if not text.strip():
@@ -92,7 +99,9 @@ class DocumentProcessor:
             chunk_meta["text"] = chunk # Store text in metadata for retrieval
             chunk_metadatas.append(chunk_meta)
 
-        vector_store.add_texts(chunks, chunk_metadatas)
+        from app.services.ai.dependencies import get_vector_store
+        vs = get_vector_store()
+        vs.add_texts(chunks, chunk_metadatas)
         return len(chunks)
 
 document_processor = DocumentProcessor()

@@ -10,7 +10,7 @@ from app.models.user import User
 from app.models.chat import ChatSession
 from app.services.rag.pipeline import OmniRAGPipeline
 from app.services.ai.router import ai_router
-from app.services.ai.vector_store import vector_store
+from app.services.ai.dependencies import get_vector_store
 from app.services.ai.groq_client import groq_client
 from app.services.ai.document_processor import document_processor
 from datetime import datetime
@@ -21,11 +21,18 @@ from loguru import logger
 
 router = APIRouter()
 
-# Initialize the pipeline
-omni_rag_pipeline = OmniRAGPipeline(
-    vector_store=vector_store,
-    llm_client=groq_client
-)
+# Pipeline instance - will be initialized lazily on first use
+_omni_rag_pipeline = None
+
+def get_omni_rag_pipeline():
+    """Lazy initialize the OmniRAG pipeline"""
+    global _omni_rag_pipeline
+    if _omni_rag_pipeline is None:
+        _omni_rag_pipeline = OmniRAGPipeline(
+            vector_store=get_vector_store(),
+            llm_client=groq_client
+        )
+    return _omni_rag_pipeline
 
 class OmniRAGRequest(BaseModel):
     query: str
@@ -93,7 +100,8 @@ async def process_omni_rag_query(
 
     try:
         # 4. Process through Omni-RAG
-        result = await omni_rag_pipeline.process_query(
+        pipeline = get_omni_rag_pipeline()
+        result = await pipeline.process_query(
             query=request.query,
             user_id=str(current_user.id),
             session_id=session_id,
@@ -208,10 +216,11 @@ async def build_graph_for_document(document_id: str, text: str, user_id: str):
     """
     try:
         # Step 1: Extract entities and relationships
-        entities, relationships = await omni_rag_pipeline.entity_extractor.extract_from_text(text, document_id)
+        pipeline = get_omni_rag_pipeline()
+        entities, relationships = await pipeline.entity_extractor.extract_from_text(text, document_id)
 
         for entity in entities:
-            omni_rag_pipeline.knowledge_graph.add_entity(
+            pipeline.knowledge_graph.add_entity(
                 entity_id=entity['id'],
                 name=entity['name'],
                 type=entity['type'],
@@ -220,7 +229,7 @@ async def build_graph_for_document(document_id: str, text: str, user_id: str):
             )
 
         for rel in relationships:
-            omni_rag_pipeline.knowledge_graph.add_relationship(
+            pipeline.knowledge_graph.add_relationship(
                 source=rel['source'],
                 target=rel['target'],
                 relation=rel['relation'],
@@ -228,13 +237,13 @@ async def build_graph_for_document(document_id: str, text: str, user_id: str):
             )
 
         # Step 2: Detect communities if graph has grown
-        omni_rag_pipeline.knowledge_graph.detect_communities()
+        pipeline.knowledge_graph.detect_communities()
 
         # Step 3: Generate summaries for new or updated communities
-        await omni_rag_pipeline.knowledge_graph.generate_community_summaries()
+        await pipeline.knowledge_graph.generate_community_summaries()
 
         # Step 4: Persist changes
-        omni_rag_pipeline.knowledge_graph.save()
+        pipeline.knowledge_graph.save()
         logger.info(f"Updated knowledge graph and communities for document {document_id}")
     except Exception as e:
         logger.error(f"Error building graph for document {document_id}: {e}")
@@ -248,8 +257,9 @@ async def get_omni_rag_stats(
     """
     try:
         # Filter metadata for user's documents
+        vs = get_vector_store()
         user_docs_meta = [
-            m for m in vector_store.metadata
+            m for m in vs.metadata
             if str(m.get('user_id')) == str(current_user.id)
         ]
 
@@ -278,16 +288,17 @@ async def get_graph_communities(
         user_communities = []
 
         # This is a bit inefficient but works for the current schema
-        for comm_id, summary in omni_rag_pipeline.knowledge_graph.community_summaries.items():
+        pipeline = get_omni_rag_pipeline()
+        for comm_id, summary in pipeline.knowledge_graph.community_summaries.items():
             # Handle both string and int keys for communities
             lookup_id = int(comm_id) if comm_id.isdigit() else comm_id
-            nodes = omni_rag_pipeline.knowledge_graph.communities.get(str(comm_id),
-                    omni_rag_pipeline.knowledge_graph.communities.get(lookup_id, []))
+            nodes = pipeline.knowledge_graph.communities.get(str(comm_id),
+                    pipeline.knowledge_graph.communities.get(lookup_id, []))
 
             # Check if any node in community belongs to user
             is_user_community = False
             for node in nodes:
-                entity = omni_rag_pipeline.knowledge_graph.entities.get(node)
+                entity = pipeline.knowledge_graph.entities.get(node)
                 if entity and entity.get('metadata', {}).get('user_id') == user_id_str:
                     is_user_community = True
                     break
@@ -323,9 +334,10 @@ async def rebuild_user_graph_task():
     Background task to detect communities and generate summaries
     """
     try:
-        omni_rag_pipeline.knowledge_graph.detect_communities()
-        await omni_rag_pipeline.knowledge_graph.generate_community_summaries()
-        omni_rag_pipeline.knowledge_graph.save()
+        pipeline = get_omni_rag_pipeline()
+        pipeline.knowledge_graph.detect_communities()
+        await pipeline.knowledge_graph.generate_community_summaries()
+        pipeline.knowledge_graph.save()
         logger.info("Knowledge graph rebuild completed")
     except Exception as e:
         logger.error(f"Error in graph rebuild task: {e}")
@@ -385,7 +397,8 @@ async def stream_omni_rag_query(
             # Yield session ID and memory status for frontend
             yield f"data: {json.dumps({'type': 'metadata', 'session_id': session_id, **context_meta})}\n\n"
 
-            async for event in omni_rag_pipeline.stream_query(
+            pipeline = get_omni_rag_pipeline()
+            async for event in pipeline.stream_query(
                 query=request.query,
                 user_id=str(current_user.id),
                 session_id=session_id,

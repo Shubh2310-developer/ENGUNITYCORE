@@ -11,7 +11,8 @@ import {
   FolderOpen,
   FileText,
   Trash2,
-  Plus
+  Plus,
+  Pencil
 } from 'lucide-react';
 import { useCodeStore, FileItem } from '@/stores/codeStore';
 
@@ -54,7 +55,9 @@ const FileBadge = ({ name }: { name: string }) => {
 };
 
 export const FileExplorer = () => {
-  const { files, toggleFolder, openFile, activeFileId, deleteFile, addFile, setNotification } = useCodeStore();
+  const { files, toggleFolder, openFile, activeFileId, deleteFile, addFile, renameFile, setNotification } = useCodeStore();
+  const [editingFileId, setEditingFileId] = React.useState<string | null>(null);
+  const [editName, setEditName] = React.useState('');
 
   const handleDelete = (e: React.MouseEvent, file: FileItem) => {
     e.stopPropagation();
@@ -62,6 +65,26 @@ export const FileExplorer = () => {
       deleteFile(file.id);
       setNotification({ message: `Deleted ${file.name}`, type: 'info' });
     }
+  };
+
+  const handleRenameStart = (e: React.MouseEvent, file: FileItem) => {
+    e.stopPropagation();
+    setEditingFileId(file.id);
+    setEditName(file.name);
+  };
+
+  const handleRenameSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingFileId && editName.trim()) {
+      renameFile(editingFileId, editName.trim());
+      setEditingFileId(null);
+      setEditName('');
+    }
+  };
+
+  const handleRenameCancel = () => {
+      setEditingFileId(null);
+      setEditName('');
   };
 
   const handleAdd = (e: React.MouseEvent, parentId?: string) => {
@@ -110,11 +133,34 @@ export const FileExplorer = () => {
                 <div className="w-4" />
               )}
               <FileIcon name={file.name} type={file.type} isOpen={file.isOpen} />
-              <span className={`text-xs font-mono truncate ${file.type === 'folder' ? 'text-[#334155] font-medium' : 'text-[#0F172A]'
-                } ${activeFileId === file.id ? 'font-semibold' : ''}`}>
-                {file.name}
-              </span>
-              {file.type === 'file' && <FileBadge name={file.name} />}
+
+              {editingFileId === file.id ? (
+                <form
+                    onSubmit={handleRenameSubmit}
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex-1"
+                >
+                    <input
+                        autoFocus
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        onBlur={handleRenameCancel}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Escape') handleRenameCancel();
+                        }}
+                        className="w-full text-xs px-1 py-0.5 border border-blue-500 rounded bg-white text-black focus:outline-none"
+                    />
+                </form>
+              ) : (
+                <>
+                    <span className={`text-xs font-mono truncate ${file.type === 'folder' ? 'text-[#334155] font-medium' : 'text-[#0F172A]'
+                        } ${activeFileId === file.id ? 'font-semibold' : ''}`}>
+                        {file.name}
+                    </span>
+                    {file.type === 'file' && <FileBadge name={file.name} />}
+                </>
+              )}
 
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
                 {file.type === 'folder' && (
@@ -126,6 +172,13 @@ export const FileExplorer = () => {
                     <Plus className="w-3 h-3" />
                   </button>
                 )}
+                <button
+                    onClick={(e) => handleRenameStart(e, file)}
+                    className="p-0.5 hover:bg-[#E0E7FF] rounded text-[#64748B] hover:text-[#2563EB]"
+                    title="Rename"
+                >
+                    <Pencil className="w-3 h-3" />
+                </button>
                 <button
                   onClick={(e) => handleDelete(e, file)}
                   className="p-0.5 hover:bg-[#FEE2E2] rounded text-[#64748B] hover:text-[#DC2626]"

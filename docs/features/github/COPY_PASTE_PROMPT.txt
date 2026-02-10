@@ -1,0 +1,290 @@
+================================================================================
+  GITHUB REPOS FEATURE - COMPLETE IMPLEMENTATION PROMPT
+  Copy and paste this entire prompt into your AI coding assistant
+================================================================================
+
+I need you to implement the missing features for the GitHub Repository Intelligence feature in my Engunity application. I have comprehensive documentation that contains all the implementation details.
+
+CONTEXT
+=======
+
+Application Structure:
+- Backend: FastAPI (Python) at /home/agentrogue/Engunity/backend/
+- Frontend: Next.js (TypeScript/React) at /home/agentrogue/Engunity/frontend/
+- Databases: PostgreSQL (metadata), MongoDB (AI analysis), Redis (cache)
+- Storage: Supabase (optional file storage)
+
+CURRENT STATUS
+==============
+
+Working (80% complete):
+✅ User authentication with JWT
+✅ Repository CRUD (Create, Read) - GET and POST endpoints
+✅ Repository listing with search/filter/sort in frontend
+✅ Repository details view with 6-tab UI
+✅ Mock AI analysis storage in MongoDB
+✅ Simulated sandbox execution
+✅ Full frontend UI (931 lines in page.tsx)
+
+Missing (20% - NEED TO IMPLEMENT):
+❌ GitHub API integration for importing repos
+❌ AI tool endpoint (/ai-tool)
+❌ Bulk analysis endpoint (/bulk/analyze)
+❌ Update repository endpoint (PUT)
+❌ Delete repository endpoint (DELETE)
+❌ Real AI analysis (currently mocked)
+
+DOCUMENTATION LOCATION
+======================
+
+ALL implementation code and details are in:
+/home/agentrogue/Engunity/docs/Githubrepos/
+
+Key files:
+1. /home/agentrogue/Engunity/docs/Githubrepos/GITHUB_REPOS_COMPLETE_GUIDE.md (2,075 lines - ALL CODE IS HERE)
+2. /home/agentrogue/Engunity/docs/Githubrepos/QUICK_REFERENCE.md
+3. /home/agentrogue/Engunity/docs/Githubrepos/IMPLEMENTATION_CHECKLIST.md
+
+PLEASE READ: /home/agentrogue/Engunity/docs/Githubrepos/GITHUB_REPOS_COMPLETE_GUIDE.md
+Section: "Missing Features & Implementation Guide" - This has ALL the implementation code!
+
+PHASE 1: ESSENTIAL FEATURES TO IMPLEMENT
+=========================================
+
+1. GITHUB API INTEGRATION
+   Location: Create /home/agentrogue/Engunity/backend/app/services/github/client.py
+   Reference: Complete Guide, Section "Adding Real GitHub Integration" -> "Step 2: Create GitHub Service"
+   
+   Tasks:
+   - Install PyGithub: pip install PyGithub
+   - Create __init__.py in backend/app/services/github/
+   - Create client.py with GitHubClient class
+   - Implement methods: get_repository_info, get_file_tree, get_file_content, get_recent_commits
+   - Support authentication with GITHUB_TOKEN
+   
+   Test:
+   from app.services.github.client import github_client
+   info = github_client.get_repository_info("fastapi", "fastapi")
+   print(info)
+
+2. IMPORT REPOSITORY ENDPOINT
+   Location: /home/agentrogue/Engunity/backend/app/api/v1/githubrepos.py
+   Reference: Complete Guide, Section "Missing Features" -> "POST /api/v1/githubrepos/import"
+   
+   Tasks:
+   - Add POST /api/v1/githubrepos/import endpoint
+   - Accept owner, repo_name, optional github_token
+   - Fetch repo info from GitHub API
+   - Check for duplicates
+   - Store in PostgreSQL and MongoDB
+   - Return created repository
+   
+   Test:
+   curl -X POST http://localhost:8000/api/v1/githubrepos/import \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"owner": "fastapi", "repo_name": "fastapi"}' | jq
+
+3. AI TOOL ENDPOINT
+   Location: /home/agentrogue/Engunity/backend/app/api/v1/githubrepos.py
+   Reference: Complete Guide, Section "Missing Features" -> "POST /api/v1/githubrepos/{repo_id}/ai-tool"
+   
+   Tasks:
+   - Add POST /api/v1/githubrepos/{repo_id}/ai-tool endpoint
+   - Accept tool_type query parameter: explain, trace, bottleneck, dead_code
+   - Return analysis result with title and content
+   - Log to MongoDB ai_logs collection
+   
+   Test:
+   curl -X POST "http://localhost:8000/api/v1/githubrepos/$REPO_ID/ai-tool?tool_type=explain" \
+     -H "Authorization: Bearer $TOKEN" | jq
+
+4. BULK ANALYSIS ENDPOINT
+   Location: /home/agentrogue/Engunity/backend/app/api/v1/githubrepos.py
+   Reference: Complete Guide, Section "Missing Features" -> "POST /api/v1/githubrepos/bulk/analyze"
+   
+   Tasks:
+   - Add POST /api/v1/githubrepos/bulk/analyze endpoint
+   - Accept array of repo_ids
+   - Loop through and trigger analysis for each
+   - Return status for each repo
+   
+   Test:
+   curl -X POST http://localhost:8000/api/v1/githubrepos/bulk/analyze \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"repo_ids": ["id1", "id2"]}' | jq
+
+5. UPDATE AND DELETE ENDPOINTS
+   Location: /home/agentrogue/Engunity/backend/app/api/v1/githubrepos.py
+   Reference: Complete Guide, Section "Missing Features" -> "PUT" and "DELETE"
+   
+   Tasks:
+   - Add PUT /api/v1/githubrepos/{repo_id} endpoint
+   - Add DELETE /api/v1/githubrepos/{repo_id} endpoint
+   - Clean up MongoDB data on delete
+   
+   Test:
+   curl -X PUT "http://localhost:8000/api/v1/githubrepos/$REPO_ID" \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"description": "Updated"}' | jq
+   
+   curl -X DELETE "http://localhost:8000/api/v1/githubrepos/$REPO_ID" \
+     -H "Authorization: Bearer $TOKEN" | jq
+
+PHASE 2: ENHANCED FEATURES (IF TIME PERMITS)
+=============================================
+
+6. REAL AI ANALYSIS WITH GROQ
+   Location: Create /home/agentrogue/Engunity/backend/app/services/github/analyzer.py
+   Reference: Complete Guide, Section "Real AI Analysis Implementation"
+   
+   Tasks:
+   - Create GitHubAnalyzer class
+   - Implement analyze_repository() method using Groq API
+   - Perform real code analysis, security audit, quality scoring
+   - Update the /analyze endpoint to use real analyzer
+   
+   Test:
+   curl -X POST "http://localhost:8000/api/v1/githubrepos/$REPO_ID/analyze" \
+     -H "Authorization: Bearer $TOKEN" | jq
+
+ENVIRONMENT VARIABLES REQUIRED
+===============================
+
+Ensure these are in /home/agentrogue/Engunity/backend/.env:
+
+DATABASE_URL=postgresql://user:pass@localhost:5432/engunity
+MONGODB_URL=mongodb://localhost:27017
+REDIS_URL=redis://localhost:6379/0
+GROQ_API_KEY=your_groq_key
+GITHUB_TOKEN=ghp_your_github_token
+SECRET_KEY=your_secret_key
+
+Get GitHub token from: https://github.com/settings/tokens
+Required scopes: repo, read:user
+
+IMPLEMENTATION INSTRUCTIONS
+============================
+
+1. READ the Complete Guide first:
+   /home/agentrogue/Engunity/docs/Githubrepos/GITHUB_REPOS_COMPLETE_GUIDE.md
+   
+2. ALL implementation code is provided in Section "Missing Features & Implementation Guide"
+   - Copy the code EXACTLY as shown
+   - Do NOT write from scratch - use the provided implementations
+   
+3. Follow this order:
+   Step 1: GitHub API Integration (foundation)
+   Step 2: Import Endpoint (uses GitHub API)
+   Step 3: AI Tool Endpoint (independent)
+   Step 4: Bulk Analysis (uses analyze endpoint)
+   Step 5: Update/Delete (CRUD completion)
+   Step 6: Real AI Analysis (enhancement - optional)
+
+4. After each implementation:
+   - Test the endpoint using the provided curl commands
+   - Verify data is stored correctly in PostgreSQL and MongoDB
+   - Check backend logs for errors
+   - Test from frontend UI if applicable
+
+5. Maintain existing patterns:
+   - Use existing authentication (JWT via get_current_user)
+   - Follow existing code style in githubrepos.py
+   - Use existing database connections (get_db, mongodb)
+   - Follow existing schema definitions
+
+EXISTING CODE REFERENCE
+========================
+
+Main API file: /home/agentrogue/Engunity/backend/app/api/v1/githubrepos.py (129 lines)
+Current endpoints:
+- GET / (line 16-25)
+- POST / (line 27-44)
+- GET /{repo_id} (line 46-73)
+- POST /{repo_id}/analyze (line 75-111)
+- POST /{repo_id}/execute (line 113-128)
+
+Database model: /home/agentrogue/Engunity/backend/app/models/github.py
+Schemas: /home/agentrogue/Engunity/backend/app/schemas/github.py
+Frontend: /home/agentrogue/Engunity/frontend/src/app/(dashboard)/githubrepos/page.tsx (931 lines)
+Frontend service: /home/agentrogue/Engunity/frontend/src/services/githubrepos.ts
+
+SUCCESS CRITERIA
+================
+
+Implementation is successful when:
+✅ Can import real GitHub repositories using GitHub API
+✅ All 4 AI tools work (explain, trace, bottleneck, dead_code)
+✅ Bulk analysis processes multiple repos
+✅ Update and delete endpoints work correctly
+✅ All curl tests pass
+✅ Frontend UI works with new endpoints
+✅ No breaking changes to existing functionality
+✅ Data is stored correctly in PostgreSQL and MongoDB
+
+TESTING CHECKLIST
+=================
+
+After implementation, verify:
+[ ] PyGithub is installed and in requirements.txt
+[ ] GITHUB_TOKEN is set in .env
+[ ] Can create GitHubClient instance
+[ ] Import endpoint returns repository data
+[ ] Imported repo appears in database
+[ ] AI tool endpoint responds for all 4 tool types
+[ ] Bulk analysis endpoint accepts array of IDs
+[ ] Update endpoint modifies repository
+[ ] Delete endpoint removes from both databases
+[ ] Frontend can call all new endpoints
+[ ] No errors in backend logs
+
+IMPORTANT NOTES
+===============
+
+✨ ALL IMPLEMENTATION CODE IS PROVIDED IN THE DOCUMENTATION
+   - Do NOT write from scratch
+   - Copy from Section "Missing Features & Implementation Guide"
+   - The code is production-ready and tested
+
+✨ THE FRONTEND ALREADY EXPECTS THESE ENDPOINTS
+   - Frontend service already has functions defined
+   - Just need backend to implement the endpoints
+   - No frontend changes needed (unless bugs found)
+
+✨ USE EXISTING PATTERNS
+   - Look at existing endpoints for reference
+   - Use same authentication pattern
+   - Use same error handling
+   - Follow same code style
+
+✨ TEST AS YOU GO
+   - Test each endpoint after implementing
+   - Use the provided curl commands
+   - Check database after each operation
+   - Verify frontend works after backend changes
+
+GETTING HELP
+=============
+
+If stuck:
+1. Check Troubleshooting section in Complete Guide
+2. Check Common Issues in Quick Reference
+3. Look at existing endpoint implementations
+4. Review the provided implementation code again
+5. Check backend logs for detailed errors
+
+START HERE
+==========
+
+1. Open and read: /home/agentrogue/Engunity/docs/Githubrepos/GITHUB_REPOS_COMPLETE_GUIDE.md
+2. Go to Section: "Missing Features & Implementation Guide"
+3. Start with: GitHub API Integration (Step 2: Create GitHub Service)
+4. Copy the provided code
+5. Test after each implementation
+6. Move to next feature
+
+READY? Let's implement Phase 1 features (steps 1-5) first. Start with GitHub API Integration.
+
+================================================================================

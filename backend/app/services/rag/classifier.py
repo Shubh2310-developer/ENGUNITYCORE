@@ -2,6 +2,7 @@ from typing import List, Dict, Optional
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
 from loguru import logger
+from app.services.ai.model_optimizer import optimize_torch_for_cpu
 
 class QueryComplexityClassifier:
     """
@@ -13,14 +14,28 @@ class QueryComplexityClassifier:
 
     def __init__(self, model_name="distilbert-base-uncased"):
         try:
+            # Optimize PyTorch before loading
+            optimize_torch_for_cpu()
+            
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+            
+            # Load model without meta tensors - initialize on CPU directly
             self.model = AutoModelForSequenceClassification.from_pretrained(
                 model_name,
-                num_labels=3
+                num_labels=3,
+                # Ensure model loads directly on CPU, not meta device
+                low_cpu_mem_usage=False,  # Disable low memory mode that uses meta tensors
+                torch_dtype=torch.float32  # Use standard float32 on CPU
             )
+            
+            # Set to eval mode and ensure on CPU
             self.model.eval()
+            self.model = self.model.to('cpu')
+            
+            logger.info("✅ Query classifier loaded successfully")
         except Exception as e:
             logger.error(f"Error loading complexity classifier: {e}")
+            logger.warning("⚠️  Query classifier will use rule-based fallback only")
             self.tokenizer = None
             self.model = None
 

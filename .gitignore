@@ -462,3 +462,15 @@ dump.rdb
 # Keep example configurations
 !config.example.*
 !settings.example.*
+.planning/
+.gemini
+.opencode.json
+.mcp.json
+# ==========================================
+# Environment Backups (Added 2026-02-10)
+# ==========================================
+*.env.backup
+*.env.backup.*
+.env.backup*
+*/.env.backup*
+*.bak.env

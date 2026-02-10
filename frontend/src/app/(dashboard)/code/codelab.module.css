@@ -146,8 +146,7 @@
   background-color: #0F172A;
   color: #E5E7EB;
   border-top: 1px solid #E2E8F0;
-  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
-  font-size: 0.8125rem;
+  /* Font and size are managed by XTerm instance to prevent FitAddon misalignment */
 }
 
 .terminal-log {

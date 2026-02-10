@@ -3,6 +3,7 @@ import numpy as np
 from sentence_transformers import CrossEncoder, SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 from loguru import logger
+from app.services.ai.model_optimizer import optimize_torch_for_cpu, get_model_device
 
 class FlashRankReranker:
     """
@@ -18,8 +19,13 @@ class FlashRankReranker:
     ):
         try:
             print(f"Loading Optimized Reranker: {reranker_model}")
-            self.reranker = CrossEncoder(reranker_model, max_length=512)
-            self.embedder = SentenceTransformer(similarity_model)
+            
+            # Optimize PyTorch before loading models
+            optimize_torch_for_cpu()
+            device = get_model_device()
+            
+            self.reranker = CrossEncoder(reranker_model, max_length=512, device=device)
+            self.embedder = SentenceTransformer(similarity_model, device=device)
         except Exception as e:
             logger.error(f"Error loading reranker models: {e}")
             self.reranker = None

@@ -48,6 +48,14 @@ export default function LoginPage() {
     }
   };
 
+  const handleGithubLogin = async () => {
+    try {
+      await authService.loginWithGithub();
+    } catch (err: any) {
+      setError(err.message || 'GitHub login failed.');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-void-900 text-starlight-400 flex flex-col lg:flex-row">
       {/* Left Section: Brand & Trust (60% on desktop) */}
@@ -199,6 +207,7 @@ export default function LoginPage() {
               <div className="flex justify-center">
                 <button
                   disabled={isLoading}
+                  onClick={handleGithubLogin}
                   className="p-2.5 bg-void-700/50 hover:bg-void-700 border border-void-700 text-starlight-100 rounded transition-all active:scale-[0.98] disabled:opacity-50"
                   aria-label="Continue with GitHub"
                 >

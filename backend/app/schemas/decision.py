@@ -18,7 +18,7 @@ class EvidenceSchema(BaseModel):
     source_id: str
     excerpt: str
     credibility: str
-    added_at: datetime
+    added_at: str  # Changed from datetime to str for JSON serialization
     relevance_score: float
 
 class ConstraintSchema(BaseModel):

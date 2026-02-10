@@ -1,0 +1,104 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    CODE STUDIO STANDALONE DOCKER                             ║
+║                         QUICK REFERENCE CARD                                 ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌─ SETUP ────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│  First Time Setup:                                                           │
+│    ./setup-code-studio.sh                                                    │
+│                                                                              │
+│  Manual Setup:                                                               │
+│    1. cp .env.code .env.code.local                                          │
+│    2. Edit .env.code.local (add GROQ_API_KEY)                               │
+│    3. docker-compose --env-file .env.code.local -f \                        │
+│       docker-compose.code.yml up --build -d                                 │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌─ ACCESS ───────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│  🌐 Code Studio IDE:    http://localhost:3001/code                          │
+│  📚 API Documentation:  http://localhost:8001/docs                          │
+│  🔧 API Health Check:   http://localhost:8001/                              │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌─ COMMON COMMANDS ──────────────────────────────────────────────────────────┐
+│                                                                              │
+│  Start:        ./setup-code-studio.sh                                        │
+│  Stop:         ./stop-code-studio.sh                                         │
+│  Test:         ./test-code-studio.sh                                         │
+│                                                                              │
+│  View Logs:    docker-compose -f docker-compose.code.yml logs -f            │
+│  Restart:      docker-compose -f docker-compose.code.yml restart             │
+│  Rebuild:      docker-compose -f docker-compose.code.yml up --build -d      │
+│  Clean All:    docker-compose -f docker-compose.code.yml down -v            │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌─ SUPPORTED LANGUAGES ──────────────────────────────────────────────────────┐
+│                                                                              │
+│  ✓ Python 3.10          ✓ Go 1.18+                                          │
+│  ✓ Node.js 20           ✓ Java 17                                           │
+│  ✓ C/C++ (GCC)          ✓ Ruby 3.0+                                         │
+│  ✓ PHP 8.1+                                                                  │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌─ FILES CREATED ────────────────────────────────────────────────────────────┐
+│                                                                              │
+│  Docker:                                Scripts:                             │
+│   • Dockerfile.code-backend              • setup-code-studio.sh             │
+│   • Dockerfile.code-frontend             • stop-code-studio.sh              │
+│   • docker-compose.code.yml              • test-code-studio.sh              │
+│   • .dockerignore.code                                                       │
+│   • .env.code                           Docs:                               │
+│                                          • CODE_STUDIO_DOCKER_README.md     │
+│  Config Updates:                         • CODE_STUDIO_DEPLOYMENT_SUMMARY.md│
+│   • frontend/next.config.mjs            • CODE_STUDIO_QUICK_REFERENCE.txt   │
+│     (added standalone output)                                                │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌─ TROUBLESHOOTING ──────────────────────────────────────────────────────────┐
+│                                                                              │
+│  Port Conflict:                                                              │
+│    Edit docker-compose.code.yml and change port mappings                    │
+│                                                                              │
+│  Build Failed:                                                               │
+│    docker system prune -a                                                    │
+│    docker-compose -f docker-compose.code.yml build --no-cache               │
+│                                                                              │
+│  Backend Not Responding:                                                     │
+│    docker-compose -f docker-compose.code.yml logs code-backend              │
+│                                                                              │
+│  Check What's Using Port:                                                    │
+│    lsof -i :3001  (frontend)                                                │
+│    lsof -i :8001  (backend)                                                 │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌─ SECURITY WARNING ─────────────────────────────────────────────────────────┐
+│                                                                              │
+│  ⚠️  NO AUTHENTICATION - For playground/testing only!                        │
+│                                                                              │
+│  Safe:    ✓ Local development     ✓ Internal networks                       │
+│  Unsafe:  ✗ Public internet        ✗ Untrusted networks                     │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌─ RESOURCE REQUIREMENTS ────────────────────────────────────────────────────┐
+│                                                                              │
+│  CPU:   2+ cores                                                             │
+│  RAM:   4 GB minimum, 8 GB recommended                                       │
+│  Disk:  5 GB free space                                                      │
+│                                                                              │
+│  Backend Image:  ~2.5 GB                                                     │
+│  Frontend Image: ~150 MB                                                     │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  Need Help? Check CODE_STUDIO_DOCKER_README.md for detailed documentation   ║
+╚══════════════════════════════════════════════════════════════════════════════╝

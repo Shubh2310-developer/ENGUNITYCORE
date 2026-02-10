@@ -193,64 +193,7 @@ function DecisionVaultContent() {
     setIsLoading(true);
     try {
       const data = await decisionService.getDecisions();
-      if (data.length === 0) {
-        // Use realistic mock data
-        setDecisions([
-          {
-            id: '1',
-            title: 'Migrate Backend to Groq API',
-            type: 'Architecture',
-            workspace_id: 'w1',
-            created_by: 'u1',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            status: 'confirmed',
-            confidence: 'high',
-            problem_statement: 'The current inference latency is too high for real-time applications.',
-            constraints: [{ type: 'technical', description: 'Latency must be < 50ms', hard_limit: true, current_status: 'Exceeded' }],
-            options: [
-              { id: 'o1', label: 'Groq API', description: 'Use Groq for ultra-low latency inference', pros: ['Fast', 'Scalable'], cons: ['Costly'], estimated_effort: 'medium', risk_level: 'low' },
-              { id: 'o2', label: 'Self-hosted Llama', description: 'Run Llama on our own GPUs', pros: ['Private', 'Cost-effective'], cons: ['Maintenance', 'Higher latency'], estimated_effort: 'high', risk_level: 'medium' }
-            ],
-            evidence: [
-              { id: 'e1', source_type: 'code_run', source_id: 'b1', excerpt: 'Benchmark results: Groq (30ms) vs Local (450ms)', credibility: 'primary', added_at: new Date().toISOString(), relevance_score: 0.95 }
-            ],
-            tradeoffs: { performance: 5, cost: 3, complexity: 2, risk: 2, scalability: 5, time_to_implement: 4 },
-            ai_flags: [
-              { id: 'f1', flag_type: 'missing_option', severity: 'info', message: 'Did you consider Anthropic Claude API for high-reasoning tasks?', suggested_action: 'Research Claude 3.5 Sonnet benchmarks', dismissed: false }
-            ],
-            tags: ['AI', 'Infrastructure'],
-            privacy: 'private'
-          },
-          {
-            id: '2',
-            title: 'Standardize on React Hook Form',
-            type: 'Code',
-            workspace_id: 'w1',
-            created_by: 'u1',
-            created_at: new Date(Date.now() - 86400000).toISOString(),
-            updated_at: new Date(Date.now() - 86400000).toISOString(),
-            status: 'tentative',
-            confidence: 'medium',
-            problem_statement: 'Form handling logic is fragmented across different components.',
-            constraints: [],
-            options: [
-              { id: 'r1', label: 'React Hook Form', description: 'Performant, flexible form validation', pros: ['Small bundle', 'Fast'], cons: ['Learning curve'], estimated_effort: 'low', risk_level: 'low' },
-              { id: 'r2', label: 'Formik', description: 'Industry standard for complex forms', pros: ['Mature', 'Well-documented'], cons: ['Heavier', 'More renders'], estimated_effort: 'low', risk_level: 'low' }
-            ],
-            evidence: [],
-            tradeoffs: { performance: 4, cost: 5, complexity: 3, risk: 1, scalability: 4, time_to_implement: 4 },
-            ai_flags: [
-              { id: 'f2', flag_type: 'weak_evidence', severity: 'warning', message: 'No benchmark data provided for bundle size comparison.', suggested_action: 'Link a bundlephobia report', dismissed: false },
-              { id: 'f3', flag_type: 'bias_detected', severity: 'info', message: 'Pros/Cons ratio heavily favors React Hook Form (4:1).', suggested_action: 'Look for more Formik advantages', dismissed: false }
-            ],
-            tags: ['Frontend', 'Refactoring'],
-            privacy: 'private'
-          }
-        ]);
-      } else {
-        setDecisions(data);
-      }
+      setDecisions(data);
     } catch (error) {
       console.error('Failed to load decisions:', error);
     } finally {
@@ -260,23 +203,8 @@ function DecisionVaultContent() {
 
   const handleCreateDecision = async () => {
     try {
-      const decisionToCreate = {
-        ...newDecision,
-        id: Math.random().toString(36).substr(2, 9),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        workspace_id: 'w1',
-        created_by: 'u1',
-      };
-
-      try {
-        const created = await decisionService.createDecision(decisionToCreate);
-        setDecisions([created, ...decisions]);
-      } catch (serviceError) {
-        console.warn('Backend unavailable, using local state for demo:', serviceError);
-        setDecisions([decisionToCreate as Decision, ...decisions]);
-      }
-
+      const created = await decisionService.createDecision(newDecision);
+      setDecisions([created, ...decisions]);
       setShowCreateModal(false);
       resetForm();
     } catch (error) {
@@ -343,64 +271,16 @@ function DecisionVaultContent() {
 
   const prevStep = () => setCurrentStep(prev => Math.max(prev - 1, 1));
 
-  const generateAIFlags = () => {
+  const generateAIFlags = async () => {
     setIsGeneratingFlags(true);
-    // Simulate Adversarial AI analysis based on spec
-    setTimeout(() => {
-      const flags: AIFlag[] = [];
-
-      // Check for Optimism Bias in tradeoffs
-      const avgScore = Object.values(newDecision.tradeoffs || {}).reduce((a, b) => a + b, 0) / 6;
-      if (avgScore > 4) {
-        flags.push({
-          id: 'flag-' + Math.random().toString(36).substr(2, 5),
-          flag_type: 'bias_detected',
-          severity: 'warning',
-          message: 'Potential Optimism Bias: Tradeoff scores are exceptionally high across all dimensions.',
-          suggested_action: 'Audit whether these scores are defensible with current evidence.',
-          dismissed: false
-        });
-      }
-
-      // Check for Weak Evidence
-      if (!newDecision.evidence || newDecision.evidence.length === 0) {
-        flags.push({
-          id: 'flag-' + Math.random().toString(36).substr(2, 5),
-          flag_type: 'weak_evidence',
-          severity: 'critical',
-          message: 'Decision lacks primary source evidence.',
-          suggested_action: 'Attach at least one document or code run result to validate assumptions.',
-          dismissed: false
-        });
-      }
-
-      // Check for Sunk Cost in rationale
-      if (newDecision.rationale?.toLowerCase().includes('already') || newDecision.rationale?.toLowerCase().includes('invested')) {
-        flags.push({
-          id: 'flag-' + Math.random().toString(36).substr(2, 5),
-          flag_type: 'sunk_cost_fallacy',
-          severity: 'warning',
-          message: 'Sunk Cost Fallacy Detected: Rationale mentions past investment as a deciding factor.',
-          suggested_action: 'Evaluate the decision based on future value, not past costs.',
-          dismissed: false
-        });
-      }
-
-      // Missing Option prompt
-      if (newDecision.options && newDecision.options.length < 3) {
-        flags.push({
-          id: 'flag-' + Math.random().toString(36).substr(2, 5),
-          flag_type: 'missing_option',
-          severity: 'info',
-          message: 'Limited Choice Set: You only have 2 options.',
-          suggested_action: 'Consider a third "Status Quo" or "Hybrid" option to pressure test your choice.',
-          dismissed: false
-        });
-      }
-
+    try {
+      const flags = await decisionService.analyzeDecision(newDecision);
       setNewDecision(prev => ({ ...prev, ai_flags: flags }));
+    } catch (error) {
+      console.error('Failed to generate AI flags:', error);
+    } finally {
       setIsGeneratingFlags(false);
-    }, 1800);
+    }
   };
 
   const addOption = () => {

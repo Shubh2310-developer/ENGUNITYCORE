@@ -680,9 +680,21 @@ export default function ResearchPage() {
                 <span>•</span>
                 <span>18 Citations</span>
               </div>
-              <button className="text-blue-600 font-bold text-sm hover:underline flex items-center gap-1">
-                Open Full Screen Editor <ArrowUpRight className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => {
+                    const title = "Research Decision: " + (activeProject || 'Untitled');
+                    router.push(`/decisionvault?source=research&title=${encodeURIComponent(title)}&problem=${encodeURIComponent('Based on current research findings...')}`);
+                  }}
+                  className="flex items-center gap-2 px-3 py-1 rounded-lg bg-blue-50 text-blue-700 border border-blue-100 hover:bg-blue-100 transition-all text-xs font-bold"
+                >
+                  <Shield className="w-3.5 h-3.5" />
+                  Finalize as Decision
+                </button>
+                <button className="text-blue-600 font-bold text-sm hover:underline flex items-center gap-1">
+                  Open Full Screen Editor <ArrowUpRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
         </div>

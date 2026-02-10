@@ -12,10 +12,18 @@ import {
   ChevronRight,
   Code2,
   Shield,
-  Zap
+  Zap,
+  Square,
+  Bug,
+  GitBranch,
+  Beaker
 } from 'lucide-react';
 import { FileExplorer } from '@/components/code-lab/FileExplorer';
 import { GlobalSearch } from '@/components/code-lab/GlobalSearch';
+import { DebugSidebar } from '@/components/code-lab/DebugSidebar';
+import { GitSidebar } from '@/components/code-lab/GitSidebar';
+import { TestRunner } from '@/components/code-lab/TestRunner';
+import { DebugToolbar } from '@/components/code-lab/DebugToolbar';
 import { EditorTabs } from '@/components/code-lab/EditorTabs';
 import { Breadcrumbs } from '@/components/code-lab/Breadcrumbs';
 import { CodeEditor } from '@/components/code-lab/CodeEditor';
@@ -44,8 +52,14 @@ export default function CodeLabPage() {
     addFile,
     saveFile,
     activeFileId,
-    setNotification
+    setNotification,
+    debugSession
   } = useCodeStore();
+
+  // State for execution control and stdin input
+  const [isExecuting, setIsExecuting] = React.useState(false);
+  const [showStdinModal, setShowStdinModal] = React.useState(false);
+  const [stdinInput, setStdinInput] = React.useState('');
 
   // Global Keyboard Shortcuts
   React.useEffect(() => {
@@ -60,6 +74,24 @@ export default function CodeLabPage() {
         e.preventDefault();
         setSidebarOpen(true);
         setActiveSidebarTab('search');
+      }
+      // Cmd+Shift+D or Ctrl+Shift+D for Debug
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'd') {
+        e.preventDefault();
+        setSidebarOpen(true);
+        setActiveSidebarTab('debug');
+      }
+      // Cmd+Shift+G or Ctrl+Shift+G for Git
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'g') {
+        e.preventDefault();
+        setSidebarOpen(true);
+        setActiveSidebarTab('git');
+      }
+      // Cmd+Shift+T or Ctrl+Shift+T for Tests
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 't') {
+        e.preventDefault();
+        setSidebarOpen(true);
+        setActiveSidebarTab('test');
       }
       // Cmd+B or Ctrl+B for Toggle Sidebar
       if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
@@ -83,16 +115,133 @@ export default function CodeLabPage() {
   // Sidebar stays in its current state when entering Code Lab
   // (removed auto-close behavior)
 
-  const handleRunProject = () => {
+  const handleRunProject = async (withStdin: boolean = false) => {
+    const { files, activeFileId, setNotification, setTerminalOpen, setActiveBottomTab } = useCodeStore.getState();
+    
+    if (!activeFileId) {
+      setNotification({ message: 'No file selected to run', type: 'error' });
+      return;
+    }
+    
+    const activeFile = files.find(f => f.id === activeFileId);
+    if (!activeFile || activeFile.type !== 'file') {
+      setNotification({ message: 'Please select a file to run', type: 'error' });
+      return;
+    }
+    
+    if (!activeFile.content) {
+      setNotification({ message: 'File is empty', type: 'error' });
+      return;
+    }
+    
+    // Check if code uses input() or similar
+    const needsInput = activeFile.content.includes('input(') || 
+                       activeFile.content.includes('Scanner') ||
+                       activeFile.content.includes('gets') ||
+                       activeFile.content.includes('readline');
+    
+    if (needsInput && !withStdin) {
+      setShowStdinModal(true);
+      return;
+    }
+    
     setTerminalOpen(true);
     setActiveBottomTab('terminal');
-    runCommand('python generator.py --mode production --batch-size 1024');
-    setNotification({ message: 'Project execution started', type: 'info' });
+    setNotification({ message: `Running ${activeFile.name}...`, type: 'info' });
+    setIsExecuting(true);
+    
+    try {
+      // Call backend API to execute code
+      const response = await fetch('http://localhost:8000/api/v1/code/execute-direct', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          code: activeFile.content,
+          language: activeFile.language || 'python',
+          filename: activeFile.name,
+          stdin_data: withStdin ? stdinInput : undefined
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      // Format output for terminal with proper line breaks
+      let output = `\r\n\x1b[33m[Running ${activeFile.name}]\x1b[0m\r\n`;
+      output += `\x1b[34m[Language: ${result.language}]\x1b[0m\r\n`;
+      output += `\x1b[34m[Execution time: ${result.execution_time}s]\x1b[0m\r\n`;
+      if (withStdin) {
+        output += `\x1b[34m[Input provided: ${stdinInput.split('\n').length} line(s)]\x1b[0m\r\n`;
+      }
+      output += '─'.repeat(60) + '\r\n';
+      
+      if (result.success) {
+        output += `\x1b[32m[Output]\x1b[0m\r\n`;
+        // Process stdout to ensure proper line endings
+        const processedStdout = result.stdout.replace(/\n/g, '\r\n');
+        output += processedStdout;
+        if (result.stderr && result.stderr.trim()) {
+          const processedStderr = result.stderr.replace(/\n/g, '\r\n');
+          output += `\r\n\x1b[33m[Warnings]\x1b[0m\r\n${processedStderr}`;
+        }
+        output += `\r\n\x1b[32m✓ Execution completed successfully\x1b[0m`;
+        setNotification({ message: 'Code executed successfully', type: 'success' });
+      } else {
+        output += `\x1b[31m[Error]\x1b[0m\r\n`;
+        const errorOutput = result.stderr || result.error;
+        const processedError = errorOutput.replace(/\n/g, '\r\n');
+        output += processedError;
+        if (result.stdout && result.stdout.trim()) {
+          const processedStdout = result.stdout.replace(/\n/g, '\r\n');
+          output += `\r\n\x1b[34m[Partial Output]\x1b[0m\r\n${processedStdout}`;
+        }
+        output += `\r\n\x1b[31m✗ Execution failed\x1b[0m`;
+        setNotification({ message: 'Execution failed', type: 'error' });
+      }
+      
+      // Send output to terminal via runCommand
+      runCommand(output);
+      
+    } catch (error: any) {
+      const errorMsg = `Error: ${error.message}\r\n\r\nMake sure the backend is running on http://localhost:8000`;
+      runCommand(`\r\n\x1b[31m${errorMsg}\x1b[0m\r\n`);
+      setNotification({ message: 'Failed to execute code', type: 'error' });
+    } finally {
+      setIsExecuting(false);
+      setShowStdinModal(false);
+      setStdinInput('');
+    }
+  };
+
+  const handleStopExecution = () => {
+    setIsExecuting(false);
+    setNotification({ message: 'Execution stopped', type: 'info' });
+    runCommand('\r\n\x1b[31m[Stopped by user]\x1b[0m\r\n');
   };
 
   const handleSearch = () => {
     setSidebarOpen(true);
     setActiveSidebarTab('search');
+  };
+
+  const handleDebug = () => {
+    setSidebarOpen(true);
+    setActiveSidebarTab('debug');
+  };
+
+  const handleGit = () => {
+    setSidebarOpen(true);
+    setActiveSidebarTab('git');
+  };
+
+  const handleTest = () => {
+    setSidebarOpen(true);
+    setActiveSidebarTab('test');
   };
 
   const handleNewFile = () => {
@@ -144,6 +293,27 @@ export default function CodeLabPage() {
                 <Search className="w-4 h-4" />
               </button>
               <button
+                onClick={handleDebug}
+                className={styles.button}
+                title="Debug"
+              >
+                <Bug className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handleGit}
+                className={styles.button}
+                title="Source Control"
+              >
+                <GitBranch className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handleTest}
+                className={styles.button}
+                title="Test Runner"
+              >
+                <Beaker className="w-4 h-4" />
+              </button>
+              <button
                 onClick={handleNewFile}
                 className={styles.button}
                 title="New File"
@@ -168,13 +338,23 @@ export default function CodeLabPage() {
 
             <div className="h-4 w-[1px] bg-[#E2E8F0] mx-1" />
 
-            <button
-              onClick={handleRunProject}
-              className={styles['button-primary']}
-            >
-              <Play className="w-3 h-3 fill-current" />
-              Run
-            </button>
+            {isExecuting ? (
+              <button
+                onClick={handleStopExecution}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-md transition-all text-xs font-medium"
+              >
+                <Square className="w-3 h-3" />
+                Stop
+              </button>
+            ) : (
+              <button
+                onClick={() => handleRunProject(false)}
+                className={styles['button-primary']}
+              >
+                <Play className="w-3 h-3 fill-current" />
+                Run
+              </button>
+            )}
 
             <div className="h-4 w-[1px] bg-[#E2E8F0] mx-1" />
 
@@ -193,7 +373,11 @@ export default function CodeLabPage() {
             {/* Sidebar Header */}
             <div className="h-9 flex items-center justify-between px-3 border-b border-[#E2E8F0] bg-[#F8FAFC]">
               <span className="text-[10px] font-semibold text-[#475569] uppercase tracking-wider">
-                {activeSidebarTab === 'explorer' ? 'Explorer' : 'Search'}
+                {activeSidebarTab === 'explorer' && 'Explorer'}
+                {activeSidebarTab === 'search' && 'Search'}
+                {activeSidebarTab === 'debug' && 'Debug'}
+                {activeSidebarTab === 'git' && 'Source Control'}
+                {activeSidebarTab === 'test' && 'Test Runner'}
               </span>
               <button
                 onClick={() => setSidebarOpen(false)}
@@ -203,7 +387,11 @@ export default function CodeLabPage() {
                 <ChevronLeft className="w-3.5 h-3.5" />
               </button>
             </div>
-            {activeSidebarTab === 'explorer' ? <FileExplorer /> : <GlobalSearch />}
+            {activeSidebarTab === 'explorer' && <FileExplorer />}
+            {activeSidebarTab === 'search' && <GlobalSearch />}
+            {activeSidebarTab === 'debug' && <DebugSidebar />}
+            {activeSidebarTab === 'git' && <GitSidebar />}
+            {activeSidebarTab === 'test' && <TestRunner />}
           </div>
         </aside>
 
@@ -213,6 +401,7 @@ export default function CodeLabPage() {
           <div className="flex flex-col border-b border-[#E2E8F0]">
             <EditorTabs />
             <Breadcrumbs />
+            {debugSession.status !== 'idle' && <DebugToolbar />}
           </div>
 
           {/* Canvas */}
@@ -260,6 +449,39 @@ export default function CodeLabPage() {
 
       <NotificationOverlay />
       <CommandPalette />
+      
+      {/* Stdin Input Modal */}
+      {showStdinModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-[500px] max-w-[90vw]">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900">Provide Input</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              This program requires input. Enter the values below (one per line):
+            </p>
+            <textarea
+              value={stdinInput}
+              onChange={(e) => setStdinInput(e.target.value)}
+              placeholder="Enter input here...\nExample:\nJohn\n25"
+              className="w-full h-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono text-sm"
+              autoFocus
+            />
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => handleRunProject(true)}
+                className="flex-1 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-md transition-colors"
+              >
+                Run with Input
+              </button>
+              <button
+                onClick={() => setShowStdinModal(false)}
+                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-md transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

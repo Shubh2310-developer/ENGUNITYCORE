@@ -1,0 +1,253 @@
+
+================================================================================
+COMPREHENSIVE E2E TEST REPORT
+================================================================================
+Test Date: 2026-01-26 12:22:27
+Base URL: http://localhost:8000
+Total Tests: 19
+
+--------------------------------------------------------------------------------
+SUMMARY
+--------------------------------------------------------------------------------
+✅ Passed: 14
+❌ Failed: 5
+📊 Pass Rate: 73.7%
+
+================================================================================
+DETAILED RESULTS BY CATEGORY
+================================================================================
+
+────────────────────────────────────────────────────────────────────────────────
+📁 Health & Infrastructure (2/2 passed)
+────────────────────────────────────────────────────────────────────────────────
+
+✅ Root Endpoint
+   Status: PASS
+   HTTP Status: 200
+   Response Time: 0.00s
+   Message: Root endpoint responding in 0.00s
+   Details: {
+      "response": {
+            "message": "Welcome to Engunity AI API"
+      }
+}
+
+✅ Health Check
+   Status: PASS
+   HTTP Status: 200
+   Response Time: 0.00s
+   Message: Health check passing in 0.00s
+   Details: {
+      "response": {
+            "status": "healthy"
+      }
+}
+
+────────────────────────────────────────────────────────────────────────────────
+📁 Security & CORS (2/2 passed)
+────────────────────────────────────────────────────────────────────────────────
+
+✅ CORS Headers
+   Status: PASS
+   HTTP Status: 200
+   Message: CORS headers correctly set
+   Details: {
+      "access-control-allow-origin": "http://localhost:3000",
+      "access-control-allow-credentials": "true"
+}
+
+✅ CORS Preflight
+   Status: PASS
+   HTTP Status: 200
+   Message: Preflight request successful
+   Details: {
+      "status": 200,
+      "headers": {
+            "date": "Mon, 26 Jan 2026 06:52:13 GMT",
+            "server": "uvicorn",
+            "access-control-allow-origin": "http://localhost:3000",
+            "access-control-allow-credentials": "true",
+            "access-control-allow-methods": "*",
+            "access-control-allow-headers": "*",
+            "content-length": "2",
+            "content-type": "application/json"
+      }
+}
+
+────────────────────────────────────────────────────────────────────────────────
+📁 Authentication (3/3 passed)
+────────────────────────────────────────────────────────────────────────────────
+
+✅ User Registration
+   Status: PASS
+   HTTP Status: 200
+   Response Time: 1.59s
+   Message: Registration successful in 1.59s
+   Details: {
+      "user_id": 15,
+      "email": "test_1769410333@example.com"
+}
+
+✅ User Login
+   Status: PASS
+   HTTP Status: 200
+   Response Time: 2.85s
+   Message: Login successful in 2.85s
+   Details: {
+      "token_type": "bearer",
+      "has_token": true
+}
+
+✅ Get Current User
+   Status: PASS
+   HTTP Status: 200
+   Response Time: 0.16s
+   Message: User data retrieved in 0.16s
+   Details: {
+      "user_id": 15,
+      "email": "test_1769410333@example.com"
+}
+
+────────────────────────────────────────────────────────────────────────────────
+📁 Chat Service (0/2 passed)
+────────────────────────────────────────────────────────────────────────────────
+
+❌ Chat Query
+   Status: FAIL
+   HTTP Status: 405
+   Response Time: 0.00s
+   Message: Chat query failed: {"detail":"Method Not Allowed"}
+
+❌ Chat History
+   Status: FAIL
+   HTTP Status: 404
+   Response Time: 0.00s
+   Message: Failed to get history: {"detail":"Not Found"}
+
+────────────────────────────────────────────────────────────────────────────────
+📁 Document Service (1/1 passed)
+────────────────────────────────────────────────────────────────────────────────
+
+✅ List Documents
+   Status: PASS
+   HTTP Status: 200
+   Response Time: 0.61s
+   Message: Documents listed in 0.61s
+   Details: {
+      "document_count": 0
+}
+
+────────────────────────────────────────────────────────────────────────────────
+📁 Memory Service (1/1 passed)
+────────────────────────────────────────────────────────────────────────────────
+
+✅ Get Memory
+   Status: PASS
+   HTTP Status: 404
+   Response Time: 0.00s
+   Message: Memory endpoint responding in 0.00s
+   Details: {
+      "status": 404
+}
+
+────────────────────────────────────────────────────────────────────────────────
+📁 Decision Vault (1/1 passed)
+────────────────────────────────────────────────────────────────────────────────
+
+✅ List Decisions
+   Status: PASS
+   HTTP Status: 200
+   Response Time: 0.38s
+   Message: Decisions listed in 0.38s
+   Details: {
+      "decision_count": 0
+}
+
+────────────────────────────────────────────────────────────────────────────────
+📁 GitHub Repos (1/1 passed)
+────────────────────────────────────────────────────────────────────────────────
+
+✅ List GitHub Repos
+   Status: PASS
+   HTTP Status: 404
+   Response Time: 1.82s
+   Message: GitHub repos endpoint responding in 1.82s
+   Details: {
+      "status": 404,
+      "note": "May require GitHub OAuth"
+}
+
+────────────────────────────────────────────────────────────────────────────────
+📁 Analytics Service (1/1 passed)
+────────────────────────────────────────────────────────────────────────────────
+
+✅ List Analytics Datasets
+   Status: PASS
+   HTTP Status: 200
+   Response Time: 1.76s
+   Message: Analytics datasets listed in 1.76s
+   Details: {
+      "dataset_count": 0
+}
+
+────────────────────────────────────────────────────────────────────────────────
+📁 Research Service (0/1 passed)
+────────────────────────────────────────────────────────────────────────────────
+
+❌ List Research Papers
+   Status: FAIL
+   HTTP Status: 404
+   Response Time: 1.12s
+   Message: Failed to list papers: {"detail":"Research paper not found"}
+
+────────────────────────────────────────────────────────────────────────────────
+📁 Code Service (0/1 passed)
+────────────────────────────────────────────────────────────────────────────────
+
+❌ List Code Projects
+   Status: FAIL
+   HTTP Status: 404
+   Response Time: 1.52s
+   Message: Failed to list projects: {"detail":"Code project not found"}
+
+────────────────────────────────────────────────────────────────────────────────
+📁 Image Service (1/1 passed)
+────────────────────────────────────────────────────────────────────────────────
+
+✅ List Images
+   Status: PASS
+   HTTP Status: 200
+   Response Time: 1.45s
+   Message: Images listed in 1.45s
+   Details: {
+      "image_count": 0
+}
+
+────────────────────────────────────────────────────────────────────────────────
+📁 Error Handling (1/2 passed)
+────────────────────────────────────────────────────────────────────────────────
+
+✅ 404 Not Found
+   Status: PASS
+   HTTP Status: 404
+   Message: 404 error properly handled
+
+❌ Unauthorized Access
+   Status: FAIL
+   HTTP Status: 404
+   Message: Should return 401, got: 404
+
+================================================================================
+PERFORMANCE METRICS
+================================================================================
+Average Response Time: 0.88s
+Max Response Time: 2.85s
+
+================================================================================
+RECOMMENDATIONS
+================================================================================
+⚠️  Some tests failed. Review the detailed results above.
+
+================================================================================
+END OF REPORT
+================================================================================

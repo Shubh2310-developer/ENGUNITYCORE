@@ -832,10 +832,8 @@
   background-color: #111827;
   color: #e5e7eb;
   border-radius: 0.5rem;
-  padding: 1rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  height: 300px;
-  overflow-y: auto;
+  /* Padding and height are removed to allow XTerm to manage its own dimensions correctly */
+  height: 100%;
 }
 
 /* Security */

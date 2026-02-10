@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  code-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.code-backend
+    ports:
+      - "8001:8001" # Host:Container
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GROQ_API_KEY_2=${GROQ_API_KEY_2:-}
+      - GROQ_API_KEY_3=${GROQ_API_KEY_3:-}
+      - CORS_ORIGINS=http://localhost:3001
+      - ENABLE_AI=False
+      - LOG_LEVEL=INFO
+    volumes:
+      - code-execution-temp:/tmp/code_execution
+    restart: always
+    networks:
+      - code-studio-network
+
+  code-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.code-frontend
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:8001
+    ports:
+      - "3001:3001" # Host:Container
+    depends_on:
+      - code-backend
+    restart: always
+    networks:
+      - code-studio-network
+
+volumes:
+  code-execution-temp:
+
+networks:
+  code-studio-network:
+    driver: bridge

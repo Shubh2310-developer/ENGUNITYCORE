@@ -2,6 +2,17 @@ import { useAuthStore } from '@/stores/authStore';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
+// Ensure API_URL ends with /api/v1
+const getBaseUrl = () => {
+  let url = API_URL;
+  if (!url.includes('/api/v1')) {
+    url = url.endsWith('/') ? `${url}api/v1` : `${url}/api/v1`;
+  }
+  return url;
+};
+
+const FINAL_API_URL = getBaseUrl();
+
 export interface Document {
   id: string;
   title: string;
@@ -56,7 +67,7 @@ export const documentService = {
 
   async createDocument(data: DocumentCreate): Promise<Document> {
     const token = useAuthStore.getState().token;
-    const response = await fetch(`${API_URL}/documents/`, {
+    const response = await fetch(`${FINAL_API_URL}/documents/`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -75,7 +86,7 @@ export const documentService = {
 
   async getDocuments(): Promise<Document[]> {
     const token = useAuthStore.getState().token;
-    const response = await fetch(`${API_URL}/documents/`, {
+    const response = await fetch(`${FINAL_API_URL}/documents/`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -91,7 +102,7 @@ export const documentService = {
 
   async getDocument(id: string): Promise<Document> {
     const token = useAuthStore.getState().token;
-    const response = await fetch(`${API_URL}/documents/${id}`, {
+    const response = await fetch(`${FINAL_API_URL}/documents/${id}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -107,7 +118,7 @@ export const documentService = {
 
   async updateDocument(id: string, data: DocumentUpdate): Promise<Document> {
     const token = useAuthStore.getState().token;
-    const response = await fetch(`${API_URL}/documents/${id}`, {
+    const response = await fetch(`${FINAL_API_URL}/documents/${id}`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -126,7 +137,7 @@ export const documentService = {
 
   async deleteDocument(id: string): Promise<Document> {
     const token = useAuthStore.getState().token;
-    const response = await fetch(`${API_URL}/documents/${id}`, {
+    const response = await fetch(`${FINAL_API_URL}/documents/${id}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`,

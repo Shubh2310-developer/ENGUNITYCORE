@@ -7,6 +7,7 @@ class UserBase(BaseModel):
     email: Optional[EmailStr] = None
     is_active: Optional[bool] = True
     role: Optional[str] = "user"
+    provider: Optional[str] = "local"
 
 # Properties to receive via API on creation
 class UserCreate(UserBase):

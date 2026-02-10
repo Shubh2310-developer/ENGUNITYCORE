@@ -2,6 +2,17 @@ import { useAuthStore } from '@/stores/authStore';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
+// Ensure API_URL ends with /api/v1
+const getBaseUrl = () => {
+  let url = API_URL;
+  if (!url.includes('/api/v1')) {
+    url = url.endsWith('/') ? `${url}api/v1` : `${url}/api/v1`;
+  }
+  return url;
+};
+
+const FINAL_API_URL = getBaseUrl();
+
 export type DecisionStatus = 'tentative' | 'confirmed' | 'revisited' | 'deprecated';
 export type DecisionConfidence = 'low' | 'medium' | 'high';
 export type DecisionType = 'Architecture' | 'Research' | 'Code' | 'Product' | 'Career' | 'Compliance';
@@ -36,7 +47,9 @@ export interface Constraint {
 
 export interface AIFlag {
   id: string;
-  flag_type: 'missing_option' | 'weak_evidence' | 'bias_detected' | 'contradiction' | 'sunk_cost_fallacy';
+  flag_type: 'missing_option' | 'weak_evidence' | 'bias_detected' | 'contradiction' | 'sunk_cost_fallacy' | 
+             'anchoring_bias' | 'availability_bias' | 'groupthink' | 'optimism_bias' | 
+             'status_quo_bias' | 'recency_bias' | 'bandwagon_effect';
   severity: 'info' | 'warning' | 'critical';
   message: string;
   suggested_action: string;
@@ -84,7 +97,7 @@ export const decisionService = {
   async getDecisions() {
     const token = useAuthStore.getState().token;
     try {
-      const response = await fetch(`${API_URL}/decisions/`, {
+      const response = await fetch(`${FINAL_API_URL}/decisions/`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -108,7 +121,7 @@ export const decisionService = {
   async getDecision(id: string): Promise<Decision | null> {
     const token = useAuthStore.getState().token;
     try {
-      const response = await fetch(`${API_URL}/decisions/${id}`, {
+      const response = await fetch(`${FINAL_API_URL}/decisions/${id}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -128,7 +141,7 @@ export const decisionService = {
   async createDecision(decision: Partial<Decision>) {
     const token = useAuthStore.getState().token;
     try {
-      const response = await fetch(`${API_URL}/decisions/`, {
+      const response = await fetch(`${FINAL_API_URL}/decisions/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -150,7 +163,7 @@ export const decisionService = {
   async updateDecision(id: string, updates: Partial<Decision>) {
     const token = useAuthStore.getState().token;
     try {
-      const response = await fetch(`${API_URL}/decisions/${id}`, {
+      const response = await fetch(`${FINAL_API_URL}/decisions/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -166,6 +179,28 @@ export const decisionService = {
     } catch (error) {
       console.error('Decision service error:', error);
       throw error;
+    }
+  },
+
+  async analyzeDecision(decision: Partial<Decision>): Promise<AIFlag[]> {
+    const token = useAuthStore.getState().token;
+    try {
+      const response = await fetch(`${FINAL_API_URL}/decisions/analyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(decision),
+      });
+
+      if (response.ok) {
+        return response.json();
+      }
+      return [];
+    } catch (error) {
+      console.error('Decision analysis error:', error);
+      return [];
     }
   }
 };

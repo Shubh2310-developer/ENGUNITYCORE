@@ -42,9 +42,18 @@ export interface DocumentUploadResponse {
 }
 
 class OmniRAGService {
-  private baseURL = process.env.NEXT_PUBLIC_API_URL 
-    ? `${process.env.NEXT_PUBLIC_API_URL.replace('/api/v1', '')}/api/v1/omni-rag`
-    : 'http://localhost:8000/api/v1/omni-rag';
+  private getBaseUrl() {
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+    let url = API_URL;
+    if (!url.includes('/api/v1')) {
+      url = url.endsWith('/') ? `${url}api/v1` : `${url}/api/v1`;
+    }
+    return `${url}/omni-rag`;
+  }
+
+  private get baseURL() {
+    return this.getBaseUrl();
+  }
 
   async query(request: OmniRAGRequest): Promise<OmniRAGResponse> {
     const token = useAuthStore.getState().token;
@@ -76,8 +85,8 @@ class OmniRAGService {
       formData,
       {
         headers: {
-          'Content-Type': 'multipart/form-data',
           'Authorization': `Bearer ${token}`,
+          // Don't set Content-Type for FormData - let browser set it with boundary
         },
       }
     );

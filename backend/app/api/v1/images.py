@@ -71,19 +71,33 @@ async def list_images(
     """
     Retrieve images for the current user.
     """
-    images = db.query(Image).filter(Image.user_id == current_user.id)\
-        .order_by(Image.created_at.desc())\
-        .offset(skip).limit(limit).all()
+    try:
+        images = db.query(Image).filter(Image.user_id == current_user.id)\
+            .order_by(Image.created_at.desc())\
+            .offset(skip).limit(limit).all()
 
-    # Generate fresh signed URLs for each image and its variants
-    for img in images:
-        img.public_url = await storage_service.get_file_url("images", img.storage_path)
+        # Generate fresh signed URLs for each image and its variants
+        for img in images:
+            try:
+                img.public_url = await storage_service.get_file_url("images", img.storage_path)
 
-        # Variants are refreshed in the response via relationship
-        for variant in img.variants:
-            variant.public_url = await storage_service.get_file_url("images", variant.storage_path)
+                # Variants are refreshed in the response via relationship
+                for variant in img.variants:
+                    try:
+                        variant.public_url = await storage_service.get_file_url("images", variant.storage_path)
+                    except Exception as variant_error:
+                        print(f"Error refreshing variant URL for {variant.id}: {variant_error}")
+                        # Keep existing URL if refresh fails
+            except Exception as img_error:
+                print(f"Error refreshing image URL for {img.id}: {img_error}")
+                # Keep existing URL if refresh fails
 
-    return images
+        return images
+    except Exception as e:
+        print(f"Error listing images: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to list images: {str(e)}")
 
 @router.get("/{image_id}", response_model=ImageResponse)
 async def get_image(

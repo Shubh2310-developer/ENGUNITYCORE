@@ -10,6 +10,7 @@ from app.models.chat import ChatSession
 from app.schemas.chat import ChatMessageCreate, ChatMessage, ChatSession as ChatSessionSchema, ChatSessionCreate
 from app.services.ai.router import ai_router
 from app.services.storage.supabase import storage_service
+from app.services.chat.context import build_context
 from datetime import datetime
 import uuid
 import json
@@ -66,6 +67,7 @@ def create_chat_session(
     db.refresh(session)
     return session
 
+@router.get("/history/{session_id}")
 @router.get("/{session_id}", response_model=ChatSessionSchema)
 async def get_chat_session(
     session_id: str,
@@ -74,97 +76,115 @@ async def get_chat_session(
 ) -> Any:
     """
     Get a specific chat session with its messages from MongoDB.
+    Also available at /history/{session_id} for backwards compatibility.
     """
-    session = db.query(ChatSession).filter(
-        ChatSession.id == session_id,
-        ChatSession.user_id == current_user.id
-    ).first()
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+    try:
+        session = db.query(ChatSession).filter(
+            ChatSession.id == session_id,
+            ChatSession.user_id == current_user.id
+        ).first()
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
 
-    # Fetch messages from MongoDB
-    messages = []
-    if mongodb.db is not None:
-        cursor = mongodb.db.chat_messages.find({"session_id": session_id}).sort("timestamp", 1)
-        async for msg in cursor:
-            # Refresh signed URLs for images if they exist
-            image_urls = msg.get("image_urls", [])
-            images_data = []
+        # Fetch messages from MongoDB
+        messages = []
+        if mongodb.db is not None:
+            try:
+                cursor = mongodb.db.chat_messages.find({"session_id": session_id}).sort("timestamp", 1)
+                async for msg in cursor:
+                    # Refresh signed URLs for images if they exist
+                    image_urls = msg.get("image_urls", [])
+                    images_data = []
 
-            image_ids = msg.get("image_ids", [])
-            if image_ids:
-                from app.models.image import Image
-                refreshed_urls = []
-                for img_id in image_ids:
-                    db_img = db.query(Image).filter(Image.id == img_id).first()
-                    if db_img:
-                        # Refresh signed URL for original
-                        original_url = await storage_service.get_file_url("images", db_img.storage_path)
-                        refreshed_urls.append(original_url)
+                    image_ids = msg.get("image_ids", [])
+                    if image_ids:
+                        from app.models.image import Image
+                        refreshed_urls = []
+                        for img_id in image_ids:
+                            db_img = db.query(Image).filter(Image.id == img_id).first()
+                            if db_img:
+                                # Refresh signed URL for original
+                                original_url = await storage_service.get_file_url("images", db_img.storage_path)
+                                refreshed_urls.append(original_url)
 
-                        # Prepare full image data with variants
-                        variants_data = []
-                        for variant in db_img.variants:
-                            variant_url = await storage_service.get_file_url("images", variant.storage_path)
-                            variants_data.append({
-                                "variant_type": variant.variant_type,
-                                "public_url": variant_url,
-                                "width": variant.width,
-                                "height": variant.height,
-                                "file_size": variant.file_size,
-                                "format": variant.format
-                            })
+                                # Prepare full image data with variants
+                                variants_data = []
+                                for variant in db_img.variants:
+                                    variant_url = await storage_service.get_file_url("images", variant.storage_path)
+                                    variants_data.append({
+                                        "variant_type": variant.variant_type,
+                                        "public_url": variant_url,
+                                        "width": variant.width,
+                                        "height": variant.height,
+                                        "file_size": variant.file_size,
+                                        "format": variant.format
+                                    })
 
-                        images_data.append({
-                            "id": str(db_img.id),
-                            "filename": db_img.filename,
-                            "mime_type": db_img.mime_type,
-                            "width": db_img.width,
-                            "height": db_img.height,
-                            "file_size": db_img.file_size,
-                            "public_url": original_url,
-                            "variants": variants_data,
-                            "scene_description": db_img.scene_description,
-                            "detected_text": db_img.detected_text,
-                            "processing_status": db_img.processing_status,
-                            "created_at": db_img.created_at
-                        })
+                                images_data.append({
+                                    "id": str(db_img.id),
+                                    "filename": db_img.filename,
+                                    "mime_type": db_img.mime_type,
+                                    "width": db_img.width,
+                                    "height": db_img.height,
+                                    "file_size": db_img.file_size,
+                                    "public_url": original_url,
+                                    "variants": variants_data,
+                                    "scene_description": db_img.scene_description,
+                                    "detected_text": db_img.detected_text,
+                                    "processing_status": db_img.processing_status,
+                                    "created_at": db_img.created_at
+                                })
 
-                if refreshed_urls:
-                    image_urls = refreshed_urls
+                        if refreshed_urls:
+                            image_urls = refreshed_urls
 
-            # Prepare for response schema
-            msg_data = {
-                "id": str(msg.get("_id") or msg.get("id")),
-                "role": msg["role"],
-                "content": msg["content"],
-                "image_urls": image_urls,
-                "images": images_data,
-                "timestamp": msg.get("timestamp") or datetime.now(),
-                "retrieved_docs": msg.get("retrieved_docs", []),
-                # Load all enhanced metadata fields
-                "complexity": msg.get("complexity"),
-                "strategy": msg.get("strategy"),
-                "used_web_search": msg.get("used_web_search", False),
-                "hyde_doc": msg.get("hyde_doc"),
-                "confidence": msg.get("confidence"),
-                "critique": msg.get("critique"),
-                "multi_queries": msg.get("multi_queries", []),
-                "memory_active": msg.get("memory_active", False),
-                "memory_summary": msg.get("memory_summary")
-            }
-            messages.append(msg_data)
+                    # Prepare for response schema
+                    msg_data = {
+                        "id": str(msg.get("_id") or msg.get("id")),
+                        "role": msg["role"],
+                        "content": msg["content"],
+                        "image_urls": image_urls,
+                        "images": images_data,
+                        "timestamp": msg.get("timestamp") or datetime.now(),
+                        "retrieved_docs": msg.get("retrieved_docs", []),
+                        # Load all enhanced metadata fields
+                        "complexity": msg.get("complexity"),
+                        "strategy": msg.get("strategy"),
+                        "used_web_search": msg.get("used_web_search", False),
+                        "hyde_doc": msg.get("hyde_doc"),
+                        "confidence": msg.get("confidence"),
+                        "critique": msg.get("critique"),
+                        "multi_queries": msg.get("multi_queries", []),
+                        "memory_active": msg.get("memory_active", False),
+                        "memory_summary": msg.get("memory_summary")
+                    }
+                    messages.append(msg_data)
+            except Exception as mongo_error:
+                # Log MongoDB error but continue with empty messages
+                print(f"Error fetching messages from MongoDB: {mongo_error}")
+                import traceback
+                traceback.print_exc()
+                messages = []
 
-    # Convert session to dict and add messages
-    session_data = {
-        "id": session.id,
-        "title": session.title,
-        "created_at": session.created_at,
-        "updated_at": session.updated_at,
-        "message_count": len(messages),
-        "messages": messages
-    }
-    return session_data
+        # Convert session to dict and add messages
+        session_data = {
+            "id": session.id,
+            "title": session.title,
+            "created_at": session.created_at,
+            "updated_at": session.updated_at,
+            "message_count": len(messages),
+            "messages": messages
+        }
+        return session_data
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        # Catch all other errors and return proper error
+        print(f"Error in get_chat_session: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to fetch chat session: {str(e)}")
 
 @router.delete("/{session_id}")
 async def delete_chat_session(

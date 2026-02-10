@@ -1,14 +1,31 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
-import Editor from '@monaco-editor/react';
+import React, { useEffect, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { Code2 } from 'lucide-react';
 import { useCodeStore } from '@/stores/codeStore';
+import { useFindReplace } from './FindReplace';
+import { AIInlineCompletionProvider } from './AIInlineProvider';
+
+// Dynamically import Monaco Editor with no SSR
+const Editor = dynamic(() => import('@monaco-editor/react'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex-1 flex items-center justify-center bg-void-950">
+      <div className="text-starlight-400">Loading editor...</div>
+    </div>
+  ),
+});
 
 export const CodeEditor = () => {
   const { files, activeFileId, updateFileContent, saveFile, setNotification, setCursorPosition } = useCodeStore();
   const activeFile = files.find(f => f.id === activeFileId);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const editorRef = useRef<any>(null);
+  const monacoRef = useRef<any>(null);
+
+  // Enable Find & Replace
+  useFindReplace(editorRef.current, monacoRef.current);
 
   // Auto-save logic
   useEffect(() => {
@@ -55,7 +72,12 @@ export const CodeEditor = () => {
           value={activeFile.content}
           onChange={(value: string | undefined) => updateFileContent(activeFile.id, value || '')}
           options={{
-            minimap: { enabled: false },
+            minimap: {
+              enabled: true,
+              renderCharacters: false,
+              maxColumn: 120,
+              showSlider: 'mouseover'
+            },
             fontSize: 14,
             fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
             fontLigatures: true,
@@ -72,6 +94,16 @@ export const CodeEditor = () => {
             occurrencesHighlight: true,
             links: true,
             colorDecorators: true,
+            folding: true,
+            foldingStrategy: 'indentation',
+            showFoldingControls: 'mouseover',
+            multiCursorModifier: 'ctrlCmd',
+            multiCursorMergeOverlapping: true,
+            bracketPairColorization: { enabled: true },
+            guides: {
+                indentation: true,
+                bracketPairs: true
+            },
             scrollbar: {
               vertical: 'visible',
               horizontal: 'visible',
@@ -111,6 +143,15 @@ export const CodeEditor = () => {
             });
           }}
           onMount={(editor: any, monaco: any) => {
+            editorRef.current = editor;
+            monacoRef.current = monaco;
+
+            // Register AI Inline Completion Provider
+            const aiProvider = new AIInlineCompletionProvider(monaco);
+            monaco.languages.registerInlineCompletionsProvider('python', aiProvider);
+            monaco.languages.registerInlineCompletionsProvider('javascript', aiProvider);
+            monaco.languages.registerInlineCompletionsProvider('typescript', aiProvider);
+
             // Manual Resize Handling
             const container = editor.getContainerDomNode().parentElement;
             const observer = new ResizeObserver(() => {

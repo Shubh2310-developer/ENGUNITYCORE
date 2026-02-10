@@ -3,6 +3,17 @@ import { ImageResponse } from './image';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
+// Ensure API_URL ends with /api/v1
+const getBaseUrl = () => {
+  let url = API_URL;
+  if (!url.includes('/api/v1')) {
+    url = url.endsWith('/') ? `${url}api/v1` : `${url}/api/v1`;
+  }
+  return url;
+};
+
+const FINAL_API_URL = getBaseUrl();
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant' | 'system' | 'tool';
@@ -39,7 +50,7 @@ export const chatService = {
     const token = useAuthStore.getState().token;
 
     try {
-      const response = await fetch(`${API_URL}/chat/`, {
+      const response = await fetch(`${FINAL_API_URL}/chat/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -66,7 +77,7 @@ export const chatService = {
 
   async getSessions() {
     const token = useAuthStore.getState().token;
-    const response = await fetch(`${API_URL}/chat/`, {
+    const response = await fetch(`${FINAL_API_URL}/chat/`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -82,7 +93,7 @@ export const chatService = {
 
   async getSession(sessionId: string): Promise<ChatSession> {
     const token = useAuthStore.getState().token;
-    const response = await fetch(`${API_URL}/chat/${sessionId}`, {
+    const response = await fetch(`${FINAL_API_URL}/chat/${sessionId}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -98,7 +109,7 @@ export const chatService = {
 
   async createSession(title: string) {
     const token = useAuthStore.getState().token;
-    const response = await fetch(`${API_URL}/chat/sessions`, {
+    const response = await fetch(`${FINAL_API_URL}/chat/sessions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -116,7 +127,7 @@ export const chatService = {
 
   async deleteSession(sessionId: string): Promise<void> {
     const token = useAuthStore.getState().token;
-    const response = await fetch(`${API_URL}/chat/${sessionId}`, {
+    const response = await fetch(`${FINAL_API_URL}/chat/${sessionId}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -141,7 +152,7 @@ export const chatService = {
     const token = useAuthStore.getState().token;
 
     try {
-      const response = await fetch(`${API_URL}/chat/stream`, {
+      const response = await fetch(`${FINAL_API_URL}/chat/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

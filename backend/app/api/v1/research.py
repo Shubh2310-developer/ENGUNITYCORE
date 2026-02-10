@@ -9,7 +9,7 @@ from app.models.user import User
 from app.models.research import ResearchPaper
 from app.schemas.research import ResearchPaper as ResearchPaperSchema, ResearchPaperCreate, ResearchPaperUpdate
 from app.services.storage.supabase import storage_service
-from app.services.ai.vector_store import vector_store
+from app.services.ai.dependencies import get_vector_store
 from datetime import datetime
 
 router = APIRouter()
@@ -65,7 +65,8 @@ async def upload_research_paper(
         # Here we just try to decode if it's text-based
         text_content = content.decode('utf-8', errors='ignore')
         if len(text_content.strip()) > 0:
-            vector_store.add_texts(
+            vs = get_vector_store()
+            vs.add_texts(
                 texts=[text_content],
                 metadatas=[{
                     "paper_id": file_id,

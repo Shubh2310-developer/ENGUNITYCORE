@@ -1,5 +1,4 @@
 from app.core.mongodb import mongodb
-from app.services.ai.vector_store import vector_store
 from app.services.ai.groq_client import groq_client
 from typing import List, Dict, Any, Tuple
 import json
@@ -26,8 +25,10 @@ async def build_context(session_id: str, user_id: str = None, query: str = None,
     # but the pipeline handles the complex RAG flow. This function serves as the
     # default context builder for simpler paths or history retrieval.
     rag_context = ""
-    if query and user_id and vector_store:
+    if query and user_id:
         try:
+            from app.services.ai.dependencies import get_vector_store
+            vector_store = get_vector_store()
             # Enhanced search with hybrid logic
             # Pass session_id to filter documents to only this chat session
             results = vector_store.search(query, user_id=user_id, session_id=session_id, k=5, alpha=0.5)

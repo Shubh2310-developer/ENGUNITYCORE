@@ -6,11 +6,18 @@ import os
 import pickle
 import re
 from typing import List, Dict, Any, Optional
+from app.services.ai.model_optimizer import optimize_torch_for_cpu, get_model_device
 
 class VectorStore:
     def __init__(self, model_name: str = "BAAI/bge-large-en-v1.5", storage_path: str = None):
         print(f"Initializing VectorStore with model: {model_name}")
-        self.model = SentenceTransformer(model_name)
+        
+        # Optimize PyTorch before loading model
+        optimize_torch_for_cpu()
+        
+        # Load model with device specification
+        device = get_model_device()
+        self.model = SentenceTransformer(model_name, device=device)
         self.dimension = self.model.get_sentence_embedding_dimension()
         self.is_bge = "bge" in model_name.lower()
 
@@ -195,4 +202,6 @@ class VectorStore:
         elif self.metadata:
             self._build_bm25()
 
-vector_store = VectorStore()
+# REMOVED: vector_store = VectorStore()
+# This was loading at import time and blocking startup!
+# Use get_vector_store() dependency injection instead
