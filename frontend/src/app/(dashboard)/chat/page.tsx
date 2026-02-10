@@ -31,6 +31,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
+import { VariableSizeList as List } from 'react-window';
 import { useAuthStore } from '@/stores/authStore';
 import { chatService, Message } from '@/services/chat';
 import { documentService } from '@/services/document';
@@ -47,14 +48,15 @@ interface ChatSession {
   isActive: boolean;
 }
 
-const CodeBlock = ({ children, lang }: { children: string, lang: string }) => {
+// Memoized CodeBlock component to prevent re-renders
+const CodeBlock = React.memo(({ children, lang }: { children: string, lang: string }) => {
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = () => {
+  const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(children);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  };
+  }, [children]);
 
   return (
     <div className="relative my-4 group">
@@ -76,7 +78,9 @@ const CodeBlock = ({ children, lang }: { children: string, lang: string }) => {
       </pre>
     </div>
   );
-};
+}, (prevProps, nextProps) => {
+  return prevProps.children === nextProps.children && prevProps.lang === nextProps.lang;
+});
 
 export default function ChatPage() {
   const router = useRouter();
@@ -103,6 +107,8 @@ export default function ChatPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<List>(null);
+  const rowHeights = useRef<{ [key: number]: number }>({});
 
   // Update "now" every minute to refresh relative timestamps
   useEffect(() => {
@@ -187,11 +193,71 @@ export default function ChatPage() {
     ]);
   };
 
+  // Scroll to bottom when messages change
   useEffect(() => {
-    if (scrollRef.current) {
+    if (messages.length > 50 && listRef.current) {
+      // Use virtualized list scroll
+      listRef.current.scrollToItem(messages.length - 1, 'end');
+    } else if (scrollRef.current) {
+      // Use regular scroll for small lists
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // Calculate message height dynamically
+  const getRowHeight = useCallback((index: number) => {
+    // Return cached height if available
+    if (rowHeights.current[index]) {
+      return rowHeights.current[index];
+    }
+
+    const msg = messages[index];
+    if (!msg) return 150;
+
+    // Estimate height based on message properties
+    let estimatedHeight = 80; // Base height
+
+    if (msg.content) {
+      // Estimate based on content length
+      const lines = msg.content.split('\n').length;
+      const chars = msg.content.length;
+      estimatedHeight += Math.max(lines * 24, Math.ceil(chars / 80) * 24);
+    }
+
+    if (msg.images && msg.images.length > 0) {
+      estimatedHeight += 200; // Image height
+    }
+
+    if (msg.image_urls && msg.image_urls.length > 0) {
+      estimatedHeight += 200;
+    }
+
+    if (msg.steps && msg.steps.length > 0) {
+      estimatedHeight += msg.steps.length * 80; // Recursive steps
+    }
+
+    if (msg.retrieved_docs && msg.retrieved_docs.length > 0) {
+      estimatedHeight += 60; // RAG docs
+    }
+
+    // Add extra height for metadata
+    if (msg.strategy || msg.complexity || msg.used_web_search) {
+      estimatedHeight += 40;
+    }
+
+    // Cache the calculated height
+    rowHeights.current[index] = estimatedHeight;
+    
+    return estimatedHeight;
+  }, [messages]);
+
+  // Reset row heights when messages change significantly
+  useEffect(() => {
+    rowHeights.current = {};
+    if (listRef.current) {
+      listRef.current.resetAfterIndex(0);
+    }
+  }, [messages.length]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -845,8 +911,119 @@ export default function ChatPage() {
 
         {/* Messages */}
         <div ref={scrollRef} className={styles.messagesContainer}>
-          <AnimatePresence initial={false}>
-            {messages.map((msg, idx) => (
+          {/* Use virtualization for >50 messages, regular rendering for smaller lists */}
+          {messages.length > 50 ? (
+            <List
+              ref={listRef}
+              height={typeof window !== 'undefined' ? window.innerHeight - 200 : 600}
+              itemCount={messages.length}
+              itemSize={getRowHeight}
+              width="100%"
+              overscanCount={5}
+              itemData={{
+                messages,
+                copiedId,
+                copyMessage,
+                regenerateLastMessage,
+                chatSessions,
+                activeSessionId,
+                router,
+                shouldShowDivider,
+                getDividerText,
+                MarkdownComponents,
+                styles
+              }}
+            >
+              {({ index, style }) => {
+                const msg = messages[index];
+                const isLastMessage = msg.role === 'assistant' && index === messages.length - 1;
+                
+                return (
+                  <div style={style} key={msg.id || index}>
+                    {shouldShowDivider(index) && (
+                      <div className={styles.timeDivider}>
+                        <div className={styles.timeDividerLine}></div>
+                        <span className={styles.timeDividerText}>
+                          {getDividerText(msg.timestamp || undefined)}
+                        </span>
+                      </div>
+                    )}
+
+                    {msg.role === 'assistant' ? (
+                      <div className={styles.messageBubble}>
+                        {/* Message Interaction Toolbar */}
+                        <div className={styles.messageToolbar}>
+                          <button
+                            onClick={() => copyMessage(msg.content || '', msg.id || index.toString())}
+                            className={styles.toolbarBtn}
+                            title="Copy message"
+                          >
+                            {copiedId === (msg.id || index.toString()) ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                          {isLastMessage && (
+                            <button
+                              onClick={regenerateLastMessage}
+                              className={styles.toolbarBtn}
+                              title="Regenerate response"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              router.push(`/decisionvault?source=chat&title=${encodeURIComponent(chatSessions.find(s => s.id === activeSessionId)?.title || 'Decision')}&problem=${encodeURIComponent(msg.content?.slice(0, 200) || '')}`);
+                            }}
+                            className={styles.toolbarBtn}
+                            title="Save to Decision Vault"
+                          >
+                            <Shield className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        <div className={styles.messageAssistant}>
+                          <div className={styles.messageAvatar}>
+                            <Bot className={styles.messageAvatarIcon} />
+                          </div>
+                          <div className={styles.messageAssistantContent}>
+                            {/* Content rendering - simplified for virtualization */}
+                            <div className={styles.messageContent}>
+                              <ReactMarkdown remarkPlugins={[remarkGfm]} components={MarkdownComponents}>
+                                {msg.content || ''}
+                              </ReactMarkdown>
+                            </div>
+
+                            {msg.status === 'streaming' && (
+                              <div className={`${styles.messageStatus} ${styles.streaming}`}>
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                AI is thinking...
+                              </div>
+                            )}
+
+                            {msg.status === 'error' && (
+                              <div className={`${styles.messageStatus} ${styles.error}`}>
+                                <X className="w-3 h-3" />
+                                Connection error
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className={styles.messageBubble}>
+                        <div className={styles.messageUser}>
+                          <div className={styles.messageUserContent}>
+                            <p className="whitespace-pre-wrap">{msg.content}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }}
+            </List>
+          ) : (
+            <AnimatePresence initial={false}>
+              {messages.map((msg, idx) => (
               <motion.div
                 key={msg.id || idx}
                 initial={{ opacity: 0, y: 20 }}
@@ -1162,8 +1339,9 @@ export default function ChatPage() {
                 </div>
               )}
               </motion.div>
-            ))}
-          </AnimatePresence>
+              ))}
+            </AnimatePresence>
+          )}
 
           {isLoading && !messages.find(m => m.status === 'streaming') && (
             <div className={styles.messageBubble}>
