@@ -4,7 +4,7 @@ import { useAuthStore } from '@/stores/authStore';
 export interface OmniRAGRequest {
   query: string;
   session_id?: string;
-  strategy?: 'direct_generation' | 'vector_rag' | 'graph_rag';
+  strategy?: 'direct_generation' | 'vector_rag' | 'graph_rag' | 'recursive_intensive';
   include_metadata?: boolean;
   image_urls?: string[];
   image_ids?: string[];
@@ -30,6 +30,10 @@ export interface OmniRAGResponse {
     memory_active?: boolean;
     memory_summary?: string;
     context_compressed?: boolean;
+    steps?: Array<{
+      thought: string;
+      output: string;
+    }>;
   };
   latency: number;
 }

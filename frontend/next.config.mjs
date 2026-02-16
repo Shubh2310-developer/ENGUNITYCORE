@@ -18,6 +18,10 @@ const nextConfig = {
       },
     ],
   },
+  // Disable static generation for dynamic pages
+  experimental: {
+    missingSuspenseWithCSRBailout: false,
+  },
 };
 
 export default nextConfig;

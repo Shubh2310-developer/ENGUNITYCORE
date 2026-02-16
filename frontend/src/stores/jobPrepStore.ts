@@ -18,6 +18,9 @@ interface JobPrepState {
   fetchSimulations: () => Promise<void>;
   fetchSkillGaps: () => Promise<any[]>;
   fetchReadinessHistory: () => Promise<any[]>;
+  fetchReadinessForecast: () => Promise<any>;
+  fetchRoleCurriculum: (roleId: string) => Promise<any[]>;
+  evaluateEvidence: (evidenceId: string) => Promise<void>;
 
   createProfile: (data: any) => Promise<void>;
   updateProfile: (data: any) => Promise<void>;
@@ -36,7 +39,7 @@ interface JobPrepState {
   fetchSkillEvidence: (skillId: string) => Promise<any[]>;
   addSkillEvidence: (skillId: string, data: any) => Promise<void>;
   deleteSkillEvidence: (evidenceId: string) => Promise<void>;
-  evaluatePractice: (topic: string, answer: string) => Promise<any>;
+  evaluatePractice: (topic: string, answer: string, practiceType?: string, difficulty?: string) => Promise<any>;
 }
 
 export const useJobPrepStore = create<JobPrepState>((set, get) => ({
@@ -109,6 +112,33 @@ export const useJobPrepStore = create<JobPrepState>((set, get) => ({
     } catch (err: any) {
       set({ error: err.message });
       return [];
+    }
+  },
+
+  fetchReadinessForecast: async () => {
+    try {
+      return await jobPrepService.getReadinessForecast();
+    } catch (err: any) {
+      set({ error: err.message });
+      return null;
+    }
+  },
+
+  fetchRoleCurriculum: async (roleId: string) => {
+    try {
+      return await jobPrepService.getRoleCurriculum(roleId);
+    } catch (err: any) {
+      set({ error: err.message });
+      return [];
+    }
+  },
+
+  evaluateEvidence: async (evidenceId: string) => {
+    try {
+      await jobPrepService.evaluateEvidence(evidenceId);
+      await get().fetchSkills(); // Refresh skills to update evidence quality scores
+    } catch (err: any) {
+      set({ error: err.message });
     }
   },
 
@@ -243,9 +273,11 @@ export const useJobPrepStore = create<JobPrepState>((set, get) => ({
     }
   },
 
-  evaluatePractice: async (topic: string, answer: string) => {
+  evaluatePractice: async (topic: string, answer: string, practiceType = 'conceptual', difficulty = 'medium') => {
     try {
-      return await jobPrepService.evaluatePractice(topic, answer);
+      const result = await jobPrepService.evaluatePractice(topic, answer, practiceType, difficulty);
+      await get().fetchProfile(); // Refresh profile to get updated readiness
+      return result;
     } catch (err: any) {
       set({ error: err.message });
       return null;

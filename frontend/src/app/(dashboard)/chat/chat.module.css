@@ -326,6 +326,8 @@
     max-width: 96%;
     margin: 0 auto 1.5rem;
     position: relative;
+    content-visibility: auto;
+    contain-intrinsic-size: 0 200px;
 }
 
 .messageToolbar {
@@ -642,7 +644,9 @@
 }
 
 /* Utilities */
-.hidden { display: none !important; }
+.hidden {
+    display: none !important;
+}
 
 .iconBtn {
     padding: 0.5rem;
@@ -679,25 +683,46 @@
     animation: bounce 1.4s infinite ease-in-out both;
 }
 
-.loadingDot:nth-child(1) { animation-delay: -0.32s; }
-.loadingDot:nth-child(2) { animation-delay: -0.16s; }
+.loadingDot:nth-child(1) {
+    animation-delay: -0.32s;
+}
+
+.loadingDot:nth-child(2) {
+    animation-delay: -0.16s;
+}
 
 @keyframes bounce {
-    0%, 80%, 100% { transform: scale(0); }
-    40% { transform: scale(1.0); opacity: 1; }
+
+    0%,
+    80%,
+    100% {
+        transform: scale(0);
+    }
+
+    40% {
+        transform: scale(1.0);
+        opacity: 1;
+    }
 }
 
 /* Scrollbar */
-.messagesContainer::-webkit-scrollbar { width: 6px; }
+.messagesContainer::-webkit-scrollbar {
+    width: 6px;
+}
+
 .messagesContainer::-webkit-scrollbar-thumb {
     background-color: #e2e8f0;
     border-radius: 10px;
 }
+
 .messagesContainer::-webkit-scrollbar-thumb:hover {
     background-color: #cbd5e1;
 }
 
-.sessionsList::-webkit-scrollbar { width: 4px; }
+.sessionsList::-webkit-scrollbar {
+    width: 4px;
+}
+
 .sessionsList::-webkit-scrollbar-thumb {
     background-color: #e2e8f0;
     border-radius: 10px;

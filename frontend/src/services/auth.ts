@@ -71,7 +71,9 @@ export const authService = {
 
   async getMe(token: string) {
     try {
-      console.log('[Auth Service] Fetching user data with token:', token.substring(0, 50) + '...');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Auth Service] Fetching user data with token:', token.substring(0, 50) + '...');
+      }
       const response = await fetch(`${FINAL_API_URL}/auth/me`, {
         method: 'GET',
         headers: {
@@ -80,19 +82,27 @@ export const authService = {
         },
       });
 
-      console.log('[Auth Service] Response status:', response.status);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Auth Service] Response status:', response.status);
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('[Auth Service] Error response:', errorText);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('[Auth Service] Error response:', errorText);
+        }
         throw new Error(`Failed to fetch user data: ${response.status} ${errorText}`);
       }
 
       const userData = await response.json();
-      console.log('[Auth Service] User data received:', userData);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Auth Service] User data received:', userData);
+      }
       return userData;
     } catch (error) {
-      console.error('[Auth Service] Error in getMe:', error);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[Auth Service] Error in getMe:', error);
+      }
       if (error instanceof TypeError && error.message === 'Failed to fetch') {
         throw new Error(`Unable to connect to backend at ${FINAL_API_URL}. Please ensure the backend server is running.`);
       }

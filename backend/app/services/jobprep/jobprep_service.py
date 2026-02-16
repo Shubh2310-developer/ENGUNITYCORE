@@ -3,6 +3,7 @@ from typing import List, Optional, Dict, Any
 from uuid import UUID
 import json
 import re
+import hashlib
 from datetime import datetime
 from loguru import logger
 
@@ -155,72 +156,94 @@ class JobPrepService:
         return project
 
     # --- AI Integration ---
+    def _generate_content_hash(self, content_parts: List[str]) -> str:
+        """Generate a unique hash for a set of strings to cache AI results."""
+        combined = "|".join([str(p).strip().lower() for p in content_parts if p])
+        return hashlib.sha256(combined.encode()).hexdigest()
+
     async def analyze_project_with_ai(self, project_id: UUID):
         project = self.db.query(JobPrepProject).filter(JobPrepProject.id == project_id).first()
         if not project:
             return None
 
+        # Content hashing for caching check
+        content_parts = [project.title, project.description] + (project.tech_stack or [])
+        content_hash = self._generate_content_hash(content_parts)
+
+        # Check if we already have a recent analysis for this exact content
+        if project.impact_metrics and project.impact_metrics.get("content_hash") == content_hash:
+            logger.info(f"Using cached AI analysis for project {project.id}")
+            return project
+
+        # Fetch target roles for relevance scoring
+        roles = self.db.query(JobPrepTargetRole).filter(JobPrepTargetRole.profile_id == project.profile_id).all()
+        roles_context = [{"title": r.role_title, "skills": r.required_skills} for r in roles]
+
         prompt = f"""
-        You are an expert technical interviewer. Analyze the following project for its technical value in a job interview:
+        You are an expert technical interviewer and code auditor.
+        Analyze this project for its technical depth and career impact:
         Title: {project.title}
         Description: {project.description}
         Tech Stack: {project.tech_stack}
 
-        Provide a structured analysis in JSON format with the following keys:
+        Target Roles Context: {roles_context}
+
+        Provide a structured analysis in JSON:
         - complexity_score (float 0-1.0)
         - innovation_score (float 0-1.0)
         - interview_value_score (float 0-1.0)
-        - talking_points (list of strings)
-        - key_strengths (list of strings)
+        - role_relevance_scores (dict mapping role titles to float 0-1.0)
+        - talking_points (list of 5 powerful interview bullet points)
+        - technical_complexity_breakdown (string summary)
+        - improvement_suggestions (list of strings)
 
         Ensure the output is ONLY the JSON object.
         """
 
         try:
             response = await groq_client.get_completion([{"role": "user", "content": prompt}])
-            
-            # Robust JSON parsing - extract JSON even if wrapped in text
             json_match = re.search(r'\{.*\}', response, re.DOTALL)
             if json_match:
                 try:
                     analysis = json.loads(json_match.group())
-                    
-                    # Validate and sanitize scores
+
                     project.complexity_score = max(0.0, min(1.0, float(analysis.get('complexity_score', 0.5))))
                     project.innovation_score = max(0.0, min(1.0, float(analysis.get('innovation_score', 0.5))))
                     project.interview_value_score = max(0.0, min(1.0, float(analysis.get('interview_value_score', 0.5))))
-                    
-                    # Validate talking points (limit to 10, each max 500 chars)
+
+                    # Store relevance and breakdown in metadata
+                    project.impact_metrics = {
+                        "role_relevance": analysis.get('role_relevance_scores', {}),
+                        "complexity_breakdown": analysis.get('technical_complexity_breakdown', ''),
+                        "improvement_suggestions": analysis.get('improvement_suggestions', []),
+                        "content_hash": content_hash,
+                        "analyzed_at": datetime.utcnow().isoformat()
+                    }
+
                     talking_points = analysis.get('talking_points', [])
                     if isinstance(talking_points, list):
                         project.talking_points = [str(tp)[:500] for tp in talking_points[:10]]
-                    else:
-                        project.talking_points = []
-                    
+
                     self.db.commit()
                     self.db.refresh(project)
                 except (json.JSONDecodeError, ValueError, TypeError) as parse_error:
-                    logger.error(f"AI JSON parsing failed: {parse_error}. Response: {response[:200]}")
-                    # Set default values if parsing fails
-                    project.complexity_score = 0.5
-                    project.innovation_score = 0.5
-                    project.interview_value_score = 0.5
-                    project.talking_points = ["Analysis unavailable - please retry"]
-                    self.db.commit()
-                    self.db.refresh(project)
-            else:
-                logger.warning(f"No JSON found in AI response: {response[:200]}")
+                    logger.error(f"AI JSON parsing failed: {parse_error}")
         except Exception as e:
             logger.error(f"AI Project Analysis failed: {e}")
-            # Don't crash - return project with default values
-            pass
 
         return project
 
-    async def generate_interview_question(self, role_id: UUID, difficulty: str):
+    async def generate_interview_question(self, role_id: UUID, difficulty: str, sim_id: Optional[UUID] = None):
         role = self.db.query(JobPrepTargetRole).filter(JobPrepTargetRole.id == role_id).first()
         if not role:
              return {"error": "Role not found"}
+
+        # Fetch simulation context if available
+        sim_context = ""
+        if sim_id:
+            sim = self.db.query(JobPrepInterviewSimulation).filter(JobPrepInterviewSimulation.id == sim_id).first()
+            if sim:
+                sim_context = f"Company Style: {sim.company_style or 'General'}, Interviewer Persona: {sim.persona_style or 'Professional'}."
 
         # Validate difficulty
         valid_difficulties = ['entry', 'mid-level', 'mid', 'senior', 'expert']
@@ -230,6 +253,7 @@ class JobPrepService:
         prompt = f"""
         Generate a {difficulty} level technical interview question for a {role.role_title} position.
         The question should focus on {role.required_skills}.
+        {sim_context}
 
         Provide the output in JSON format with:
         - question (string)
@@ -363,6 +387,20 @@ class JobPrepService:
         if not role:
             return {"error": "Role not found"}
 
+        # Caching check for roles
+        content_parts = [role.role_title, role.role_category, role.seniority_level]
+        content_hash = self._generate_content_hash(content_parts)
+
+        if role.interview_pattern and role.interview_pattern.get("content_hash") == content_hash:
+            logger.info(f"Using cached AI analysis for role {role.id}")
+            return {
+                "typical_interview_rounds": role.typical_interview_rounds,
+                "recommended_skills": role.required_skills,
+                "market_demand_description": role.market_demand_description,
+                "suggested_salary_range": role.suggested_salary_range,
+                "preparation_focus_areas": role.preparation_focus_areas
+            }
+
         prompt = f"""
         You are an expert technical recruiter. Analyze the requirements for this role:
         Role: {role.role_title}
@@ -396,6 +434,11 @@ class JobPrepService:
                     
                     focus = analysis.get('preparation_focus_areas', [])
                     role.preparation_focus_areas = [str(f)[:100] for f in focus[:30]] if isinstance(focus, list) else []
+
+                    role.interview_pattern = {
+                        "content_hash": content_hash,
+                        "analyzed_at": datetime.utcnow().isoformat()
+                    }
 
                     self.db.commit()
                     return {
@@ -455,7 +498,7 @@ class JobPrepService:
         return True
 
     # --- Practice Evaluation ---
-    async def evaluate_practice_attempt(self, profile_id: UUID, topic: str, user_answer: str):
+    async def evaluate_practice_attempt(self, profile_id: UUID, topic: str, user_answer: str, practice_type: str = "conceptual", difficulty: str = "medium"):
         # Validate inputs
         if not user_answer or not user_answer.strip():
             return {
@@ -470,7 +513,7 @@ class JobPrepService:
         answer_truncated = user_answer[:10000]
 
         prompt = f"""
-        Evaluate this practice attempt for the topic: {topic_truncated}
+        Evaluate this {difficulty} difficulty {practice_type} practice attempt for the topic: {topic_truncated}
         User Answer: {answer_truncated}
 
         Provide feedback in JSON:
@@ -486,7 +529,7 @@ class JobPrepService:
             if json_match:
                 try:
                     evaluation = json.loads(json_match.group())
-                    
+
                     # Sanitize and validate
                     sanitized_eval = {
                         "score": max(0, min(100, int(evaluation.get('score', 0)))),
@@ -498,8 +541,9 @@ class JobPrepService:
                     # Save session in PostgreSQL
                     session = JobPrepPracticeSession(
                         profile_id=profile_id,
-                        practice_type="conceptual",
+                        practice_type=practice_type,
                         topic=topic_truncated,
+                        difficulty=difficulty,
                         score=sanitized_eval['score'],
                         ai_feedback=sanitized_eval['feedback'],
                         completed=True,
@@ -531,24 +575,38 @@ class JobPrepService:
         if not profile:
             return
 
-        # Simple weighted algorithm:
-        # 40% Simulations average
-        # 30% Skills progress
-        # 20% Projects impact
-        # 10% Practice consistency
-
-        sims = self.db.query(JobPrepInterviewSimulation).filter(JobPrepInterviewSimulation.profile_id == profile_id).all()
-        sim_score = sum([s.overall_score for s in sims if s.overall_score]) / len(sims) if sims else 0
-
+        # Fetch common data
         skills = self.db.query(JobPrepSkill).filter(JobPrepSkill.profile_id == profile_id).all()
-        skill_score = (sum([s.current_level for s in skills]) / (len(skills) * 5)) * 100 if skills else 0
-
         projects = self.db.query(JobPrepProject).filter(JobPrepProject.profile_id == profile_id).all()
-        proj_score = (sum([float(p.interview_value_score or 0) for p in projects]) / len(projects)) * 100 if projects else 0
+        sims = self.db.query(JobPrepInterviewSimulation).filter(JobPrepInterviewSimulation.profile_id == profile_id).all()
 
-        weighted_score = int((sim_score * 0.4) + (skill_score * 0.3) + (proj_score * 0.2) + 10) # Base 10
-        profile.overall_readiness_score = min(weighted_score, 100)
+        # Overall profile readiness
+        skill_score_overall = (sum([s.current_level for s in skills]) / (len(skills) * 5)) * 100 if skills else 0
+        proj_score_overall = (sum([float(p.interview_value_score or 0) for p in projects]) / len(projects)) * 100 if projects else 0
+        sim_score_overall = sum([s.overall_score for s in sims if s.overall_score]) / len(sims) if sims else 0
+
+        weighted_score_overall = int((sim_score_overall * 0.4) + (skill_score_overall * 0.3) + (proj_score_overall * 0.2) + 10)
+        profile.overall_readiness_score = min(weighted_score_overall, 100)
         profile.last_assessment_date = datetime.utcnow()
+
+        # Role-specific readiness
+        for role in profile.target_roles:
+            required = [s.lower() for s in (role.required_skills or [])]
+            if not required:
+                role.readiness_score = profile.overall_readiness_score
+                continue
+
+            # Filter skills relevant to this role
+            relevant_skills = [s for s in skills if s.skill_name.lower() in required]
+            role_skill_score = (sum([s.current_level for s in relevant_skills]) / (len(required) * 5)) * 100 if required else 0
+
+            # Filter simulations relevant to this role
+            role_sims = [s for s in sims if s.target_role_id == role.id]
+            role_sim_score = sum([s.overall_score for s in role_sims if s.overall_score]) / len(role_sims) if role_sims else sim_score_overall
+
+            # Weighted Role Score
+            role_weighted = int((role_sim_score * 0.5) + (role_skill_score * 0.4) + (proj_score_overall * 0.1))
+            role.readiness_score = min(role_weighted, 100)
 
         self.db.commit()
 
@@ -556,7 +614,7 @@ class JobPrepService:
         assessment = JobPrepReadinessAssessment(
             profile_id=profile_id,
             overall_readiness_score=profile.overall_readiness_score,
-            technical_skills_score=int(skill_score),
+            technical_skills_score=int(skill_score_overall),
             assessment_type="automatic",
             assessed_at=datetime.utcnow()
         )
@@ -588,3 +646,111 @@ class JobPrepService:
                         })
 
         return gaps
+
+    # --- New Advanced Features ---
+    async def generate_role_curriculum(self, role_id: UUID) -> List[Dict[str, Any]]:
+        role = self.db.query(JobPrepTargetRole).filter(JobPrepTargetRole.id == role_id).first()
+        if not role:
+            return []
+
+        prompt = f"""
+        Generate a 4-week preparation curriculum for a {role.role_title} position.
+        Required Skills: {role.required_skills}
+        Focus Areas: {role.preparation_focus_areas}
+
+        Provide a structured weekly plan in JSON format:
+        [
+          {{
+            "week": 1,
+            "theme": "string",
+            "topics": ["string"],
+            "recommended_projects": ["string"],
+            "success_criteria": "string"
+          }},
+          ...
+        ]
+        """
+
+        try:
+            response = await groq_client.get_completion([{"role": "user", "content": prompt}])
+            json_match = re.search(r'\[.*\]', response, re.DOTALL)
+            if json_match:
+                try:
+                    curriculum = json.loads(json_match.group())
+                    if isinstance(curriculum, list):
+                        role.role_curriculum = curriculum
+                        self.db.commit()
+                        return curriculum
+                except json.JSONDecodeError:
+                    logger.error(f"Failed to parse curriculum JSON: {response[:200]}")
+        except Exception as e:
+            logger.error(f"Failed to generate curriculum: {e}")
+
+        return []
+
+    async def evaluate_evidence_quality(self, evidence_id: UUID) -> Dict[str, Any]:
+        evidence = self.db.query(JobPrepSkillEvidence).filter(JobPrepSkillEvidence.id == evidence_id).first()
+        if not evidence:
+            return {"error": "Evidence not found"}
+
+        prompt = f"""
+        Evaluate the quality and relevance of this career skill evidence:
+        Title: {evidence.title}
+        Type: {evidence.evidence_type}
+        Description: {evidence.description}
+        URL: {evidence.source_url}
+
+        Provide a quality assessment in JSON format:
+        - quality_score (float 0-1.0)
+        - impact_level (string: high, medium, low)
+        - strengths (list of strings)
+        - improvements (list of strings)
+        - verification_suggestion (string)
+        """
+
+        try:
+            response = await groq_client.get_completion([{"role": "user", "content": prompt}])
+            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            if json_match:
+                try:
+                    analysis = json.loads(json_match.group())
+                    evidence.quality_score = max(0.0, min(1.0, float(analysis.get('quality_score', 0.5))))
+                    evidence.impact_level = str(analysis.get('impact_level', 'medium'))[:50]
+                    evidence.verified = True if evidence.quality_score > 0.8 else False
+
+                    self.db.commit()
+                    return analysis
+                except (json.JSONDecodeError, ValueError, TypeError):
+                    logger.error(f"Failed to parse evidence quality JSON: {response[:200]}")
+        except Exception as e:
+            logger.error(f"Failed to evaluate evidence: {e}")
+
+        return {"error": "Evaluation failed"}
+
+    def get_readiness_forecast(self, profile_id: UUID) -> Dict[str, Any]:
+        history = self.db.query(JobPrepReadinessAssessment).filter(
+            JobPrepReadinessAssessment.profile_id == profile_id
+        ).order_by(JobPrepReadinessAssessment.assessed_at.asc()).all()
+
+        if len(history) < 2:
+            return {
+                "current_score": history[-1].overall_readiness_score if history else 0,
+                "projected_score_30d": history[-1].overall_readiness_score if history else 0,
+                "velocity": 0,
+                "confidence": "low"
+            }
+
+        # Simple linear projection
+        first = history[0]
+        last = history[-1]
+        days = (last.assessed_at - first.assessed_at).days or 1
+        velocity = (last.overall_readiness_score - first.overall_readiness_score) / days
+
+        projected = min(100, last.overall_readiness_score + (velocity * 30))
+
+        return {
+            "current_score": last.overall_readiness_score,
+            "projected_score_30d": int(projected),
+            "velocity": round(velocity, 2),
+            "confidence": "medium" if len(history) > 5 else "low"
+        }

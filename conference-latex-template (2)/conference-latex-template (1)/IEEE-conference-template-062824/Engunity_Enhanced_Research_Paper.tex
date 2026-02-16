@@ -23,8 +23,8 @@
 
 \begin{document}
 
-\title{Engunity X:AI- Powered SaaS Platform for Research, Code Generation and Data Analysis\\
-{\footnotesize \textsuperscript{}Research Platform for Advanced AI-Driven Development}}
+\title{Engunity X:AI Powered SaaS Platform for Research, Code Generation and Data Analysis\\
+{\footnotesize \textsuperscript{}Research Platform for Advanced AI Driven Development}}
 }
 
 \makeatletter
@@ -35,37 +35,37 @@
 }
 \makeatother
 
-\author{\IEEEauthorblockN{1\textsuperscript{st} Shubh Rajesh Shah}
+\author{\IEEEauthorblockN{\textsuperscript{} Shubh Rajesh Shah}
 \IEEEauthorblockA{\textit{Artificial Intelligence and Data Science} \\
 \textit{Shah And Anchor Kutchhi Engineering College}\\
 Mumbai, India\\
 shubhshahwork@gmail.com}
 \and
-\IEEEauthorblockN{2\textsuperscript{nd} Nigranth Shailesh Shah}
+\IEEEauthorblockN{\textsuperscript{} Nigranth Shailesh Shah}
 \IEEEauthorblockA{\textit{Artificial Intelligence and Data Science} \\
 \textit{Shah And Anchor Kutchhi Engineering College}\\
 Mumbai, India \\
 nigranth.17430@sakec.ac.in}
 \linebreakand
-\IEEEauthorblockN{3\textsuperscript{rd} Shreyash Chetan Mokani}
+\IEEEauthorblockN{\textsuperscript{} Shreyash Chetan Mokani}
 \IEEEauthorblockA{\textit{Artificial Intelligence and Data Science} \\
 \textit{Shah And Anchor Kutchhi Engineering College}\\
 Mumbai, India \\
 shreyash.17269@sakec.ac.in}
 \and
-\IEEEauthorblockN{4\textsuperscript{th} Anurag Mrityunjay Kumar}
+\IEEEauthorblockN{\textsuperscript{} Anurag Mrityunjay Kumar}
 \IEEEauthorblockA{\textit{Artificial Intelligence and Data Science} \\
 \textit{Shah And Anchor Kutchhi Engineering College}\\
 Mumbai, India  \\
 anurag.kumar17647@sakec.ac.in}
 \linebreakand
-\IEEEauthorblockN{5\textsuperscript{th} Author Name Placeholder}
+\IEEEauthorblockN{\textsuperscript{} Dr.Rahul Pachade}
 \IEEEauthorblockA{\textit{Artificial Intelligence and Data Science} \\
 \textit{Shah And Anchor Kutchhi Engineering College}\\
 Mumbai, India \\
-email@placeholder.com}
+rahul.pachade@sakec.ac.in}
 \and
-\IEEEauthorblockN{\phantom{6\textsuperscript{th} Author Name Placeholder}}
+\IEEEauthorblockN{\phantom{\textsuperscript{} Author Name Placeholder}}
 \IEEEauthorblockA{\phantom{\textit{Artificial Intelligence and Data Science}} \\
 \phantom{\textit{Shah And Anchor Kutchhi Engineering College}}\\
 \phantom{Mumbai, India} \\
@@ -76,105 +76,77 @@ email@placeholder.com}
 \maketitle
 
 \begin{abstract}
-The landscape of digital knowledge work is rapidly shifting towards integrated cognitive augmentation systems that go beyond conversational interfaces to perform complex, multi-domain tasks. This study introduces \textbf{Engunity}, a holistic agentic AI framework engineered upon a microservices architecture to deliver robust cognitive support in research, software engineering, and strategic analysis. The platform synthesizes five specialized subsystems: (1) \textbf{OmniRAG}, a retrieval-augmented generation engine employing hybrid search strategies and graph-based retrieval; (2) \textbf{Code Lab}, a secure, polyglot execution environment facilitating real-time collaborative development; (3) \textbf{Decision Vault}, an adversarial reasoning engine for detecting and mitigating cognitive biases; (4) \textbf{Analytics Dashboard}, an ML-driven visualization suite; and (5) \textbf{GitHub Intelligence}, for automated repository interrogation. Operating on a codebase of over 2,632 production lines, Engunity integrates more than 15 distinct AI models and achieves sub-500ms latency with 500 concurrent active users. Validated benchmarks demonstrate an 88\% retrieval accuracy for complex multi-hop queries, marking a 45\% efficiency gain over conventional RAG implementations. This research outlines a scalable reference architecture for production-ready agentic systems that merge security with advanced cognitive capabilities.
+This study introduces \textbf{Engunity}, an agentic AI framework on a microservices architecture for research, software engineering, and strategic analysis. It synthesizes five subsystems: (1) \textbf{OmniRAG}, a hybrid retrieval augmented generation engine; (2) \textbf{Code Lab}, a secure polyglot execution sandbox; (3) \textbf{Decision Vault}, an adversarial reasoning engine for cognitive bias detection; (4) \textbf{Analytics Dashboard}, an ML driven visualization suite; and (5) \textbf{GitHub Intelligence}, for automated repository analysis. With 2,632+ production lines and 15+ AI models, Engunity achieves sub 500ms latency at 500 concurrent users and 88\% retrieval accuracy on multihop queries—a 45\% gain over conventional RAG. This paper outlines a scalable reference architecture for production ready agentic systems.
 \end{abstract}
 
 \begin{IEEEkeywords}
-Agentic AI, Retrieval-Augmented Generation, Microservices Architecture, Secure Code Sandbox, Adversarial AI, Knowledge Graphs, Real-time Collaboration, Multi-modal Intelligence.
+Agentic AI, Retrieval Augmented Generation, Microservices Architecture, Secure Code Sandbox, Adversarial AI, Knowledge Graphs, Realtime Collaboration, Multimodal Intelligence.
 \end{IEEEkeywords}
 
 
 \section{Introduction}
 
-The rapid advancement of Large Language Models (LLMs) has necessitated a transition from passive, query-response tools to active, \textit{agentic} ecosystems designed for autonomous cognitive workflows. Professionals in knowledge-intensive sectors—spanning research, software engineering, and data science—now require platforms that transcend information retrieval to actively engage in code synthesis, analytical reasoning, and decision verification.
-
-Despite their proliferation, contemporary AI-assistive tools face significant architectural and functional bottlenecks:
-\begin{itemize}
-    \item \textbf{Tool Siloing:} The fragmentation of capabilities across distinct platforms (e.g., coding assistants vs. general-purpose chatbots) introduces substantial context-switching penalties.
-    \item \textbf{Retrieval Latency and Inaccuracy:} Conventional RAG architectures struggle to synthesize information across disparate documents for multi-hop queries.
-    \item \textbf{Execution Security:} Running AI-generated code in localized environments presents unmitigated security risks.
-    \item \textbf{Cognitive Echo Chambers:} AI assistants frequently prioritize alignment over factual rigor, reinforcing user biases rather than offering critical evaluation.
-\end{itemize}
+LLM advancement has driven a shift from passive query response tools to \textit{agentic} ecosystems for autonomous cognitive workflows. However, contemporary AI tools face key bottlenecks: (a) tool siloing across fragmented platforms, (b) poor RAG accuracy on multihop queries, (c) insecure code execution environments, and (d) cognitive echo chambers where AI validates rather than challenges user biases.
 
 \subsection{Key Contributions}
-
-\textbf{Engunity} systematically addresses these deficiencies via a unified, scalable microservices framework, delivering:
-
+Engunity addresses these via a unified microservices framework:
 \begin{enumerate}
-    \item \textbf{Hybrid OmniRAG Engine:} An advanced three-tier retrieval mechanism integrating dense vector search (FAISS), sparse keyword matching (BM25), and graph-based traversal, optimized by dynamic query complexity analysis.
-    \item \textbf{Isolated Execution Environment:} A secure, polyglot sandbox capable of safe execution for 10+ programming languages, featuring real-time I/O streaming and strict resource containment.
-    \item \textbf{Adversarial Cognitive Audit:} A novel decision support module that utilizes adversarial prompting to rigorously detect and counter cognitive biases such as sunk cost fallacy and confirmation bias.
-    \item \textbf{High-Performance Architecture:} A robust backend utilizing FastAPI for asynchronous orchestration, Redis for high-speed caching (300s TTL), and Socket.IO for low-latency collaboration.
-    \item \textbf{Empirical Validation:} Comprehensive benchmarks demonstrating superior performance, including 88\% multi-hop query accuracy and sub-500ms latency under substantial concurrent load.
+    \item Hybrid OmniRAG: Three-tier retrieval integrating FAISS, BM25, and graph traversal with dynamic query complexity routing and production-grade cross-session persistence.
+    \item Secure Code Lab: Polyglot sandbox for 10+ languages with realtime I/O and strict resource containment.
+    \item Adversarial Decision Vault: Bias detection via adversarial prompting (sunk cost, confirmation bias, etc.).
+    \item High-Performance Backend: FastAPI + Redis caching (300s TTL) + Socket.IO for sub-500ms latency.
+    \item Smart Session Management: AI-driven autonomous chat naming and robust document-to-user identity anchoring.
 \end{enumerate}
 
-The platform consists of 121 Python modules (backend) and 79 TypeScript/React components (frontend), integrating 15+ AI services including Groq (Llama 3.1), Gemini 2.0 Flash, BAAI/bge-large embeddings, YOLOv8-nano for vision, and DistilBERT for classification.
-
-\subsection{Paper Organization}
-
-Section II presents the system architecture and design principles. Section III details the OmniRAG retrieval pipeline. Section IV describes the Code Lab sandbox. Section V explains the Decision Vault's adversarial mechanisms. Section VI covers the Analytics Dashboard and GitHub Intelligence. Section VII presents performance evaluations. Section VIII discusses related work, and Section IX concludes with future directions.
+The platform comprises 121 Python modules and 79 TypeScript/React components, integrating 15+ AI services (Groq Llama 3.1, Gemini 2.0, BAAI/bge-large, YOLOv8-nano, DistilBERT).
 
 
 \section{System Architecture}
 
-Engunity implements a layered microservices architecture designed for horizontal scalability, fault tolerance, and modular extensibility. The system consists of five primary service planes orchestrated through a central FastAPI gateway.
-
-\subsection{Architectural Overview}
-
-The platform follows a client-server architecture with clear separation of concerns:
+Engunity uses a layered microservices architecture with five service planes orchestrated through a FastAPI gateway (Fig.~\ref{fig:arch}).
 
 \begin{figure}[htbp]
 \centering
-\resizebox{\linewidth}{!}{%
-\begin{tikzpicture}[node distance=1.6cm, auto, font=\small]
-% ENHANCED STYLES - Better Contrast and Visibility
-\tikzstyle{block} = [rectangle, draw=orange!80!black, fill=orange!20, text width=8.5em, text centered, rounded corners, minimum height=3.5em, drop shadow, line width=2pt]
-\tikzstyle{service} = [rectangle, draw=blue!80!black, fill=blue!15, text width=8.5em, text centered, rounded corners, minimum height=3.5em, drop shadow, line width=2pt]
-\tikzstyle{database} = [cylinder, draw=green!70!black, shape border rotate=90, aspect=0.25, fill=green!15, text width=6em, text centered, minimum height=4.5em, drop shadow, line width=2pt]
-\tikzstyle{arrow} = [very thick,->,>=stealth, line width=2pt, black!80]
+\scalebox{0.92}{%
+\begin{tikzpicture}[node distance=0.4cm, auto, font=\tiny]
+\tikzstyle{block} = [rectangle, draw=orange!80!black, fill=orange!20, text width=5em, text centered, rounded corners, minimum height=1.6em, line width=0.5pt]
+\tikzstyle{service} = [rectangle, draw=blue!80!black, fill=blue!15, text width=5em, text centered, rounded corners, minimum height=1.6em, line width=0.5pt]
+\tikzstyle{database} = [cylinder, draw=green!70!black, shape border rotate=90, aspect=0.25, fill=green!15, text width=3.8em, text centered, minimum height=2em, line width=0.5pt]
+\tikzstyle{arrow} = [->,>=stealth, line width=0.5pt, black!80]
 
-% Core Path
-\node (frontend) [block, fill=orange!25] {\textbf{Next.js Frontend}\\79 UI Components};
-\node (gateway) [block, below=1cm of frontend] {\textbf{FastAPI Gateway}\\Request Orchestrator};
-\node (router) [block, below=1cm of gateway] {\textbf{Service Registry}\\AI Model Router};
+\node (frontend) [block, fill=orange!25] {\textbf{Next.js}\\79 Components};
+\node (gateway) [block, below=0.3cm of frontend] {\textbf{FastAPI}\\Gateway};
+\node (router) [block, below=0.3cm of gateway] {\textbf{Registry}\\AI Router};
 
-% Services
-\node (code) [service, below=1.8cm of router] {\textbf{Code Lab}\\Polyglot Sandbox};
-\node (rag) [service, left=0.8cm of code] {\textbf{OmniRAG}\\Adaptive Retrieval};
-\node (decision) [service, right=0.8cm of code] {\textbf{Decision Vault}\\Bias Detection};
+\node (code) [service, below=0.6cm of router] {\textbf{Code Lab}\\Sandbox};
+\node (rag) [service, left=0.3cm of code] {\textbf{OmniRAG}\\Retrieval};
+\node (decision) [service, right=0.3cm of code] {\textbf{Decision}\\Bias Det.};
 
-% Secondary Services
-\node (analytics) [service, below=1cm of rag] {\textbf{Analytics ML}\\Data Visualization};
-\node (github) [service, below=1cm of decision] {\textbf{GitHub Intel}\\Repo Analysis};
+\node (analytics) [service, below=0.4cm of rag] {\textbf{Analytics}\\ML};
+\node (github) [service, below=0.4cm of decision] {\textbf{GitHub}\\Intel};
 
-% Persistence
-\node (vector) [database, below=1.5cm of analytics] {\textbf{FAISS}\\Vector Store};
-\node (db) [database, below=1.5cm of github] {\textbf{PostgreSQL}\\Relational DB};
-\node (cache) [database, below=1.5cm of code] {\textbf{Redis}\\Shared Cache};
+\node (vector) [database, below=0.5cm of analytics] {\textbf{FAISS}};
+\node (db) [database, below=0.5cm of github] {\textbf{PostgreSQL}};
+\node (cache) [database, below=0.5cm of code] {\textbf{Redis}};
 
-% Connections - Enhanced routing to avoid box intersections
-\draw [arrow] (frontend.south) -- (gateway.north);
-\draw [arrow] (gateway.south) -- (router.north);
-\draw [arrow] (router.south) -- (code.north);
-% Curved arrows to avoid intersecting router box
-\draw [arrow] (router.195) to[out=180,in=90] (rag.north);
-\draw [arrow] (router.-15) to[out=0,in=90] (decision.north);
-
-\draw [arrow] (rag.south) -- (analytics.north);
-\draw [arrow] (decision.south) -- (github.north);
-\draw [arrow] (analytics.south) -- (vector.north);
-\draw [arrow] (github.south) -- (db.north);
-\draw [arrow] (code.south) -- (cache.north);
+\draw [arrow] (frontend) -- (gateway);
+\draw [arrow] (gateway) -- (router);
+\draw [arrow] (router) -- (code);
+\draw [arrow] (router.195) to[out=180,in=90] (rag);
+\draw [arrow] (router.-15) to[out=0,in=90] (decision);
+\draw [arrow] (rag) -- (analytics);
+\draw [arrow] (decision) -- (github);
+\draw [arrow] (analytics) -- (vector);
+\draw [arrow] (github) -- (db);
+\draw [arrow] (code) -- (cache);
 
 \end{tikzpicture}%
 }
-\caption{Engunity Microservices Architecture. The high-concurrency gateway handles request orchestration across five specialized service planes and three optimized persistence layers.}
+\caption{Engunity Microservices Architecture.}
 \label{fig:arch}
 \end{figure}
 
 \subsection{Technology Stack}
-
-Table~\ref{tab:techstack} summarizes the core technologies employed in each layer.
 
 \begin{table}[htbp]
 \caption{Engunity Technology Stack}
@@ -201,87 +173,56 @@ Orchestration & Docker Compose, Nginx \\
 \end{table}
 
 \subsection{Frontend Architecture}
-
-The client application is built with \textbf{Next.js 14} using the App Router for efficient server-side rendering and code splitting. Key features include:
-
-\begin{itemize}
-    \item \textbf{State Management:} Zustand stores manage complex application state (chat history, code projects, file trees) without prop-drilling overhead.
-    \item \textbf{Real-time Collaboration:} Socket.IO client enables live terminal sessions, debug streams, and collaborative editing.
-    \item \textbf{Monaco Editor Integration:} Full VS Code editing experience in-browser with IntelliSense, syntax highlighting, and multi-language support.
-    \item \textbf{Design System:} "Void \& Starlight" dark theme using glassmorphism (backdrop-blur-md) with cyber-teal accents (\#2DD4BF).
-\end{itemize}
+Built with Next.js 14 (App Router), featuring Zustand state management, Socket.IO realtime collaboration, Monaco Editor with IntelliSense, and a custom dark theme with glassmorphism.
 
 \subsection{Backend Architecture}
-
-The backend is an asynchronous \textbf{FastAPI} application supporting concurrent request processing. Architecture highlights:
-
-\begin{enumerate}
-    \item \textbf{Service Registry Pattern:} Centralized \texttt{ServiceRegistry} provides lazy-loaded singleton access to AI services, preventing duplicate model loading.
-    \item \textbf{Async Processing:} Long-running tasks (PDF indexing, repository cloning) execute via Celery workers with Redis as message broker.
-    \item \textbf{Response Caching:} Custom middleware caches GET responses with 300s TTL, reducing redundant AI calls.
-    \item \textbf{Rate Limiting:} SlowAPI middleware enforces per-user rate limits (60 req/min) to prevent abuse.
-    \item \textbf{Error Handling:} Global exception handlers with CORS-enabled responses ensure graceful degradation.
-\end{enumerate}
+The asynchronous FastAPI backend features: a centralized \texttt{ServiceRegistry} with lazy loaded singletons, Celery+Redis async task processing, response caching (300s TTL), SlowAPI rate limiting (60 req/min), and global error handling.
 
 \subsection{Security \& Isolation}
-
-Security is paramount in code execution and data handling:
-
-\begin{itemize}
-    \item \textbf{Row-Level Security (RLS):} Supabase policies enforce per-user data isolation at the database level.
-    \item \textbf{JWT Authentication:} Secure token-based auth with automatic refresh.
-    \item \textbf{Sandboxed Execution:} Code runs in ephemeral subprocess environments with 30s timeouts and memory limits.
-    \item \textbf{Input Sanitization:} All user inputs undergo validation before AI processing.
-\end{itemize}
+Security measures include Supabase Row-Level Security (RLS) for data isolation, JWT authentication, ephemeral sandboxed execution (30s timeout, 512MB limit), and input sanitization.
 
 
 \section{OmniRAG: Adaptive Retrieval System}
 
-Standard RAG systems suffer from poor retrieval relevance on complex queries. Engunity's \textbf{OmniRAG} implements a multi-stage adaptive pipeline that dynamically selects retrieval strategies based on query complexity.
-
-\subsection{Pipeline Architecture}
-
-Figure~\ref{fig:rag} illustrates the OmniRAG data flow, consisting of four key stages: query classification, multi-query expansion, hybrid search fusion, and contextual compression.
+Conventional RAG suffers from poor accuracy on complex queries. OmniRAG implements a multistage adaptive pipeline that dynamically selects retrieval strategies based on query complexity (Fig.~\ref{fig:rag}).
 
 \begin{figure}[htbp]
 \centering
-\resizebox{\linewidth}{!}{%
-\begin{tikzpicture}[node distance=1.4cm, auto, font=\small]
-% ENHANCED STYLES - Better Contrast
-\tikzstyle{process} = [rectangle, draw=blue!80!black, fill=blue!18, text width=9em, text centered, rounded corners, minimum height=3.5em, drop shadow, line width=2pt]
-\tikzstyle{decision} = [diamond, draw=red!80!black, fill=red!18, text width=5.5em, text centered, inner sep=0pt, minimum height=4.5em, drop shadow, line width=2pt]
-\tikzstyle{line} = [draw, -latex', very thick, black!80, line width=2pt]
+\scalebox{0.92}{%
+\begin{tikzpicture}[node distance=0.4cm, auto, font=\tiny]
+\tikzstyle{process} = [rectangle, draw=blue!80!black, fill=blue!18, text width=5em, text centered, rounded corners, minimum height=1.6em, line width=0.5pt]
+\tikzstyle{decision} = [diamond, draw=red!80!black, fill=red!18, text width=3em, text centered, inner sep=0pt, minimum height=2em, line width=0.5pt]
+\tikzstyle{line} = [draw, -latex', line width=0.5pt, black!80]
 
-\node (input) [process, fill=gray!25] {\textbf{Query}\\Pre-processing};
-\node (classify) [decision, below=1.2cm of input] {\textbf{Router}\\Complexity?};
-\node (hyde) [process, left=1.2cm of classify, yshift=-1.5cm] {\textbf{HyDE}\\Hallucination Vector};
-\node (multiq) [process, right=1.2cm of classify, yshift=-1.5cm] {\textbf{Multi-Query}\\Expansion (3-4x)};
+\node (input) [process, fill=gray!25] {\textbf{Query}\\Pre-process};
+\node (classify) [decision, below=0.5cm of input] {\textbf{Router}};
+\node (hyde) [process, left=0.6cm of classify, yshift=-0.7cm] {\textbf{HyDE}\\Halluc. Vec.};
+\node (multiq) [process, right=0.6cm of classify, yshift=-0.7cm] {\textbf{Multi-Query}\\Expand (3-4x)};
 
-\node (search) [process, below=3cm of classify] {\textbf{Hybrid Search}\\Dense + BM25};
-\node (rrf) [process, below=1cm of search] {\textbf{RRF Fusion}\\Reciprocal Rank};
-\node (compress) [process, below=1cm of rrf] {\textbf{Compression}\\Extractive Filter};
-\node (gen) [process, below=1cm of compress, fill=green!18, draw=green!80!black] {\textbf{Generator}\\LLM w/ Critique};
+\node (search) [process, below=1.2cm of classify] {\textbf{Hybrid Search}\\Dense + BM25};
+\node (rrf) [process, below=0.3cm of search] {\textbf{RRF Fusion}};
+\node (compress) [process, below=0.3cm of rrf] {\textbf{Compression}};
+\node (gen) [process, below=0.3cm of compress, fill=green!18, draw=green!80!black] {\textbf{Generator}\\LLM + Critique};
 
-% Enhanced Paths - Curved to avoid box intersections
-\draw [line] (input.south) -- (classify.north);
-\draw [line] (classify.210) to[out=180,in=60] node[above left, xshift=-0.2cm] {\textit{Abstract}} (hyde.north);
-\draw [line] (classify.-30) to[out=0,in=120] node[above right, xshift=0.2cm] {\textit{Multi-hop}} (multiq.north);
+\draw [line] (input) -- (classify);
+\draw [line] (classify.210) to[out=180,in=60] node[above left, font=\tiny] {\textit{Abs.}} (hyde.north);
+\draw [line] (classify.-30) to[out=0,in=120] node[above right, font=\tiny] {\textit{Multi}} (multiq.north);
 \draw [line] (hyde.south) to[out=-90,in=180] (search.west);
 \draw [line] (multiq.south) to[out=-90,in=0] (search.east);
-\draw [line] (classify.south) -- node[right, xshift=0.1cm] {\textit{Simple}} (search.north);
-\draw [line] (search.south) -- (rrf.north);
-\draw [line] (rrf.south) -- (compress.north);
-\draw [line] (compress.south) -- (gen.north);
+\draw [line] (classify.south) -- node[right, font=\tiny] {\textit{Simple}} (search.north);
+\draw [line] (search) -- (rrf);
+\draw [line] (rrf) -- (compress);
+\draw [line] (compress) -- (gen);
 
 \end{tikzpicture}%
 }
-\caption{OmniRAG Pipeline Architecture. The system dynamically routes queries through specialized expansion paths based on structural complexity before applying rank fusion and contextual compression.}
+\caption{OmniRAG Pipeline Architecture.}
 \label{fig:rag}
 \end{figure}
 
-\subsection{Stage 1: Query Complexity Classification}
+\subsection{Query Complexity Classification}
 
-The \texttt{QueryComplexityClassifier} analyzes incoming queries using a hybrid rule-based and ML approach:
+The \texttt{QueryComplexityClassifier} uses a hybrid rule based and ML approach:
 
 \begin{algorithm}[htbp]
 \caption{Query Complexity Classification}
@@ -304,144 +245,77 @@ The \texttt{QueryComplexityClassifier} analyzes incoming queries using a hybrid 
 \end{algorithmic}
 \end{algorithm}
 
-\textbf{SIMPLE} queries (e.g., "What is X?") bypass retrieval and use direct generation. \textbf{SINGLE\_HOP} queries trigger vector search. \textbf{MULTI\_HOP} queries activate GraphRAG or HyDE.
+SIMPLE queries bypass retrieval; SINGLE\_HOP triggers vector search; MULTI\_HOP activates GraphRAG or HyDE.
 
-\subsection{Stage 2: Hybrid Search with RRF}
+\subsection{Hybrid Search with RRF}
 
-OmniRAG combines two complementary search methods:
-
-\subsubsection{Dense Retrieval}
-Semantic search using \texttt{BAAI/bge-large-en-v1.5} embeddings (1024 dimensions) stored in a FAISS HNSW index. The index provides $O(\log n)$ search complexity with 32 HNSW neighbors and 200 efSearch.
-
-\subsubsection{Sparse Retrieval}
-Keyword-based search using BM25 Okapi with parameters $k_1=1.5$ and $b=0.75$. BM25 captures exact term matches that semantic search may miss.
-
-\subsubsection{Reciprocal Rank Fusion (RRF)}
-Results from both streams merge via RRF scoring:
+OmniRAG combines dense retrieval (\texttt{BAAI/bge-large-en-v1.5}, 1024-dim FAISS HNSW, $O(\log n)$) with sparse BM25 Okapi ($k_1$=1.5, $b$=0.75). Results merge via Reciprocal Rank Fusion:
 \begin{equation}
 \text{RRF}(d) = \sum_{r \in R} \frac{1}{\eta + r(d)}
 \end{equation}
-where $r(d)$ is the rank of document $d$ in retrieval stream $r$, and $\eta=60$ is a smoothing constant. This approach has been shown to outperform linear combination methods by stabilizing rank distributions~\cite{cormack2009reciprocal}.
+where $r(d)$ is the rank of document $d$ in stream $r$, $\eta$=60~\cite{cormack2009reciprocal}.
 
-\subsection{Stage 3: Multi-Query Expansion}
+\subsection{Advanced Retrieval Strategies}
 
-For complex queries, the system generates 3-4 query variations including:
-\begin{itemize}
-    \item \textbf{Original Query}
-    \item \textbf{Step-Back Abstraction:} Higher-level conceptual query
-    \item \textbf{Decompositions:} 2-3 sub-questions addressing different aspects
-\end{itemize}
+\textit{Multi Query Expansion:} For complex queries, 3-4 variations (original, step back abstraction, decomposed subquestions) undergo independent hybrid search before RRF fusion.
 
-Each variation undergoes hybrid search independently, and results are pooled before RRF fusion.
+\textit{HyDE}~\cite{gao2022precise}: For abstract queries, the LLM generates a hypothetical ideal document, which is embedded and used as the search vector—improving recall by 32\%.
 
-\subsection{Stage 4: HyDE (Hypothetical Document Embeddings)}
+\textit{GraphRAG:} For multihop reasoning, entity extraction, Louvain community detection, and MapReduce summarization enable global reasoning over document collections.
 
-For abstract queries lacking specific terminology, OmniRAG employs HyDE~\cite{gao2022precise}. The system:
-\begin{enumerate}
-    \item Prompts the LLM to generate a hypothetical ideal document answering the query.
-    \item Embeds this hypothetical document.
-    \item Uses the embedding as the search vector.
-\end{enumerate}
+\textit{Contextual Compression:} Retrieved chunks undergo extractive LLM based filtering, passing only high relevance sentences to the generator.
 
-This technique improves recall on conceptual queries by 32\% compared to direct query embedding.
+\textit{Self Critique:} Post generation evaluation assigns confidence scores (0-100\%) and flags potential hallucinations.
 
-\subsection{Stage 5: GraphRAG for Global Understanding}
-
-When multi-hop reasoning is required, OmniRAG constructs and queries a knowledge graph:
-
-\begin{enumerate}
-    \item \textbf{Entity Extraction:} Extract entities and relationships from documents using NER.
-    \item \textbf{Community Detection:} Apply Louvain algorithm to identify document clusters.
-    \item \textbf{Map-Reduce Summarization:} Generate community summaries via hierarchical reduction.
-    \item \textbf{Graph Traversal:} Query the graph structure to find related communities.
-\end{enumerate}
-
-This approach enables "global" reasoning over entire document collections, essential for trend analysis and comprehensive summaries.
-
-\subsection{Stage 6: Contextual Compression}
-
-Retrieved chunks undergo LLM-based filtering to extract only relevant sentences, reducing noise and token consumption. An extractive compression model scores each sentence's relevance and passes only high-confidence content to the generator.
-
-\subsection{Stage 7: Self-Critique}
-
-After generation, the system performs self-reflection:
-\begin{itemize}
-    \item Evaluates factual alignment with retrieved context
-    \item Assigns a confidence score (0-100\%)
-    \item Flags potential hallucinations
-\end{itemize}
-
-This meta-cognitive step increases user trust and enables iterative refinement.
+\textit{Persistence \& Identity Anchoring:} To ensure reliable research workflows, OmniRAG implements a cross-session storage layer where vector embeddings are anchored to a unified string-based \texttt{user\_id} rather than ephemeral session keys. This enables account-wide knowledge retrieval while maintaining strict user-level data isolation and preventing index-metadata synchronization failures.
 
 
 \section{Code Lab: Secure Polyglot Sandbox}
 
-The \textbf{Code Lab} is an integrated development environment (IDE) that enables the AI to write, execute, and debug code in real-time. This "close-the-loop" capability transforms the platform from a code generator to an active development partner.
-
-\subsection{Architecture}
-
-Code Lab consists of three primary components:
+The Code Lab provides a full IDE enabling users and AI agents to collaboratively write, execute, and debug code in real-time across 10+ programming languages. Unlike standalone code generators, Code Lab closes the feedback loop by validating outputs within a secure sandbox (Fig.~\ref{fig:sandbox}).
 
 \begin{figure}[htbp]
 \centering
-\resizebox{\linewidth}{!}{%
-\begin{tikzpicture}[node distance=1.8cm, auto, font=\small]
-% ENHANCED STYLES - Better Contrast
-\tikzstyle{entity} = [rectangle, draw=blue!80!black, fill=blue!18, text width=8em, text centered, rounded corners, minimum height=3.5em, drop shadow, line width=2pt]
-\tikzstyle{action} = [rectangle, draw=orange!80!black, fill=orange!18, text width=8em, text centered, rounded corners, minimum height=3.5em, drop shadow, line width=2pt]
-\tikzstyle{box} = [rectangle, draw=black!70, dashed, fill=gray!8, inner sep=0.6cm, rounded corners, line width=1.5pt]
-\tikzstyle{line} = [draw, -latex', very thick, blue!70!black, line width=2pt]
+\scalebox{0.92}{%
+\begin{tikzpicture}[node distance=0.4cm, auto, font=\tiny]
+\tikzstyle{entity} = [rectangle, draw=blue!80!black, fill=blue!18, text width=5em, text centered, rounded corners, minimum height=1.6em, line width=0.5pt]
+\tikzstyle{action} = [rectangle, draw=orange!80!black, fill=orange!18, text width=5em, text centered, rounded corners, minimum height=1.6em, line width=0.5pt]
+\tikzstyle{box} = [rectangle, draw=black!70, dashed, fill=gray!8, inner sep=0.2cm, rounded corners, line width=0.5pt]
+\tikzstyle{line} = [draw, -latex', blue!70!black, line width=0.5pt]
 
-% Nodes
-\node (frontend) [entity] {\textbf{Monaco Editor}\\IDE Interface};
-\node (ws) [entity, below=1.2cm of frontend] {\textbf{WebSocket}\\Bidirectional Stream};
-\node (val) [action, below=1.2cm of ws] {\textbf{Security Filter}\\AST / Static Analysis};
+\node (frontend) [entity] {\textbf{Monaco}\\IDE};
+\node (ws) [entity, below=0.3cm of frontend] {\textbf{WebSocket}\\Bidir. Stream};
+\node (val) [action, below=0.3cm of ws] {\textbf{Security}\\AST Filter};
 
-% Isolated Environment
-\node (exec) [action, below=1.8cm of val, fill=red!20, draw=red!80!black] {\textbf{Execution}\\Subprocess};
-\node (stream) [action, right=1.2cm of exec] {\textbf{I/O Capture}\\stdout / stderr};
-\node (cleanup) [action, below=1cm of exec] {\textbf{Auto Cleanup}\\FS Wipe};
+\node (exec) [action, below=0.6cm of val, fill=red!20, draw=red!80!black] {\textbf{Execution}\\Subprocess};
+\node (stream) [action, right=0.4cm of exec] {\textbf{I/O Cap.}\\stdout/err};
+\node (cleanup) [action, below=0.3cm of exec] {\textbf{Cleanup}\\FS Wipe};
 
-% Boundary
 \begin{pgfonlayer}{background}
     \node (boundary) [box, fit=(exec) (stream) (cleanup)] {};
 \end{pgfonlayer}
-% LABEL MOVED TO BOTTOM - below Auto Cleanup box to avoid arrow collision
-\node at (boundary.south) [anchor=north, yshift=-0.3cm, font=\footnotesize\itshape] {Ephemeral Sandbox Container (30s TTL, 512MB RAM)};
+\node at (boundary.south) [anchor=north, yshift=-0.1cm, font=\tiny\itshape] {Sandbox (30s, 512MB)};
 
-% Feedback path - high routing maintained as before
-\draw [line] (frontend.south) -- (ws.north);
-\draw [line] (ws.south) -- (val.north);
-\draw [line] (val.south) -- (exec.north);
-\draw [line] (exec.east) -- (stream.west);
-\draw [line] (stream.north) -- ++(0,1.2cm) coordinate (tmp1);
-\draw [line] (tmp1) -- ++(1.5cm,0) coordinate (tmp2);
-\draw [line] (tmp2) -- ++(0,2cm) coordinate (tmp3);
-\draw [line] (tmp3) -| (ws.east);
-\draw [line] (exec.south) -- (cleanup.north);
+\draw [line] (frontend) -- (ws);
+\draw [line] (ws) -- (val);
+\draw [line] (val) -- (exec);
+\draw [line] (exec) -- (stream);
+\draw [line] (stream.north) -- ++(0,0.4cm) coordinate (t1);
+\draw [line] (t1) -- ++(0.5cm,0) coordinate (t2);
+\draw [line] (t2) -- ++(0,0.8cm) coordinate (t3);
+\draw [line] (t3) -| (ws.east);
+\draw [line] (exec) -- (cleanup);
 
 \end{tikzpicture}%
 }
-\caption{Code Lab Execution Pipeline. The architecture ensures strict resource isolation and real-time feedback through bidirectional WebSockets, with automated filesystem remediation.}
+\caption{Code Lab Execution Pipeline.}
 \label{fig:sandbox}
 \end{figure}
 
-\subsection{Frontend: Monaco Editor Integration}
-
-The frontend employs \textbf{Monaco Editor} (VS Code's core engine) providing:
-\begin{itemize}
-    \item Syntax highlighting for 10+ languages (Python, JavaScript, Java, C++, Go, Rust, etc.)
-    \item IntelliSense autocomplete
-    \item Multi-cursor editing
-    \item Bracket matching and auto-indentation
-    \item Integrated terminal via xterm.js
-\end{itemize}
-
-File management is handled through a tree-view component with drag-and-drop support.
+\subsection{Monaco Editor Frontend}
+The frontend uses Monaco Editor (VS Code core) with syntax highlighting for 10+ languages, IntelliSense, multicursor editing, and integrated terminal via xterm.js.
 
 \subsection{Execution Security Model}
-
-Code execution follows a strict isolation protocol:
 
 \begin{algorithm}[htbp]
 \caption{Secure Code Execution}
@@ -457,7 +331,7 @@ Code execution follows a strict isolation protocol:
 \STATE Execute via subprocess:
 \STATE \quad \texttt{proc = subprocess.run(cmd, timeout=30, capture\_output=True)}
 \STATE
-\STATE Stream stdout/stderr via WebSocket in real-time
+\STATE Stream stdout/stderr via WebSocket in realtime
 \STATE
 \IF{exit\_code $\neq 0$}
     \STATE Parse error messages
@@ -496,169 +370,63 @@ PHP & php 8.2 & .php \\
 \end{center}
 \end{table}
 
-\subsection{Real-time Debugging}
+\subsection{Realtime Debugging}
+DAP integration enables language agnostic debugging with breakpoints, variable inspection, step execution, and watch expressions.
 
-The Debug Console provides:
-\begin{itemize}
-    \item \textbf{Breakpoint Management:} Set/remove breakpoints in Monaco
-    \item \textbf{Variable Inspection:} View local/global scope
-    \item \textbf{Step Execution:} Step over/into/out
-    \item \textbf{Watch Expressions:} Monitor variable values
-\end{itemize}
-
-Debug Adapter Protocol (DAP) integration enables language-agnostic debugging.
-
-\subsection{AI-Assisted Features}
-
-Code Lab includes several AI-powered enhancements:
-
-\subsubsection{Inline Code Refinement}
-Users can select code blocks and request AI improvements. The system:
-\begin{enumerate}
-    \item Analyzes the selected code
-    \item Generates optimized version
-    \item Shows diff view for review
-    \item Applies changes on approval
-\end{enumerate}
-
-\subsubsection{Auto-Fix Errors}
-When compilation/execution fails:
-\begin{enumerate}
-    \item Parse error messages
-    \item Send error + code context to LLM
-    \item Generate fix suggestions
-    \item Apply and re-execute
-\end{enumerate}
-
-This creates a self-healing feedback loop, dramatically reducing debugging time.
-
-\subsubsection{Test Generation}
-The system can automatically generate unit tests:
-\begin{itemize}
-    \item Analyzes function signatures
-    \item Identifies edge cases
-    \item Generates pytest/jest test suites
-    \item Executes tests and reports coverage
-\end{itemize}
-
-\subsection{Collaborative Features}
-
-Code Lab supports real-time collaboration via Socket.IO:
-\begin{itemize}
-    \item \textbf{Shared Sessions:} Multiple users edit the same project
-    \item \textbf{Cursor Presence:} See where teammates are editing
-    \item \textbf{Live Terminal:} Shared execution environment
-    \item \textbf{Comment Threads:} In-line code discussions
-\end{itemize}
+\subsection{AI Assisted Features}
+Code Lab includes: (1) inline code refinement with diff view approval, (2) auto fix error loops (parse errors $\rightarrow$ LLM fix $\rightarrow$ reexecute), creating a self healing feedback loop that reduces debugging time, and (3) automatic test generation—analyzing function signatures, identifying edge cases, and generating pytest/jest suites with coverage reporting. Realtime collaboration via Socket.IO supports shared editing sessions, cursor presence indicators, live shared terminal, and inline comment threads.
 
 
 \section{Decision Vault: Adversarial Intelligence}
 
-Most AI systems prioritize "helpfulness," often reinforcing user biases rather than challenging assumptions. The \textbf{Decision Vault} employs adversarial prompting to identify cognitive distortions and improve decision quality.
-
-\subsection{Motivation}
-
-Cognitive biases—systematic errors in thinking—plague high-stakes decisions. Common biases include:
-\begin{itemize}
-    \item \textbf{Confirmation Bias:} Seeking information that confirms existing beliefs
-    \item \textbf{Sunk Cost Fallacy:} Continuing failed projects due to past investment
-    \item \textbf{Optimism Bias:} Underestimating risks and overestimating rewards
-    \item \textbf{Anchoring:} Over-relying on the first piece of information encountered
-\end{itemize}
-
-Traditional AI assistants amplify these biases by validating user assumptions. Decision Vault inverts this paradigm.
-
-\subsection{Architecture}
+The Decision Vault counters the tendency of AI assistants to validate rather than challenge user reasoning. It employs adversarial prompting to detect cognitive biases (confirmation bias, sunk cost fallacy, optimism bias, anchoring) and improve decision quality (Fig.~\ref{fig:decision}).
 
 \begin{figure}[htbp]
 \centering
-\resizebox{\linewidth}{!}{%
-\begin{tikzpicture}[node distance=2.5cm, auto, font=\small]
-% COMPLETELY REDESIGNED - Maximum spacing and clean routing
-\tikzstyle{human} = [circle, draw=green!80!black, fill=green!18, text width=4.5em, text centered, drop shadow, line width=2pt, minimum height=3em]
-\tikzstyle{data} = [trapezium, draw=orange!80!black, fill=orange!18, text width=7em, text centered, trapezium left angle=70, trapezium right angle=110, minimum height=3.5em, drop shadow, line width=2pt]
-\tikzstyle{ai} = [rectangle, draw=purple!80!black, fill=purple!18, text width=9em, text centered, rounded corners, minimum height=3.5em, drop shadow, line width=2pt]
-\tikzstyle{line} = [draw, -latex', very thick, black!80, line width=2pt]
-\tikzstyle{feedback} = [draw, -latex', very thick, red!80!black, dashed, line width=2.5pt]
+\scalebox{0.92}{%
+\begin{tikzpicture}[node distance=0.6cm, auto, font=\tiny]
+\tikzstyle{human} = [circle, draw=green!80!black, fill=green!18, text width=2.5em, text centered, line width=0.5pt, minimum height=1.5em]
+\tikzstyle{data} = [trapezium, draw=orange!80!black, fill=orange!18, text width=3.8em, text centered, trapezium left angle=70, trapezium right angle=110, minimum height=1.6em, line width=0.5pt]
+\tikzstyle{ai} = [rectangle, draw=purple!80!black, fill=purple!18, text width=5em, text centered, rounded corners, minimum height=1.6em, line width=0.5pt]
+\tikzstyle{line} = [draw, -latex', line width=0.5pt, black!80]
+\tikzstyle{feedback} = [draw, -latex', red!80!black, dashed, line width=0.6pt]
 
-% REDESIGNED LAYOUT - Maximum horizontal spread
-\node (user) [human] {\textbf{User}\\\Decision};
-\node (input) [data, right=2.5cm of user] {\textbf{Context}\\Options};
-\node (skeptic) [ai, below=2.2cm of input] {\textbf{Adversarial Agent}\\(Critical Auditor)};
-\node (bias) [data, left=2.8cm of skeptic] {\textbf{Ruleset}\\Bias Patterns};
+\node (user) [human] {\textbf{User}\\Decision};
+\node (input) [data, right=1cm of user] {\textbf{Context}\\Options};
+\node (skeptic) [ai, below=0.8cm of input] {\textbf{Adversarial}\\Auditor};
+\node (bias) [data, left=1cm of skeptic] {\textbf{Ruleset}\\Bias};
 
-% Bottom nodes - WIDE diagonal spread
-\node (nlp) [ai, below left=2.5cm and 1.8cm of skeptic] {\textbf{Semantic Scan}\\Sunk Cost / Anchor};
-\node (tradeoff) [ai, below right=2.5cm and 1.8cm of skeptic] {\textbf{Matrix Verify}\\Tradeoff Logic};
+\node (nlp) [ai, below left=1cm and 0.6cm of skeptic] {\textbf{Semantic}\\Sunk Cost};
+\node (tradeoff) [ai, below right=1cm and 0.6cm of skeptic] {\textbf{Matrix}\\Tradeoff};
 
-\node (report) [data, below=3cm of skeptic, xshift=0.5cm] {\textbf{Audit}\\Report (JSON)};
+\node (report) [data, below=1.2cm of skeptic, xshift=0.2cm] {\textbf{Audit}\\Report};
 
-% FORWARD PATHS
-\draw [line] (user.east) -- (input.west);
-\draw [line] (input.south) -- (skeptic.north);
-\draw [line] (bias.east) -- (skeptic.west);
-\draw [line] (skeptic.south west) -- (nlp.north);
-\draw [line] (skeptic.south east) -- (tradeoff.north);
+\draw [line] (user) -- (input);
+\draw [line] (input) -- (skeptic);
+\draw [line] (bias) -- (skeptic);
+\draw [line] (skeptic.south west) -- (nlp);
+\draw [line] (skeptic.south east) -- (tradeoff);
 \draw [line] (nlp.south) |- (report.west);
 \draw [line] (tradeoff.south) -- (report.north east);
 
-% FEEDBACK LOOP - Robust routing using Bias node as left reference
-\draw [feedback] (report.south) -- ++(0,-0.8cm) 
-    -| ([xshift=-1cm]bias.west |- user.west) 
+\draw [feedback] (report.south) -- ++(0,-0.3cm) 
+    -| ([xshift=-0.4cm]bias.west |- user.west) 
     -- (user.west);
 
 \end{tikzpicture}%
 }
-\caption{Decision Vault Adversarial Loop. The system challenges user assumptions through a critical feedback cycle, mapping input context against a library of cognitive bias patterns to produce structured critiques.}
+\caption{Decision Vault Adversarial Loop.}
 \label{fig:decision}
 \end{figure}
 
 \subsection{Bias Detection Mechanisms}
 
-\subsubsection{Confirmation Bias: Missing Option Detection}
-When users present only 2 options (false dilemma), the system:
-\begin{enumerate}
-    \item Detects binary choice structure
-    \item Generates a third alternative (e.g., "Status Quo," "Hybrid")
-    \item Flags the decision with severity=4/5
-\end{enumerate}
-
-\subsubsection{Optimism Bias: Tradeoff Validation}
-Users rate options across dimensions (Performance, Cost, Risk, etc.). The system flags unrealistic profiles:
-\begin{itemize}
-    \item High Performance + Low Cost + Low Risk = \textbf{Flag}: "Optimism Distortion"
-    \item Scores of 5/5 across all positive dimensions trigger warnings
-\end{itemize}
-
-\subsubsection{Sunk Cost Fallacy: NLP Scanning}
-The system scans decision rationales for keywords:
-\begin{itemize}
-    \item "already invested," "spent months," "cannot waste"
-    \item "too late to change," "past effort," "committed resources"
-\end{itemize}
-
-Detection triggers a counter-prompt: "Would you make this choice if you started today with zero prior investment?"
-
-\subsubsection{Confidence Calibration Error}
-Users set confidence levels (Low/Medium/High). The system validates against evidence:
-\begin{itemize}
-    \item High confidence + Zero primary sources = \textbf{Flag}: "Overconfidence"
-    \item Low evidence quality + High confidence = Calibration warning
-\end{itemize}
+\textit{Confirmation Bias:} Detects binary only choices and generates a third alternative (severity=4/5). \textit{Optimism Bias:} Flags unrealistic tradeoff profiles (High Performance + Low Cost + Low Risk). \textit{Sunk Cost:} NLP scans rationales for keywords (``already invested,'' ``too late to change'') and counter prompts. \textit{Overconfidence:} Validates confidence levels against evidence quality.
 
 \subsection{Adversarial Prompting}
-
-The Decision AI Service uses a specialized system prompt:
-
-\begin{quote}
-\textit{"You are the Engunity Adversarial AI Reviewer. Your goal is NOT to be helpful, but to be skeptical and challenge the user's reasoning. Act as a red-team auditor. If they only have 2 options, suggest a 3rd. If they claim high confidence with weak evidence, flag it. Be critical and rigorous."}
-\end{quote}
-
-This prompt inversion shifts the model's objective function from validation to interrogation.
+The system prompt inverts the model's objective: \textit{``You are the Engunity Adversarial AI Reviewer. Your goal is NOT to be helpful, but to be skeptical. Act as a red team auditor.''}
 
 \subsection{Evidence Framework}
-
-Decisions are supported by evidence nodes classified into three tiers:
 
 \begin{table}[htbp]
 \caption{Evidence Quality Hierarchy}
@@ -667,7 +435,7 @@ Decisions are supported by evidence nodes classified into three tiers:
 \hline
 \textbf{Tier} & \textbf{Examples} \\
 \hline
-Primary & Raw data, code benchmarks, peer-reviewed papers, A/B test results \\
+Primary & Raw data, code benchmarks, peer reviewed papers, A/B test results \\
 \hline
 Secondary & Industry reports, expert summaries, case studies, internal documentation \\
 \hline
@@ -678,38 +446,19 @@ Anecdotal & Personal opinions, assumptions, gut feelings, unverified claims \\
 \end{center}
 \end{table}
 
-The system calculates an \textbf{Evidence Quality Score}:
+The system calculates an Evidence Quality Score:
 \begin{equation}
 \text{EQS} = \frac{3 \cdot N_{\text{primary}} + 2 \cdot N_{\text{secondary}} + N_{\text{anecdotal}}}{N_{\text{total}}}
 \end{equation}
 
 Target threshold: EQS $> 2.0$ (at least 70\% primary sources).
 
-\subsection{Decision Lifecycle}
-
-\begin{enumerate}
-    \item \textbf{Draft:} User creates decision with options and rationale
-    \item \textbf{Analyze:} System runs bias detection and returns flags
-    \item \textbf{Refine:} User addresses flags, adding evidence and alternatives
-    \item \textbf{Re-analyze:} System validates improvements
-    \item \textbf{Lock:} Decision archived as immutable record
-    \item \textbf{Export:} Generate PDF report for audits (ADRs, STAR interviews)
-\end{enumerate}
-
-This iterative refinement loop increases decision stability by an average of 42\% (measured by reduction in critical flags).
-
+The iterative refinement loop (Draft $\rightarrow$ Analyze $\rightarrow$ Refine $\rightarrow$ Re-analyze $\rightarrow$ Lock $\rightarrow$ Export) increases decision stability by 42\%.
 
 \section{Analytics Dashboard \& GitHub Intelligence}
 
-Beyond conversational AI and code execution, Engunity provides advanced data analysis and repository intelligence capabilities.
-
 \subsection{Analytics Dashboard}
-
-The Analytics Dashboard enables users to upload datasets (CSV, Excel, JSON) and perform ML-powered analysis.
-
-\subsubsection{Visualization Engine}
-
-The platform supports 10+ chart types powered by Recharts:
+Users upload datasets (CSV, Excel, JSON) for ML-powered analysis with 10+ chart types (Table~\ref{tab:charts}).
 
 \begin{table}[htbp]
 \caption{Supported Visualization Types}
@@ -727,68 +476,17 @@ Histogram & Frequency distribution \\
 Pie Chart & Proportional data \\
 Area Chart & Cumulative trends \\
 Violin Plot & Density distribution \\
-Radar Chart & Multi-dimensional profiles \\
+Radar Chart & Multidimensional profiles \\
 \hline
 \end{tabularx}
 \label{tab:charts}
 \end{center}
 \end{table}
 
-\subsubsection{ML Service}
-
-The backend \texttt{MLService} provides automated model training:
-
-\begin{itemize}
-    \item \textbf{Regression:} Linear, Ridge, Lasso, ElasticNet, RandomForest, GradientBoosting
-    \item \textbf{Classification:} LogisticRegression, DecisionTree, RandomForest, SVM, GradientBoosting
-    \item \textbf{Clustering:} KMeans, DBSCAN, Agglomerative
-\end{itemize}
-
-Users specify target variables and features; the system performs:
-\begin{enumerate}
-    \item Data preprocessing (scaling, encoding)
-    \item Train/test split (80/20)
-    \item Model training with cross-validation
-    \item Evaluation metrics (R², RMSE, Accuracy, F1)
-    \item Feature importance analysis
-\end{enumerate}
-
-\subsubsection{Export Capabilities}
-
-Analysis results export to:
-\begin{itemize}
-    \item \textbf{PDF Reports:} Professional multi-page documents with embedded charts
-    \item \textbf{CSV/Excel:} Processed datasets with predictions
-    \item \textbf{JSON:} Machine-readable results
-\end{itemize}
+The \texttt{MLService} supports regression (Linear, Ridge, RandomForest, GradientBoosting), classification (LogisticRegression, SVM, RandomForest), and clustering (KMeans, DBSCAN). Users specify target variables and features; the system automates data preprocessing (scaling, encoding), train/test split (80/20), model training with cross-validation, and evaluation metrics (R\textsuperscript{2}, RMSE, Accuracy, F1) along with feature importance analysis. Results export to PDF reports with embedded charts, CSV/Excel with predictions, or JSON for programmatic consumption.
 
 \subsection{GitHub Repository Intelligence}
-
-The GitHub Intelligence module provides automated repository analysis and documentation.
-
-\subsubsection{Features}
-
-\begin{enumerate}
-    \item \textbf{Repository Cloning:} Secure cloning with authentication
-    \item \textbf{Code Analysis:} Language detection, file structure mapping
-    \item \textbf{Dependency Extraction:} Parse package.json, requirements.txt, pom.xml
-    \item \textbf{Documentation Generation:} Auto-generate README sections
-    \item \textbf{Code Quality Metrics:} Lines of code, complexity, test coverage
-    \item \textbf{Commit History Analysis:} Contributor statistics, activity trends
-\end{enumerate}
-
-\subsubsection{AI-Powered Insights}
-
-The system generates:
-\begin{itemize}
-    \item Architecture diagrams from code structure
-    \item API documentation from docstrings
-    \item Onboarding guides for new developers
-    \item Security vulnerability reports
-    \item Performance optimization suggestions
-\end{itemize}
-
-\subsubsection{Integration Workflow}
+The GitHub Intelligence module provides automated repository analysis and documentation generation. Features include secure authenticated cloning, language detection, file structure mapping, dependency extraction from manifest files (package.json, requirements.txt, pom.xml), auto generated README sections, code quality metrics (LOC, complexity, coverage), and commit history analysis with contributor statistics. AI powered insights generate architecture diagrams, API documentation from docstrings, onboarding guides, and security vulnerability reports.
 
 \begin{algorithm}[htbp]
 \caption{GitHub Repository Analysis}
@@ -816,34 +514,14 @@ The system generates:
 \end{algorithmic}
 \end{algorithm}
 
-This workflow enables rapid understanding of unfamiliar codebases, reducing onboarding time by an estimated 60\%.
-
+The workflow reduces onboarding time by an estimated 60\%.
 
 \section{Performance Evaluation}
 
-We conducted comprehensive benchmarks to validate Engunity's performance across retrieval accuracy, system latency, and scalability.
-
 \subsection{Experimental Setup}
-
-\subsubsection{Hardware Configuration}
-\begin{itemize}
-    \item \textbf{CPU:} Intel i7-12700H (14 cores)
-    \item \textbf{GPU:} NVIDIA RTX 4050 (6GB VRAM)
-    \item \textbf{RAM:} 16GB DDR5
-    \item \textbf{Storage:} 1TB NVMe SSD
-\end{itemize}
-
-\subsubsection{Dataset}
-We constructed a benchmark dataset consisting of:
-\begin{itemize}
-    \item 500 queries across 4 categories (Simple, Single-hop, Multi-hop, Abstract)
-    \item 10,000 document chunks from technical documentation
-    \item Ground-truth relevance labels (binary: relevant/not relevant)
-\end{itemize}
+Benchmarks ran on Intel i7-12700H, RTX 4050 (6GB), 16GB DDR5, 1TB NVMe. Dataset: 500 queries (4 categories), 10,000 document chunks with ground-truth labels.
 
 \subsection{Retrieval Accuracy}
-
-Table~\ref{tab:accuracy} compares OmniRAG against a baseline RAG system using only cosine similarity. Figure~\ref{fig:performance_comparison} provides a visual comparison showing the substantial improvements achieved by our adaptive retrieval strategy, particularly for complex multi-hop and abstract queries.
 
 \begin{table}[htbp]
 \caption{Retrieval Accuracy by Query Type}
@@ -867,48 +545,33 @@ Abstract & 40\% & 82\% & +42\% \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth]{Images/performance_comparison.png}
-\caption{OmniRAG Performance Comparison. The bar chart demonstrates significant accuracy improvements over baseline RAG across all query types, with the most dramatic gains (+43\% and +42\%) observed for complex multi-hop and abstract queries that require sophisticated retrieval strategies.}
+\caption{OmniRAG vs. Baseline RAG accuracy.}
 \label{fig:performance_comparison}
 \end{figure}
 
-\textbf{Key Findings:}
-\begin{itemize}
-    \item OmniRAG achieves 88\% average accuracy vs. 64\% baseline
-    \item Largest gains on multi-hop (+43\%) and abstract (+42\%) queries
-    \item Query classification correctly routes 91\% of queries
-    \item HyDE improves abstract query recall by 32\%
-\end{itemize}
+OmniRAG achieves 88\% average accuracy vs 64\% baseline, with query classification routing 91\% correctly and HyDE improving abstract recall by 32\%.
 
 \subsection{System Latency}
 
-We measured end-to-end response times under varying user loads to assess the platform's responsiveness. Figure~\ref{fig:eval} illustrates the comparative accuracy and scaling behavior, while detailed latency percentiles are presented in Table~\ref{tab:api_latency} and Table~\ref{tab:scaling}. Figure~\ref{fig:latency_heatmap} provides a comprehensive heat map visualization showing how each microservice component performs under increasing concurrent load, with color-coding to identify potential bottlenecks.
+Median latency: 247ms (10 users), P95: 483ms (500 users). Cache hit rate: 34\%. FAISS search: 12-18ms; BM25: 8-15ms. The architecture maintains sub 500ms latency at 500 users.
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth]{Images/evaluation_results.png}
-\caption{System Performance Analysis. Left: Comparative retrieval accuracy between baseline RAG and OmniRAG across different query complexities. Right: End-to-end system latency scaling up to 500 concurrent users.}
+\caption{Retrieval accuracy comparison and latency scaling.}
 \label{fig:eval}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth]{Images/latency_heatmap.png}
-\caption{Service Latency Heatmap Under Concurrent Load. The color-coded matrix reveals how each microservice component scales with user load from 10 to 500 concurrent users. Analytics ML shows the highest latency (680ms at peak), while the FastAPI Gateway maintains excellent performance (210ms) even at maximum load.}
+\caption{Service latency heatmap under concurrent load (10--500 users).}
 \label{fig:latency_heatmap}
 \end{figure}
 
-\textbf{Results:}
-\begin{itemize}
-    \item Median latency: 247ms (10 concurrent users)
-    \item P95 latency: 483ms (500 concurrent users)
-    \item Cache hit rate: 34\% (300s TTL)
-    \item Vector search time: 12-18ms (FAISS HNSW)
-    \item BM25 search time: 8-15ms
-\end{itemize}
-
-The microservices architecture maintains sub-500ms latency even at 500 concurrent users, while a monolithic baseline degrades exponentially beyond 200 users.
-
 \subsection{Code Execution Performance}
+
+Interpreted languages show faster cold starts; compiled languages achieve better warm execution. Rust achieves the best warm performance (25ms).
 
 \begin{table}[htbp]
 \caption{Code Execution Latency by Language}
@@ -932,15 +595,13 @@ Rust & 420ms & 25ms \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth]{Images/code_execution_performance.png}
-\caption{Multi-Language Code Execution Performance Analysis. The logarithmic scale visualization compares cold start vs. warm execution times across six programming languages. Compiled languages (Java, C++) exhibit significant cold start penalties but achieve superior warm execution performance, while interpreted languages (Python, JavaScript) provide more consistent latency profiles.}
+\caption{Cold start vs. warm execution times across languages.}
 \label{fig:code_exec}
 \end{figure}
 
-Interpreted languages (Python, JavaScript) show faster cold starts, while compiled languages (Java, C++) have higher initialization overhead but faster warm execution. Rust demonstrates the best warm execution performance (25ms) despite moderate cold start latency.
-
 \subsection{Resource Utilization}
 
-We monitored the hardware overhead of each microservice during peak operations (500 concurrent users). Table~\ref{tab:resources} details the mean resource consumption per service instance. Figure~\ref{fig:resource_radar} provides a comprehensive multi-dimensional comparison of resource utilization patterns across the four primary service components, revealing distinct resource footprints optimized for each service's computational requirements.
+Table~\ref{tab:resources} shows resource consumption at 500 concurrent users.
 
 \begin{table}[htbp]
 \caption{Service Resource Utilization Metrics}
@@ -963,13 +624,12 @@ Analytics ML & 35.0\% & 1,200 & 0.8 \\
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth]{Images/resource_radar.png}
-\caption{Resource Utilization Profile Comparison. The radar chart visualizes the multi-dimensional resource consumption patterns across five metrics (CPU, Memory, GPU, Network I/O, Disk Access) for each core service. OmniRAG exhibits the highest overall resource footprint due to embedding computations and vector search, while Code Lab demonstrates a balanced profile with emphasis on disk access for file I/O operations.}
+\caption{Resource utilization radar across core services.}
 \label{fig:resource_radar}
 \end{figure}
 
-\subsection{API Response Time Breakdown}
+\subsection{API Response Time \& Throughput}
 
-To identify bottlenecks, we measured the latency contribution of each processing stage for the primary API endpoints. Table~\ref{tab:api_latency} shows the 50th percentile (P50) response times.
 
 \begin{table}[htbp]
 \caption{API Endpoint Latency Breakdown (P50)}
@@ -989,9 +649,7 @@ To identify bottlenecks, we measured the latency contribution of each processing
 \end{center}
 \end{table}
 
-\subsection{Throughput and Scaling}
-
-We evaluated the platform's throughput by measuring requests per second (RPS) against increasing levels of concurrency. As shown in Table~\ref{tab:scaling}, the system maintains stable throughput via horizontal pod autoscaling.
+Throughput scales linearly with concurrency (Table~\ref{tab:scaling}).
 
 \begin{table}[htbp]
 \caption{Concurrent Throughput Scaling}
@@ -1010,9 +668,9 @@ We evaluated the platform's throughput by measuring requests per second (RPS) ag
 \end{center}
 \end{table}
 
-\subsection{Contextual Compression Efficiency}
+\subsection{Compression \& Decision Vault Efficacy}
 
-To optimize token usage without sacrificing quality, OmniRAG employs extractive contextual compression. Table~\ref{tab:compression} metrics show the impact of compression on token volume and model performance retention.
+Table~\ref{tab:compression} shows compression impact on token usage.
 
 \begin{table}[htbp]
 \caption{Contextual Compression Performance}
@@ -1031,160 +689,50 @@ Deep-Filter & 82\% & 89\% & 510ms \\
 \end{center}
 \end{table}
 
-\subsection{Decision Vault Efficacy}
-
-We evaluated Decision Vault on 100 real-world decisions:
-
-\begin{itemize}
-    \item \textbf{Bias Detection Rate:} 78\% of decisions flagged with at least one bias
-    \item \textbf{False Positive Rate:} 12\% (flags disputed by users)
-    \item \textbf{Iterative Improvement:} Average 42\% reduction in critical flags after refinement
-    \item \textbf{Evidence Quality:} Initial EQS of 1.4 improved to 2.3 post-refinement
-\end{itemize}
+Decision Vault evaluation (100 decisions): 78\% bias detection rate, 12\% false positive rate, 42\% reduction in critical flags after refinement, EQS improved from 1.4 to 2.3. User surveys: 89\% found adversarial feedback helpful.
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth]{Images/bias_detection_effectiveness.png}
-\caption{Decision Vault Bias Detection Effectiveness. (a) Shows the dramatic reduction in bias flags across five categories after iterative refinement, with sunk cost and optimism biases showing the greatest improvements. (b) Demonstrates Evidence Quality Score (EQS) improvements across 20 sample decisions, with most crossing the 2.0 threshold (horizontal line) after adversarial review.}
+\caption{Bias detection effectiveness and EQS improvements after adversarial review.}
 \label{fig:bias_detection}
 \end{figure}
 
-User surveys indicate 89\% found adversarial feedback "helpful" or "very helpful" in improving decision quality.
-
-\subsection{Scalability Analysis}
-
-\begin{itemize}
-    \item \textbf{Vector Store:} FAISS scales to 10M+ vectors with minimal latency increase
-    \item \textbf{Database:} PostgreSQL handles 50K+ queries/second with proper indexing
-    \item \textbf{Redis Cache:} 95\% hit rate under typical workloads
-    \item \textbf{Horizontal Scaling:} Backend services scale linearly with container count
-\end{itemize}
+\subsection{Scalability}
+FAISS scales to 10M+ vectors; PostgreSQL handles 50K+ queries/s; Redis achieves 95\% hit rate; services scale linearly with containers.
 
 
 \section{Related Work}
 
-\subsection{Retrieval-Augmented Generation}
+\subsection{Retrieval Augmented Generation}
+Lewis et al.~\cite{lewis2020retrieval} introduced RAG for knowledge intensive tasks. Recent advances include HyDE~\cite{gao2022precise} for zero shot retrieval via hypothetical documents, Self-RAG~\cite{asai2023self} for self reflective relevance assessment, and GraphRAG~\cite{edge2024graphrag} for knowledge graph based global understanding. OmniRAG synthesizes these into a unified adaptive pipeline with dynamic complexity classification, automatically routing queries to the optimal retrieval strategy.
 
-Lewis et al.~\cite{lewis2020retrieval} introduced RAG, combining retrieval with generation for knowledge-intensive tasks. However, standard RAG suffers from poor retrieval on complex queries. Recent advances include:
+\subsection{Code Generation \& Agentic Platforms}
+GitHub Copilot~\cite{chen2021evaluating} and AlphaCode~\cite{li2022competition} demonstrate LLM code generation but lack execution validation and integrated debugging. AutoGPT~\cite{autogpt2023} and BabyAGI~\cite{babyagi2023} pioneered autonomous agent architectures but lack production grade security, multimodal capabilities, and adversarial reasoning. LangChain~\cite{chase2022langchain} provides agent orchestration primitives but requires significant custom development for production deployment. Engunity offers a complete, production ready platform with sandboxed execution and multimodal support.
 
-\begin{itemize}
-    \item \textbf{HyDE~\cite{gao2022precise}:} Hypothetical document embeddings for zero-shot retrieval
-    \item \textbf{Self-RAG~\cite{asai2023self}:} Self-reflective retrieval with relevance assessment
-    \item \textbf{GraphRAG~\cite{edge2024graphrag}:} Knowledge graph-based retrieval for global understanding
-\end{itemize}
-
-Engunity synthesizes these approaches into a unified adaptive pipeline with dynamic complexity classification.
-
-\subsection{Code Generation \& Execution}
-
-GitHub Copilot~\cite{chen2021evaluating} and AlphaCode~\cite{li2022competition} demonstrate LLM code generation capabilities. However, they lack execution validation. Systems like Codex Sandbox provide execution but without the integrated IDE experience or multi-language support of Code Lab.
-
-\subsection{Agentic AI Platforms}
-
-AutoGPT~\cite{autogpt2023} and BabyAGI~\cite{babyagi2023} pioneered autonomous agent architectures. However, these systems lack:
-\begin{itemize}
-    \item Production-grade security (code sandboxing)
-    \item Multi-modal capabilities (vision, analytics)
-    \item Adversarial reasoning (bias detection)
-\end{itemize}
-
-LangChain~\cite{chase2022langchain} provides agent orchestration primitives but requires significant custom development. Engunity offers a complete, production-ready platform.
-
-\subsection{Decision Support Systems}
-
-Traditional DSS focus on optimization algorithms~\cite{power2002decision}. AI-based systems like IBM Watson provide recommendations but lack adversarial review. Behavioral economics research~\cite{kahneman2011thinking} highlights the importance of debiasing interventions. Decision Vault operationalizes these insights through automated bias detection.
-
-\subsection{Platform Architecture}
-
-Modern AI platforms like Hugging Face~\cite{wolf2020transformers} and LangSmith focus on model deployment. Engunity differs by providing an end-to-end cognitive workspace integrating retrieval, execution, and reasoning.
+\subsection{Decision Support \& Platform Architecture}
+Traditional DSS focus on optimization algorithms~\cite{power2002decision}. Behavioral economics research~\cite{kahneman2011thinking} highlights the importance of debiasing interventions, which Decision Vault operationalizes through automated adversarial bias detection. Modern AI platforms like Hugging Face~\cite{wolf2020transformers} and LangSmith focus on model deployment and monitoring, whereas Engunity provides an end-to-end cognitive workspace integrating retrieval, execution, analytics, and reasoning.
 
 
 \section{Discussion}
 
 \subsection{Key Achievements}
-
-Engunity demonstrates that comprehensive agentic AI platforms require integration across multiple dimensions, fostering a true cognitive partnership between human analysts and machine intelligence.
-
-\begin{enumerate}
-    \item \textbf{Adaptive Intelligence:} Query classification and dynamic retrieval strategy selection improve accuracy by 24\% over baseline.
-    \item \textbf{Security by Design:} Ephemeral sandboxing with resource limits enables safe code execution.
-    \item \textbf{Cognitive Partnership:} Adversarial prompting transforms AI from validator to interrogator, improving decision quality.
-    \item \textbf{Production Readiness:} Microservices architecture with caching and async processing maintains sub-500ms latency at scale.
-\end{enumerate}
+Engunity demonstrates that comprehensive agentic AI platforms require integration across multiple dimensions: (1) adaptive retrieval via query complexity classification improves accuracy by 24\% over baseline RAG, (2) secure ephemeral sandboxing with strict resource limits enables safe multilanguage code execution, (3) adversarial prompting transforms AI from a passive validator to an active interrogator, improving decision quality by 42\%, and (4) microservices architecture with Redis caching and async processing maintains sub 500ms latency at 500 concurrent users.
 
 \subsection{Limitations}
-
-\subsubsection{Model Dependence}
-Current implementation relies on external API providers (Groq, Gemini). Future work will integrate fully local models for air-gapped deployments.
-
-\subsubsection{Context Window Constraints}
-Despite hierarchical memory, very long conversations (100+ turns) may lose early context. Techniques like MemGPT~\cite{packer2023memgpt} could address this.
-
-\subsubsection{Multimodal Limitations}
-Current vision processing handles static images. Video understanding and audio processing remain future enhancements.
-
-\subsubsection{Computational Requirements}
-RTX 4050 GPU enables local inference but limits model size. Quantization and distillation could improve efficiency.
-
-\subsection{Lessons Learned}
-
-\subsubsection{Microservices Trade-offs}
-While microservices enable modularity, they introduce complexity. Careful service boundary design is critical to avoid excessive inter-service communication.
-
-\subsubsection{Caching Strategy}
-300s TTL balances freshness and performance. Domain-specific tuning may be needed (e.g., lower TTL for real-time data, higher for static documentation).
-
-\subsubsection{User Experience}
-Streaming responses dramatically improve perceived performance. Users tolerate longer total latency when they see progressive output.
-
-\subsubsection{Adversarial AI Acceptance}
-Initial user resistance to critical feedback exists. Framing as "red-team review" rather than criticism improves acceptance.
+Current limitations include reliance on external API providers (Groq, Gemini), which future work will address through local model integration for air gapped deployments. Despite hierarchical memory, conversations exceeding 100+ turns may lose early context; techniques like MemGPT~\cite{packer2023memgpt} could mitigate this. Vision processing currently handles static images only, with video and audio remaining as future enhancements. The RTX 4050 GPU enables local inference but constrains model size; quantization and distillation could improve efficiency.
 
 \subsection{Future Directions}
-
-\subsubsection{Multi-Agent Collaboration}
-Extend to agent swarms where specialized agents (research, coding, design) collaborate on complex tasks with automatic task decomposition.
-
-\subsubsection{Reinforcement Learning from Human Feedback (RLHF)}
-Fine-tune models on user interactions to improve relevance and reduce false positives in bias detection.
-
-\subsubsection{Blockchain Integration}
-Implement decentralized identity (DID) and immutable audit logs for compliance-critical deployments.
-
-\subsubsection{Mobile Support}
-Progressive Web App (PWA) version for on-the-go access with offline capabilities.
-
-\subsubsection{Enterprise Features}
-\begin{itemize}
-    \item Team workspaces with role-based access control
-    \item Usage analytics and cost tracking
-    \item Custom model fine-tuning on proprietary data
-    \item SSO integration (SAML, OAuth2)
-\end{itemize}
-
+Planned extensions include multiagent collaboration with specialized agent swarms (research, coding, design) and automatic task decomposition. RLHF will fine tune models on user interactions to reduce bias detection false positives. Additional targets include blockchain based immutable audit logs for compliance, PWA mobile support with offline capabilities, and enterprise features such as RBAC, SSO integration (SAML, OAuth2), usage analytics, and custom model fine tuning on proprietary data.
 
 \section{Conclusion}
 
-This paper presents Engunity, a comprehensive microservices-based agentic AI platform that unifies research, development, analytics, and decision-making into a cohesive cognitive workspace. Through five core subsystems—OmniRAG, Code Lab, Decision Vault, Analytics Dashboard, and GitHub Intelligence—the platform demonstrates that true AI assistance requires more than conversational ability; it demands adaptive retrieval, secure execution, adversarial reasoning, and production-grade architecture.
+This paper presents Engunity, a microservices based agentic AI platform unifying research, development, analytics, and decision making into a cohesive cognitive workspace. Through five core subsystems—OmniRAG, Code Lab, Decision Vault, Analytics Dashboard, and GitHub Intelligence—the platform demonstrates that effective AI assistance demands adaptive retrieval, secure execution, adversarial reasoning, and production grade architecture.
 
-Our evaluation validates the design choices:
-\begin{itemize}
-    \item \textbf{88\% retrieval accuracy} on complex multi-hop queries (+24\% vs. baseline)
-    \item \textbf{Sub-500ms latency} at 500 concurrent users
-    \item \textbf{42\% improvement} in decision quality through adversarial review
-    \item \textbf{10+ programming languages} with secure sandbox execution
-    \item \textbf{2,632+ lines} of production TypeScript/Python code
-\end{itemize}
-
-The platform's modular architecture enables rapid feature development while maintaining security and performance. By combining adaptive intelligence with human-centered design, Engunity provides a blueprint for the next generation of AI-powered productivity platforms.
-
-Future work will focus on multi-agent collaboration, local model deployment, and enterprise-grade features. We plan to open-source the OmniRAG module to foster community innovation in adaptive retrieval systems.
-
-Engunity demonstrates that by coupling sophisticated AI techniques with practical engineering, we can create systems that are true partners in cognitive labor—systems that not only answer questions but actively participate in knowledge creation, problem-solving, and critical thinking.
+Key results validate the design: 88\% retrieval accuracy on multihop queries (+24\% vs baseline), sub 500ms latency at 500 concurrent users, 42\% decision quality improvement through adversarial review, 10+ language sandbox execution, and 2,632+ production code lines across 121 Python modules and 79 React components. Future work targets multiagent collaboration, local model deployment, and open sourcing the OmniRAG module to foster community innovation in adaptive retrieval systems.
 
 \section*{Acknowledgment}
-
-We thank the open-source communities behind FastAPI, Next.js, LangChain, FAISS, and Sentence Transformers for providing the foundational tools that made this platform possible. Special thanks to the Groq and Gemini teams for API access during development.
+We thank the open source communities behind FastAPI, Next.js, LangChain, FAISS, and Sentence Transformers. Special thanks to the Groq and Gemini teams for API access.
 
 \begin{thebibliography}{00}
 \bibitem{lewis2020retrieval} Lewis, P., et al. "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks." NeurIPS 2020.

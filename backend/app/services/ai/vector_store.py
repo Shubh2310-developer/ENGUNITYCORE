@@ -77,10 +77,11 @@ class VectorStore:
         self._build_bm25()
         self.save()
 
-    def search(self, query: str, user_id: str = None, session_id: str = None, doc_type: str = None, k: int = 5, alpha: float = 0.5):
+    def search(self, query: str, user_id: str = None, session_id: str = None, doc_type: str = None, k: int = 5, alpha: float = 0.5, cross_session: bool = True):
         """
         Hybrid search combining Dense (FAISS) and Sparse (BM25)
         alpha: Weight for dense search (0-1). 1.0 = pure vector, 0.0 = pure BM25
+        cross_session: If True, allow retrieving documents from other sessions of the same user.
         """
         if self.index is None or self.index.ntotal == 0:
             return []
@@ -130,14 +131,21 @@ class VectorStore:
 
         results = []
         for idx, score in sorted_indices:
+            # Defensive check: ensure the index is within the bounds of the metadata list
+            # This prevents "IndexError: list index out of range" if files get out of sync
+            if idx >= len(self.metadata):
+                continue
+
             meta = self.metadata[idx]
 
             # Filter by user_id
             if user_id and str(meta.get("user_id")) != str(user_id):
                 continue
 
-            # Filter by session_id (if provided, only return docs from this session)
-            if session_id and meta.get("session_id") and str(meta.get("session_id")) != str(session_id):
+            # Filter by session_id
+            # If cross_session is False, only return docs from this session
+            # If cross_session is True, return all user docs regardless of session
+            if not cross_session and session_id and meta.get("session_id") and str(meta.get("session_id")) != str(session_id):
                 continue
 
             # Filter by doc_type

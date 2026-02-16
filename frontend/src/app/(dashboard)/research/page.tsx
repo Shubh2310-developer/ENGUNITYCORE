@@ -36,6 +36,7 @@ import {
   GitMerge
 } from 'lucide-react';
 import styles from './research.module.css';
+import DeepResearchPanel from '@/components/research/DeepResearchPanel';
 
 export default function ResearchPage() {
   const router = useRouter();
@@ -45,6 +46,7 @@ export default function ResearchPage() {
   const [activeNode, setActiveNode] = useState(1);
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [activeDraftSection, setActiveDraftSection] = useState('intro');
+  const [activeProject, setActiveProject] = useState<string | null>('Neural Architecture Analysis');
 
   React.useEffect(() => {
     document.documentElement.style.scrollBehavior = 'smooth';
@@ -468,33 +470,10 @@ export default function ResearchPage() {
         </div>
       </header>
 
-      {/* Search Hero Area (Exploration Only) */}
+      {/* Search Hero Area (Exploration Only) replaced with Deep Research Panel */}
       {currentPhase === 1 && (
-        <section className={styles.searchHero}>
-          <div className={styles.searchIconWrapper}>
-            <Search className="w-8 h-8" />
-          </div>
-          <div className={styles.heroText}>
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">Initialize Research Query</h2>
-            <p className="text-slate-500">Targeting academic databases, patent offices, and neural repositories.</p>
-          </div>
-
-          <div className={styles.inputWrapper}>
-            <input
-              type="text"
-              placeholder="Enter research parameters, DOI, or topics..."
-              className={styles.mainInput}
-            />
-            <button className={styles.synthesizeBtn}>
-              Synthesize
-            </button>
-          </div>
-
-          <div className={styles.tagCloud}>
-            {['ArXiv', 'IEEE', 'OpenAI', 'DeepMind', 'Internal_Mesh', 'Patents'].map(tag => (
-              <span key={tag} className={styles.tag}>{tag}</span>
-            ))}
-          </div>
+        <section className="mb-8">
+          <DeepResearchPanel />
         </section>
       )}
 

@@ -31,7 +31,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { VariableSizeList as List } from 'react-window';
+
 import { useAuthStore } from '@/stores/authStore';
 import { chatService, Message } from '@/services/chat';
 import { documentService } from '@/services/document';
@@ -82,6 +82,8 @@ const CodeBlock = React.memo(({ children, lang }: { children: string, lang: stri
   return prevProps.children === nextProps.children && prevProps.lang === nextProps.lang;
 });
 
+CodeBlock.displayName = 'CodeBlock';
+
 export default function ChatPage() {
   const router = useRouter();
   const { user } = useAuthStore();
@@ -107,8 +109,7 @@ export default function ChatPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
-  const listRef = useRef<List>(null);
-  const rowHeights = useRef<{ [key: number]: number }>({});
+
 
   // Update "now" every minute to refresh relative timestamps
   useEffect(() => {
@@ -118,6 +119,9 @@ export default function ChatPage() {
 
   // Load latest session on mount
   useEffect(() => {
+    // Only initialize chat when user is authenticated
+    if (!user) return;
+
     const initChat = async () => {
       try {
         const sessions = await chatService.getSessions();
@@ -152,7 +156,7 @@ export default function ChatPage() {
     };
 
     initChat();
-  }, []);
+  }, [user]); // Re-run when user state changes (e.g. after login)
 
   const fetchCommunities = async () => {
     try {
@@ -195,69 +199,12 @@ export default function ChatPage() {
 
   // Scroll to bottom when messages change
   useEffect(() => {
-    if (messages.length > 50 && listRef.current) {
-      // Use virtualized list scroll
-      listRef.current.scrollToItem(messages.length - 1, 'end');
-    } else if (scrollRef.current) {
-      // Use regular scroll for small lists
+    if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
 
-  // Calculate message height dynamically
-  const getRowHeight = useCallback((index: number) => {
-    // Return cached height if available
-    if (rowHeights.current[index]) {
-      return rowHeights.current[index];
-    }
 
-    const msg = messages[index];
-    if (!msg) return 150;
-
-    // Estimate height based on message properties
-    let estimatedHeight = 80; // Base height
-
-    if (msg.content) {
-      // Estimate based on content length
-      const lines = msg.content.split('\n').length;
-      const chars = msg.content.length;
-      estimatedHeight += Math.max(lines * 24, Math.ceil(chars / 80) * 24);
-    }
-
-    if (msg.images && msg.images.length > 0) {
-      estimatedHeight += 200; // Image height
-    }
-
-    if (msg.image_urls && msg.image_urls.length > 0) {
-      estimatedHeight += 200;
-    }
-
-    if (msg.steps && msg.steps.length > 0) {
-      estimatedHeight += msg.steps.length * 80; // Recursive steps
-    }
-
-    if (msg.retrieved_docs && msg.retrieved_docs.length > 0) {
-      estimatedHeight += 60; // RAG docs
-    }
-
-    // Add extra height for metadata
-    if (msg.strategy || msg.complexity || msg.used_web_search) {
-      estimatedHeight += 40;
-    }
-
-    // Cache the calculated height
-    rowHeights.current[index] = estimatedHeight;
-    
-    return estimatedHeight;
-  }, [messages]);
-
-  // Reset row heights when messages change significantly
-  useEffect(() => {
-    rowHeights.current = {};
-    if (listRef.current) {
-      listRef.current.resetAfterIndex(0);
-    }
-  }, [messages.length]);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -354,37 +301,39 @@ export default function ChatPage() {
             setMessages(prev => prev.map(msg =>
               msg.id === assistantMessageId
                 ? {
-                    ...msg,
-                    complexity: event.complexity || msg.complexity,
-                    strategy: event.strategy || msg.strategy,
-                    used_web_search: event.used_web_search !== undefined ? event.used_web_search : msg.used_web_search,
-                    retrieved_docs: event.retrieved_docs || msg.retrieved_docs,
-                    hyde_doc: event.hyde_doc || msg.hyde_doc,
-                    multi_queries: event.multi_queries || msg.multi_queries,
-                    memory_active: event.memory_active !== undefined ? event.memory_active : msg.memory_active,
-                    memory_summary: event.memory_summary || msg.memory_summary,
-                    context_compressed: event.context_compressed !== undefined ? event.context_compressed : msg.context_compressed,
-                    confidence: event.confidence !== undefined ? event.confidence : msg.confidence,
-                    critique: event.critique || msg.critique,
-                    steps: event.steps || msg.steps
-                  }
+                  ...msg,
+                  complexity: event.complexity || msg.complexity,
+                  strategy: event.strategy || msg.strategy,
+                  used_web_search: event.used_web_search !== undefined ? event.used_web_search : msg.used_web_search,
+                  retrieved_docs: event.retrieved_docs || msg.retrieved_docs,
+                  hyde_doc: event.hyde_doc || msg.hyde_doc,
+                  multi_queries: event.multi_queries || msg.multi_queries,
+                  memory_active: event.memory_active !== undefined ? event.memory_active : msg.memory_active,
+                  memory_summary: event.memory_summary || msg.memory_summary,
+                  context_compressed: event.context_compressed !== undefined ? event.context_compressed : msg.context_compressed,
+                  confidence: event.confidence !== undefined ? event.confidence : msg.confidence,
+                  critique: event.critique || msg.critique,
+                  steps: event.steps || msg.steps
+                }
                 : msg
             ));
           } else if (event.type === 'content') {
-            setMessages(prev => prev.map(msg =>
-              msg.id === assistantMessageId
-                ? { ...msg, content: (msg.content || '') + event.content }
-                : msg
-            ));
+            setMessages(prev => {
+              const idx = prev.findIndex(m => m.id === assistantMessageId);
+              if (idx === -1) return prev;
+              const updated = [...prev];
+              updated[idx] = { ...updated[idx], content: (updated[idx].content || '') + event.content };
+              return updated;
+            });
           } else if (event.type === 'done') {
             setMessages(prev => prev.map(msg =>
               msg.id === assistantMessageId
                 ? {
-                    ...msg,
-                    id: event.message_id || assistantMessageId,
-                    status: 'done',
-                    strategy: event.strategy || msg.strategy
-                  }
+                  ...msg,
+                  id: event.message_id || assistantMessageId,
+                  status: 'done',
+                  strategy: event.strategy || msg.strategy
+                }
                 : msg
             ));
             setIsLoading(false);
@@ -396,12 +345,12 @@ export default function ChatPage() {
                 return prev.map(s =>
                   s.id === currentSessionId
                     ? {
-                        ...s,
-                        title: event.title || (s.title === 'New Chat' || s.title === 'New Conversation' ? (textToSend.length > 30 ? textToSend.substring(0, 30) + '...' : textToSend) : s.title),
-                        lastMessage: textToSend,
-                        timestamp: new Date(),
-                        messageCount: s.messageCount + 2
-                      }
+                      ...s,
+                      title: event.title || (s.title === 'New Chat' || s.title === 'New Conversation' ? (textToSend.length > 30 ? textToSend.substring(0, 30) + '...' : textToSend) : s.title),
+                      lastMessage: textToSend,
+                      timestamp: new Date(),
+                      messageCount: s.messageCount + 2
+                    }
                     : s
                 );
               }
@@ -628,7 +577,7 @@ export default function ChatPage() {
     return date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
   };
 
-  const MarkdownComponents = {
+  const MarkdownComponents = useMemo(() => ({
     p: ({ children }: any) => {
       // If children contains a CodeBlock (div), render a div instead of a p to avoid hydration errors
       const hasDiv = React.Children.toArray(children).some(
@@ -685,7 +634,7 @@ export default function ChatPage() {
 
       return <CodeBlock lang={lang}>{String(children)}</CodeBlock>;
     }
-  };
+  }), []);
 
   if (isInitialLoading) {
     return (
@@ -911,119 +860,8 @@ export default function ChatPage() {
 
         {/* Messages */}
         <div ref={scrollRef} className={styles.messagesContainer}>
-          {/* Use virtualization for >50 messages, regular rendering for smaller lists */}
-          {messages.length > 50 ? (
-            <List
-              ref={listRef}
-              height={typeof window !== 'undefined' ? window.innerHeight - 200 : 600}
-              itemCount={messages.length}
-              itemSize={getRowHeight}
-              width="100%"
-              overscanCount={5}
-              itemData={{
-                messages,
-                copiedId,
-                copyMessage,
-                regenerateLastMessage,
-                chatSessions,
-                activeSessionId,
-                router,
-                shouldShowDivider,
-                getDividerText,
-                MarkdownComponents,
-                styles
-              }}
-            >
-              {({ index, style }) => {
-                const msg = messages[index];
-                const isLastMessage = msg.role === 'assistant' && index === messages.length - 1;
-                
-                return (
-                  <div style={style} key={msg.id || index}>
-                    {shouldShowDivider(index) && (
-                      <div className={styles.timeDivider}>
-                        <div className={styles.timeDividerLine}></div>
-                        <span className={styles.timeDividerText}>
-                          {getDividerText(msg.timestamp || undefined)}
-                        </span>
-                      </div>
-                    )}
-
-                    {msg.role === 'assistant' ? (
-                      <div className={styles.messageBubble}>
-                        {/* Message Interaction Toolbar */}
-                        <div className={styles.messageToolbar}>
-                          <button
-                            onClick={() => copyMessage(msg.content || '', msg.id || index.toString())}
-                            className={styles.toolbarBtn}
-                            title="Copy message"
-                          >
-                            {copiedId === (msg.id || index.toString()) ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                          </button>
-                          {isLastMessage && (
-                            <button
-                              onClick={regenerateLastMessage}
-                              className={styles.toolbarBtn}
-                              title="Regenerate response"
-                            >
-                              <RotateCcw className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => {
-                              router.push(`/decisionvault?source=chat&title=${encodeURIComponent(chatSessions.find(s => s.id === activeSessionId)?.title || 'Decision')}&problem=${encodeURIComponent(msg.content?.slice(0, 200) || '')}`);
-                            }}
-                            className={styles.toolbarBtn}
-                            title="Save to Decision Vault"
-                          >
-                            <Shield className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-
-                        <div className={styles.messageAssistant}>
-                          <div className={styles.messageAvatar}>
-                            <Bot className={styles.messageAvatarIcon} />
-                          </div>
-                          <div className={styles.messageAssistantContent}>
-                            {/* Content rendering - simplified for virtualization */}
-                            <div className={styles.messageContent}>
-                              <ReactMarkdown remarkPlugins={[remarkGfm]} components={MarkdownComponents}>
-                                {msg.content || ''}
-                              </ReactMarkdown>
-                            </div>
-
-                            {msg.status === 'streaming' && (
-                              <div className={`${styles.messageStatus} ${styles.streaming}`}>
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                                AI is thinking...
-                              </div>
-                            )}
-
-                            {msg.status === 'error' && (
-                              <div className={`${styles.messageStatus} ${styles.error}`}>
-                                <X className="w-3 h-3" />
-                                Connection error
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className={styles.messageBubble}>
-                        <div className={styles.messageUser}>
-                          <div className={styles.messageUserContent}>
-                            <p className="whitespace-pre-wrap">{msg.content}</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              }}
-            </List>
-          ) : (
-            <AnimatePresence initial={false}>
-              {messages.map((msg, idx) => (
+          <AnimatePresence initial={false}>
+            {messages.map((msg, idx) => (
               <motion.div
                 key={msg.id || idx}
                 initial={{ opacity: 0, y: 20 }}
@@ -1132,11 +970,10 @@ export default function ChatPage() {
                                 <motion.span
                                   initial={{ opacity: 0, scale: 0.8 }}
                                   animate={{ opacity: 1, scale: 1 }}
-                                  className={`px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-wider ${
-                                    msg.confidence > 0.8 ? 'bg-green-500/10 text-green-400 border-green-500/20' :
+                                  className={`px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-wider ${msg.confidence > 0.8 ? 'bg-green-500/10 text-green-400 border-green-500/20' :
                                     msg.confidence > 0.5 ? 'bg-amber-500/10 text-amber-400 border-amber-100' :
-                                    'bg-red-500/10 text-red-400 border-red-500/20'
-                                  }`}
+                                      'bg-red-500/10 text-red-400 border-red-500/20'
+                                    }`}
                                 >
                                   Confidence: {Math.round(msg.confidence * 100)}%
                                 </motion.span>
@@ -1145,203 +982,202 @@ export default function ChatPage() {
                           </div>
                         )}
 
-                      {msg.multi_queries && msg.multi_queries.length > 0 && (
-                        <details className="mb-3 bg-white/5 border border-white/10 rounded-lg overflow-hidden text-[11px]">
-                          <summary className="px-2 py-1.5 cursor-pointer hover:bg-white/10 font-semibold text-slate-400 flex items-center gap-2">
-                            <Search className="w-3 h-3" />
-                            Multi-Query Expansion ({msg.multi_queries.length} paths)
-                          </summary>
-                          <div className="px-2 py-2 border-t border-white/5 text-slate-500 space-y-1">
-                            {msg.multi_queries.map((q, i) => (
-                              <div key={i} className="flex gap-2">
-                                <span className="text-blue-500">•</span>
-                                <span>{q}</span>
+                        {msg.multi_queries && msg.multi_queries.length > 0 && (
+                          <details className="mb-3 bg-white/5 border border-white/10 rounded-lg overflow-hidden text-[11px]">
+                            <summary className="px-2 py-1.5 cursor-pointer hover:bg-white/10 font-semibold text-slate-400 flex items-center gap-2">
+                              <Search className="w-3 h-3" />
+                              Multi-Query Expansion ({msg.multi_queries.length} paths)
+                            </summary>
+                            <div className="px-2 py-2 border-t border-white/5 text-slate-500 space-y-1">
+                              {msg.multi_queries.map((q, i) => (
+                                <div key={i} className="flex gap-2">
+                                  <span className="text-blue-500">•</span>
+                                  <span>{q}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        )}
+
+                        {msg.memory_active && msg.memory_summary && (
+                          <details className="mb-3 bg-pink-500/5 border border-pink-500/10 rounded-lg overflow-hidden text-[11px]">
+                            <summary className="px-2 py-1.5 cursor-pointer hover:bg-pink-500/10 font-semibold text-pink-400 flex items-center gap-2">
+                              <Clock className="w-3 h-3" />
+                              Hierarchical Memory Summary
+                            </summary>
+                            <div className="px-2 py-2 border-t border-pink-500/5 text-slate-400 leading-relaxed italic">
+                              {msg.memory_summary}
+                            </div>
+                          </details>
+                        )}
+
+                        {msg.critique && (
+                          <div className="mb-3 p-3 bg-white border-2 border-slate-900 rounded-lg text-[12px] text-black font-medium shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)]">
+                            <p className="font-bold mb-1 text-black flex items-center gap-1.5 uppercase tracking-tight">
+                              <Shield className="w-3.5 h-3.5 text-black" />
+                              AI Quality Critique:
+                            </p>
+                            <div className="leading-relaxed">
+                              {msg.critique}
+                            </div>
+                          </div>
+                        )}
+
+                        {msg.steps && msg.steps.length > 0 && (
+                          <div className="mb-4 space-y-3">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Recursive Reasoning Process</p>
+                            {msg.steps.map((step: any, sIdx: number) => (
+                              <details key={sIdx} className="bg-slate-100/50 border border-slate-200 rounded-lg overflow-hidden text-[11px]">
+                                <summary className="px-3 py-2 cursor-pointer hover:bg-slate-200/50 font-semibold text-slate-700 flex items-center gap-2">
+                                  <span className="w-4 h-4 rounded-full bg-blue-500 text-white flex items-center justify-center text-[8px]">{sIdx + 1}</span>
+                                  Step {sIdx + 1}: {step.thought.slice(0, 60)}...
+                                </summary>
+                                <div className="px-3 py-3 border-t border-slate-200 space-y-2">
+                                  <div className="text-slate-600 italic">&quot;{step.thought}&quot;</div>
+                                  <div className="bg-slate-900 text-green-400 p-2 rounded font-mono text-[10px] overflow-x-auto">
+                                    <div className="text-slate-500 mb-1"># REPL Output:</div>
+                                    {step.output}
+                                  </div>
+                                </div>
+                              </details>
+                            ))}
+                          </div>
+                        )}
+
+                        {msg.hyde_doc && (
+                          <details className="mb-3 bg-slate-50 border border-slate-100 rounded-lg overflow-hidden text-[11px]">
+                            <summary className="px-2 py-1.5 cursor-pointer hover:bg-slate-100 font-semibold text-slate-600 flex items-center gap-2">
+                              <Zap className="w-3 h-3" />
+                              AI Hypothetical Reasoning (HyDE)
+                            </summary>
+                            <div className="px-2 py-2 border-t border-slate-100 text-slate-500 leading-relaxed">
+                              {msg.hyde_doc}
+                            </div>
+                          </details>
+                        )}
+
+                        <div className={styles.messageContent}>
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            components={MarkdownComponents}
+                          >
+                            {msg.content || ''}
+                          </ReactMarkdown>
+                        </div>
+
+                        {msg.retrieved_docs && msg.retrieved_docs.length > 0 && (
+                          <div className={styles.ragStatus}>
+                            <p className={styles.ragLabel}>Sources utilized:</p>
+                            {msg.retrieved_docs.map((doc, i) => (
+                              <div key={i} className={styles.ragBadge}>
+                                <Shield className="w-3 h-3" />
+                                <span>{doc}</span>
                               </div>
                             ))}
                           </div>
-                        </details>
-                      )}
+                        )}
 
-                      {msg.memory_active && msg.memory_summary && (
-                        <details className="mb-3 bg-pink-500/5 border border-pink-500/10 rounded-lg overflow-hidden text-[11px]">
-                          <summary className="px-2 py-1.5 cursor-pointer hover:bg-pink-500/10 font-semibold text-pink-400 flex items-center gap-2">
-                            <Clock className="w-3 h-3" />
-                            Hierarchical Memory Summary
-                          </summary>
-                          <div className="px-2 py-2 border-t border-pink-500/5 text-slate-400 leading-relaxed italic">
-                            {msg.memory_summary}
+                        {msg.status === 'streaming' && (
+                          <div className={`${styles.messageStatus} ${styles.streaming}`}>
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            AI is thinking...
                           </div>
-                        </details>
-                      )}
+                        )}
 
-                      {msg.critique && (
-                        <div className="mb-3 p-3 bg-white border-2 border-slate-900 rounded-lg text-[12px] text-black font-medium shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)]">
-                          <p className="font-bold mb-1 text-black flex items-center gap-1.5 uppercase tracking-tight">
-                            <Shield className="w-3.5 h-3.5 text-black" />
-                            AI Quality Critique:
-                          </p>
-                          <div className="leading-relaxed">
-                            {msg.critique}
+                        {msg.status === 'error' && (
+                          <div className={`${styles.messageStatus} ${styles.error}`}>
+                            <X className="w-3 h-3" />
+                            Connection error
                           </div>
-                        </div>
-                      )}
-
-                      {msg.steps && msg.steps.length > 0 && (
-                        <div className="mb-4 space-y-3">
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Recursive Reasoning Process</p>
-                          {msg.steps.map((step: any, sIdx: number) => (
-                            <details key={sIdx} className="bg-slate-100/50 border border-slate-200 rounded-lg overflow-hidden text-[11px]">
-                              <summary className="px-3 py-2 cursor-pointer hover:bg-slate-200/50 font-semibold text-slate-700 flex items-center gap-2">
-                                <span className="w-4 h-4 rounded-full bg-blue-500 text-white flex items-center justify-center text-[8px]">{sIdx + 1}</span>
-                                Step {sIdx + 1}: {step.thought.slice(0, 60)}...
-                              </summary>
-                              <div className="px-3 py-3 border-t border-slate-200 space-y-2">
-                                <div className="text-slate-600 italic">&quot;{step.thought}&quot;</div>
-                                <div className="bg-slate-900 text-green-400 p-2 rounded font-mono text-[10px] overflow-x-auto">
-                                  <div className="text-slate-500 mb-1"># REPL Output:</div>
-                                  {step.output}
-                                </div>
-                              </div>
-                            </details>
-                          ))}
-                        </div>
-                      )}
-
-                      {msg.hyde_doc && (
-                        <details className="mb-3 bg-slate-50 border border-slate-100 rounded-lg overflow-hidden text-[11px]">
-                          <summary className="px-2 py-1.5 cursor-pointer hover:bg-slate-100 font-semibold text-slate-600 flex items-center gap-2">
-                            <Zap className="w-3 h-3" />
-                            AI Hypothetical Reasoning (HyDE)
-                          </summary>
-                          <div className="px-2 py-2 border-t border-slate-100 text-slate-500 leading-relaxed">
-                            {msg.hyde_doc}
-                          </div>
-                        </details>
-                      )}
-
-                      <div className={styles.messageContent}>
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          components={MarkdownComponents}
-                        >
-                          {msg.content || ''}
-                        </ReactMarkdown>
+                        )}
                       </div>
-
-                      {msg.retrieved_docs && msg.retrieved_docs.length > 0 && (
-                        <div className={styles.ragStatus}>
-                          <p className={styles.ragLabel}>Sources utilized:</p>
-                          {msg.retrieved_docs.map((doc, i) => (
-                            <div key={i} className={styles.ragBadge}>
-                              <Shield className="w-3 h-3" />
-                              <span>{doc}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {msg.status === 'streaming' && (
-                        <div className={`${styles.messageStatus} ${styles.streaming}`}>
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                          AI is thinking...
-                        </div>
-                      )}
-
-                      {msg.status === 'error' && (
-                        <div className={`${styles.messageStatus} ${styles.error}`}>
-                          <X className="w-3 h-3" />
-                          Connection error
-                        </div>
-                      )}
                     </div>
                   </div>
-                </div>
-              ) : (
-                <div className={styles.messageBubble}>
-                  <div className={styles.messageUser}>
-                    <div className={styles.messageUserContent}>
-                      {msg.images && msg.images.length > 0 ? (
-                        <div className={styles.messageImages}>
-                          {msg.images.map((img, i) => (
-                            <div key={img.id} className="group/img relative w-48 h-48 rounded-lg overflow-hidden cursor-pointer shadow-sm hover:shadow-md transition-shadow">
-                              <Image
-                                src={img.thumbnails?.medium || img.public_url}
-                                alt={img.filename}
-                                fill
-                                className="object-cover transition-transform group-hover/img:scale-105"
-                                sizes="(max-width: 768px) 100vw, 192px"
-                                onClick={() => window.open(img.public_url, '_blank')}
-                              />
-                              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover/img:opacity-100 transition-opacity">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    window.open(img.public_url, '_blank');
-                                  }}
-                                  className="p-1.5 bg-black/50 hover:bg-black/70 text-white rounded-md backdrop-blur-sm"
-                                  title="Download Original"
-                                >
-                                  <Download className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={async (e) => {
-                                    e.stopPropagation();
-                                    if (confirm('Are you sure you want to delete this image?')) {
-                                      try {
-                                        await imageService.deleteImage(img.id);
-                                        // Update state to remove image from UI
-                                        setMessages(prev => prev.map(m => ({
-                                          ...m,
-                                          images: m.images?.filter(i => i.id !== img.id)
-                                        })));
-                                      } catch (err) {
-                                        console.error('Delete failed:', err);
+                ) : (
+                  <div className={styles.messageBubble}>
+                    <div className={styles.messageUser}>
+                      <div className={styles.messageUserContent}>
+                        {msg.images && msg.images.length > 0 ? (
+                          <div className={styles.messageImages}>
+                            {msg.images.map((img, i) => (
+                              <div key={img.id} className="group/img relative w-48 h-48 rounded-lg overflow-hidden cursor-pointer shadow-sm hover:shadow-md transition-shadow">
+                                <Image
+                                  src={img.thumbnails?.medium || img.public_url}
+                                  alt={img.filename}
+                                  fill
+                                  className="object-cover transition-transform group-hover/img:scale-105"
+                                  sizes="(max-width: 768px) 100vw, 192px"
+                                  onClick={() => window.open(img.public_url, '_blank')}
+                                />
+                                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover/img:opacity-100 transition-opacity">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      window.open(img.public_url, '_blank');
+                                    }}
+                                    className="p-1.5 bg-black/50 hover:bg-black/70 text-white rounded-md backdrop-blur-sm"
+                                    title="Download Original"
+                                  >
+                                    <Download className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      if (confirm('Are you sure you want to delete this image?')) {
+                                        try {
+                                          await imageService.deleteImage(img.id);
+                                          // Update state to remove image from UI
+                                          setMessages(prev => prev.map(m => ({
+                                            ...m,
+                                            images: m.images?.filter(i => i.id !== img.id)
+                                          })));
+                                        } catch (err) {
+                                          console.error('Delete failed:', err);
+                                        }
                                       }
-                                    }
-                                  }}
-                                  className="p-1.5 bg-red-500/50 hover:bg-red-500/70 text-white rounded-md backdrop-blur-sm"
-                                  title="Delete Image"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                              {img.tags && img.tags.length > 0 && (
-                                <div className="absolute bottom-2 left-2 flex flex-wrap gap-1 opacity-0 group-hover/img:opacity-100 transition-opacity">
-                                  {img.tags.slice(0, 3).map(tag => (
-                                    <span key={tag} className="px-1.5 py-0.5 bg-black/40 text-[8px] text-white rounded backdrop-blur-sm uppercase font-bold">
-                                      {tag}
-                                    </span>
-                                  ))}
+                                    }}
+                                    className="p-1.5 bg-red-500/50 hover:bg-red-500/70 text-white rounded-md backdrop-blur-sm"
+                                    title="Delete Image"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
                                 </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      ) : msg.image_urls && msg.image_urls.length > 0 && (
-                        <div className={styles.messageImages}>
-                          {msg.image_urls.map((url, i) => (
-                            <div key={i} className="relative w-48 h-48 rounded-lg overflow-hidden shadow-sm">
-                              <Image
-                                src={url}
-                                alt="Uploaded"
-                                fill
-                                className="object-cover"
-                                sizes="(max-width: 768px) 100vw, 192px"
-                                unoptimized={url.startsWith('data:')}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                                {img.tags && img.tags.length > 0 && (
+                                  <div className="absolute bottom-2 left-2 flex flex-wrap gap-1 opacity-0 group-hover/img:opacity-100 transition-opacity">
+                                    {img.tags.slice(0, 3).map(tag => (
+                                      <span key={tag} className="px-1.5 py-0.5 bg-black/40 text-[8px] text-white rounded backdrop-blur-sm uppercase font-bold">
+                                        {tag}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : msg.image_urls && msg.image_urls.length > 0 && (
+                          <div className={styles.messageImages}>
+                            {msg.image_urls.map((url, i) => (
+                              <div key={i} className="relative w-48 h-48 rounded-lg overflow-hidden shadow-sm">
+                                <Image
+                                  src={url}
+                                  alt="Uploaded"
+                                  fill
+                                  className="object-cover"
+                                  sizes="(max-width: 768px) 100vw, 192px"
+                                  unoptimized={url.startsWith('data:')}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
               </motion.div>
-              ))}
-            </AnimatePresence>
-          )}
+            ))}
+          </AnimatePresence>
 
           {isLoading && !messages.find(m => m.status === 'streaming') && (
             <div className={styles.messageBubble}>
@@ -1460,6 +1296,8 @@ export default function ChatPage() {
                   onClick={handleSend}
                   disabled={isLoading || !input.trim()}
                   className={styles.sendBtn}
+                  title="Send message"
+                  aria-label="Send message"
                 >
                   {isLoading ? <Loader2 className="animate-spin" /> : <Send />}
                 </button>

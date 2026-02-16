@@ -1,7 +1,7 @@
 # Feature Analysis & Testing Guide: Chat Module
 
 **Component:** `frontend/src/app/(dashboard)/chat/page.tsx`
-**Service:** `frontend/src/services/chat.ts`
+**Service:** `frontend/src/services/chat.ts`, `frontend/src/services/omniRag.ts`
 
 This document provides a detailed breakdown of all features implemented in the Chat module, including their operational logic, test cases, and optimization recommendations.
 
@@ -11,15 +11,14 @@ This document provides a detailed breakdown of all features implemented in the C
 - **Description:** Uses Server-Sent Events (SSE) to stream AI responses character-by-character.
 - **Logic:** `omniRagService.streamQuery` handles the connection. Parses `data: { type: ... }` messages.
 - **Event Types:**
-  - `metadata`: Updates message attributes (complexity, strategy, confidence).
+  - `metadata`: Updates message attributes (complexity, strategy, confidence, **recursive steps**).
   - `content`: Appends text to the message body.
   - `done`: Finalizes message status and updates session title.
   - `error`: Handles stream interruptions.
 - **Test Cases:**
   - [ ] **TC-STREAM-01:** Verify text appears incrementally.
-  - [ ] **TC-STREAM-02:** Verify multiple chunks are concatenated correctly (no dropped characters).
+  - [ ] **TC-STREAM-02:** Verify multiple chunks are concatenated correctly.
   - [ ] **TC-STREAM-03:** Verify `done` event stops the loading spinner.
-  - [ ] **TC-STREAM-04:** Interrupt stream (network disconnect) and verify error handling.
 
 ### 1.2 Markdown & Code Rendering
 - **Description:** Renders AI responses using `react-markdown` with GFM support.
@@ -27,143 +26,54 @@ This document provides a detailed breakdown of all features implemented in the C
   - Syntax highlighting for code blocks.
   - "Copy Code" button overlaid on code blocks.
   - Tables, lists, and blockquotes rendering.
-- **Optimization:** Current implementation uses `ReactMarkdown` which can be heavy.
-  - *Recommendation:* Memoize the markdown component to prevent re-parsing unchanged text during streaming.
-- **Test Cases:**
-  - [ ] **TC-RENDER-01:** render a Python code block.
-  - [ ] **TC-RENDER-02:** Click "Copy" on code block -> Verify clipboard content.
-  - [ ] **TC-RENDER-03:** Render a Markdown table -> Verify alignment.
 
 ### 1.3 Slash Commands
-- **Description:** Special commands starting with `/` to trigger specific behaviors.
-- **Commands:**
-  - `/clear`: Resets the chat canvas.
-  - `/explain [topic]`: Wraps input in an explanation prompt.
-  - `/summarize [text]`: Wraps input in a summarization prompt.
-  - `/code [request]`: Wraps input in a coding prompt.
+- **Commands:** `/clear`, `/explain`, `/summarize`, `/code`.
 - **Test Cases:**
-  - [ ] **TC-CMD-01:** Type `/clear` -> Verify messages are removed.
-  - [ ] **TC-CMD-02:** Type `/explain Quantum` -> Verify prompt sent is "Please explain... Quantum".
-
-## 2. Omni-RAG & Knowledge Graph Features
-
-### 2.1 Metadata Visualization
-- **Description:** Displays rich metadata about the AI's reasoning process.
-- **Badges:**
-  - **Strategy:** "Adaptive", "Vector RAG", "Graph RAG".
-  - **Complexity:** Simple, Complex, Multi-step.
-  - **Web Search:** Indicates if live internet search was used.
-  - **Confidence:** Color-coded (Green >80%, Amber >50%, Red <50%).
-- **Collapsible Sections:**
-  - **Multi-Query:** Shows alternative search queries generated.
-  - **Memory:** Shows hierarchical memory context used.
-  - **HyDE:** Shows hypothetical document used for retrieval.
-- **Test Cases:**
-  - [ ] **TC-RAG-01:** Trigger a complex query -> Verify "Multi-Query" details appear.
-  - [ ] **TC-RAG-02:** Verify Confidence badge color changes based on score.
-
-### 2.2 Knowledge Graph Explorer
-- **Description:** Sidebar tab showing extracted communities and entities.
-- **Logic:** Fetches community summaries from `omniRagService`.
-- **Actions:** "Rebuild Graph" triggers a backend re-indexing job.
-- **Optimization:** `fetchCommunities` is called on every tab switch.
-  - *Recommendation:* Cache community data in `useState` or a global store and only re-fetch on explicit refresh or after a timeout.
-- **Test Cases:**
-  - [ ] **TC-GRAPH-01:** Switch to "Knowledge Graph" tab -> Verify API call.
-  - [ ] **TC-GRAPH-02:** Click "Rebuild Graph" -> Verify loading state and eventual refresh.
-
-### 2.3 Document Upload (RAG Indexing)
-- **Description:** Upload PDFs/Text files to be indexed into the vector store.
-- **Logic:** `omniRagService.uploadDocument` handles multipart/form-data upload.
-- **Feedback:** Assistant message confirms filename and chunk count.
-- **Test Cases:**
-  - [ ] **TC-DOC-01:** Upload PDF -> Verify success message with chunk count.
-  - [ ] **TC-DOC-02:** Upload invalid file type -> Verify error handling.
-
-## 3. Session Management Features
-
-### 3.1 Session Lifecycle
-- **Description:** CRUD operations for chat sessions.
-- **Logic:**
-  - **List:** Fetched on mount, sorted by timestamp (implied).
-  - **Create:** "New Chat" button calls API.
-  - **Delete:** Trash icon calls API.
-  - **Switch:** Clicking a session ID updates `activeSessionId` and `messages`.
-- **Optimization:** `setChatSessions` is updated frequently during streaming to update the "Last Message" preview.
-  - *Recommendation:* Debounce session list updates during streaming to avoid re-rendering the sidebar for every character.
-- **Test Cases:**
-  - [ ] **TC-SESS-01:** Create New Chat -> Verify empty message list.
-  - [ ] **TC-SESS-02:** Switch Session -> Verify messages restore correctly.
-  - [ ] **TC-SESS-03:** Delete Active Session -> Verify redirection to new/empty session.
-
-### 3.2 Search & Filtering
-- **Description:** Filter sessions by title.
-- **Logic:** Client-side filtering of the `chatSessions` array.
-- **Test Cases:**
-  - [ ] **TC-SEARCH-01:** Type "Python" -> Verify only matching sessions remain visible.
-
-## 4. Multi-Modal Features (Images)
-
-### 4.1 Image Upload & Staging
-- **Description:** Upload images for analysis (Vision capabilities).
-- **Logic:**
-  - Upload -> `imageService` -> Returns URL/ID.
-  - Image is added to `stagedImages` state.
-  - Staged images are displayed above the input box.
-- **Test Cases:**
-  - [ ] **TC-IMG-01:** Upload image -> Verify thumbnail appears in staging.
-  - [ ] **TC-IMG-02:** Click "X" on staged image -> Verify removal.
-
-### 4.2 Image Rendering
-- **Description:** Display images in chat (both user-uploaded and AI-generated).
-- **Features:**
-  - Hover actions: Download, Delete.
-  - Click to open full size.
-- **Test Cases:**
-  - [ ] **TC-IMG-03:** Click image in chat -> Verify it opens in new tab.
-  - [ ] **TC-IMG-04:** Delete image -> Verify it disappears from chat history.
-
-## 5. Integration Features
-
-### 5.1 Decision Vault Integration
-- **Description:** Export a conversation to the Decision Vault for structured analysis.
-- **Logic:** `router.push` to `/decisionvault` with query parameters (`title`, `problem`, `source=chat`).
-- **Trigger:** Button in header or message toolbar.
-- **Test Cases:**
-  - [ ] **TC-INT-01:** Click "Convert to Decision" -> Verify URL parameters on destination page.
-
-## 6. Optimization Recommendations
-
-1.  **Message List Virtualization:**
-    *   **Problem:** Rendering 100+ messages with Markdown is expensive.
-    *   **Solution:** Use `react-window` or `virtuoso` to render only visible messages.
-
-2.  **Memoization:**
-    *   **Problem:** Typing in the input box triggers re-renders of the entire parent component.
-    *   **Solution:** Wrap `MessageBubble` components in `React.memo` to prevent re-rendering unchanged messages.
-
-3.  **Socket Connection:**
-    *   **Current:** HTTP Streaming (SSE) via `fetch`.
-    *   **Proposal:** Switch to `WebSocket` for bi-directional communication, which is better for "Stop Generation" and real-time typing indicators.
-
-4.  **State Management:**
-    *   **Current:** Local `useState` for messages.
-    *   **Proposal:** Move chat state to `Zustand` or `Redux` to persist chat history when navigating away from the page (e.g., to Settings and back).
-
-## 7. Service Analysis
-
-### `chatService` (`frontend/src/services/chat.ts`)
-- **Strengths:**
-  - Clean separation of concerns (API calls vs UI).
-  - Robust error handling in `streamMessage`.
-  - Handles SSE parsing manually (flexible).
-- **Weaknesses:**
-  - Hardcoded API endpoints (partially mitigated by `FINAL_API_URL`).
-  - `streamMessage` is a very large function; could be split into a custom hook (e.g., `useChatStream`).
-
-### `omniRagService` & `imageService`
-- **Integration:** The chat page acts as a "hub", orchestrating calls to these separate services. This is a good Micro-Frontend pattern.
+  - [ ] **TC-CMD-01:** Type `/clear` -> Verify canvas resets.
 
 ---
-**Document Status:** Draft v1.0
-**Author:** QA Team
+
+## 2. Advanced Reasoning & RAG
+
+### 2.1 Recursive Reasoning (RLM) - NEW
+- **Description:** Implements the Recursive Language Model paradigm for handling unbounded context.
+- **Features:**
+  - **Strategy Selection:** "Recursive (Long Context)" option in the strategy dropdown.
+  - **Step-by-Step Visualization:** Collapsible `details` blocks showing the AI's internal "Thought" and "REPL Output".
+  - **Programmatic Interaction:** The AI executes Python code in a sandbox to inspect documents.
+- **Test Cases:**
+  - [ ] **TC-RLM-01:** Select "Recursive (Long Context)" -> Verify the strategy badge shows "recursive intensive".
+  - [ ] **TC-RLM-02:** Ask a complex counting question -> Verify "Recursive Reasoning Process" section appears.
+  - [ ] **TC-RLM-03:** Click a reasoning step -> Verify it expands to show the code block and the execution result.
+  - [ ] **TC-RLM-04:** Verify the final conclusion is derived from the steps.
+
+### 2.2 Omni-RAG Metadata
+- **Features:** "Adaptive", "Vector RAG", "Graph RAG" strategies.
+- **Badges:** Complexity, Web Search, Confidence (color-coded).
+- **Details:** Multi-Query paths, Hierarchical Memory summary, HyDE doc.
+
+### 2.3 Knowledge Graph Explorer
+- **Description:** Sidebar tab showing extracted entities and thematic communities.
+- **Actions:** "Rebuild Graph" triggers backend re-indexing.
+
+---
+
+## 3. Multi-Modal & Files
+
+### 3.1 Document Upload
+- **Logic:** Multipart upload indexed into vector store.
+- **Feedback:** Assistant confirms chunk count and indexing strategy.
+
+### 3.2 Image Analysis (Vision)
+- **Features:** Staging area for multiple images, hover actions (download, delete).
+- **Test Cases:**
+  - [ ] **TC-IMG-01:** Upload multiple images -> Verify they appear in the input staging area.
+
+---
+
+## 4. Optimization Recommendations
+
+1.  **Message Memoization:** Use `React.memo` on message bubbles to prevent parent re-renders during streaming.
+2.  **Virtualized Sidebar:** Use virtualization for the chat session list when user has >100 conversations.
+3.  **Recursive Step Debouncing:** Ensure the UI doesn't jitter when multiple recursive steps are reported in quick succession.

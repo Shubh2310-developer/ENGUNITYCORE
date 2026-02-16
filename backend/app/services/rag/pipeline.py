@@ -14,6 +14,7 @@ from .refiner import get_answer_refiner
 from .density_controller import DensityController
 from .language_optimizer import get_language_optimizer
 from .quality_metrics import get_quality_metrics, get_quality_logger
+from .recursive_agent import RecursiveReasoningAgent
 
 class OmniRAGPipeline:
     """
@@ -48,6 +49,7 @@ class OmniRAGPipeline:
         self.language_optimizer = get_language_optimizer()
         self.quality_metrics = get_quality_metrics()
         self.quality_logger = get_quality_logger()
+        self.recursive_agent = RecursiveReasoningAgent(llm_client)
 
     async def process_query(
         self,
@@ -123,7 +125,10 @@ class OmniRAGPipeline:
 
         # 1. Strategy Selection (Adaptive or Explicit)
         if strategy:
-            complexity = "SIMPLE" if strategy == "direct_generation" else ("MULTI_HOP" if strategy == "graph_rag" else "SINGLE_HOP")
+            if strategy == "recursive_intensive":
+                complexity = "RECURSIVE_INTENSIVE"
+            else:
+                complexity = "SIMPLE" if strategy == "direct_generation" else ("MULTI_HOP" if strategy == "graph_rag" else "SINGLE_HOP")
             logger.info(f"Using explicit strategy: {strategy} (mapped to complexity: {complexity})")
         else:
             complexity = self.complexity_classifier.predict_complexity(optimized_query)
@@ -150,6 +155,33 @@ class OmniRAGPipeline:
                 "metadata": {"complexity": complexity}
             }
 
+        if complexity == "RECURSIVE_INTENSIVE":
+            # 1. Gather full context from all sources for the recursive agent
+            # For simplicity in this prototype, we'll fetch more documents than usual
+            all_docs = self.vector_store.search(
+                query=optimized_query,
+                user_id=user_id,
+                session_id=session_id,
+                k=50, # Larger K for recursive processing
+                cross_session=True # Allow retrieving documents from other sessions
+            )
+            context_text = "\n\n".join([doc['content'] for doc in all_docs])
+
+            # 2. Run recursive solver
+            result = await self.recursive_agent.solve(optimized_query, context_text)
+
+            return {
+                "query": query,
+                "strategy": "recursive_intensive",
+                "response": result['response'],
+                "documents": all_docs[:5], # Still return top docs for UI
+                "metadata": {
+                    **result['metadata'],
+                    "complexity": complexity,
+                    "steps": result['steps']
+                }
+            }
+
         # 2. Execution path
         if complexity == "MULTI_HOP":
             return await self._graph_rag_flow(optimized_query, user_id, session_id, history, visual_context=visual_context)
@@ -166,7 +198,8 @@ class OmniRAGPipeline:
                 user_id=user_id,
                 session_id=session_id,
                 k=20,
-                alpha=0.6 # Favor semantic but include keyword
+                alpha=0.6, # Favor semantic but include keyword
+                cross_session=True
             )
             all_retrieved_docs.extend(results)
 
@@ -403,7 +436,8 @@ Instructions:
             query=hyde_result['hypothetical_document'],
             user_id=user_id,
             session_id=session_id,
-            k=10
+            k=10,
+            cross_session=True
         )
 
         # Step 1: MAP Phase - Generate partial answers from each source
@@ -549,6 +583,36 @@ Partial Answer (cite source):"""
             yield {"type": "done", "strategy": "direct_generation"}
             return
 
+        if complexity == "RECURSIVE_INTENSIVE":
+            # 1. Gather full context
+            all_docs = self.vector_store.search(
+                query=optimized_query,
+                user_id=user_id,
+                session_id=session_id,
+                k=50,
+                cross_session=True
+            )
+            context_text = "\n\n".join([doc['content'] for doc in all_docs])
+
+            # 2. Run recursive solver
+            result = await self.recursive_agent.solve(optimized_query, context_text)
+
+            yield {"type": "metadata", "strategy": "recursive_intensive", "steps_count": len(result['steps'])}
+
+            # Stream the steps as content
+            for step in result['steps']:
+                yield {"type": "content", "content": f"\n\n### Reasoning Step\n{step['thought']}\n\n**Output:**\n{step['output']}\n"}
+
+            yield {"type": "content", "content": f"\n\n### Final Conclusion\n{result['response']}"}
+
+            yield {
+                "type": "metadata",
+                "confidence": 0.9,
+                "retrieved_docs": [doc['metadata'].get('filename') for doc in all_docs[:5]]
+            }
+            yield {"type": "done", "strategy": "recursive_intensive"}
+            return
+
         if complexity == "MULTI_HOP":
             # GraphRAG Stream Flow
             hyde_result = await self.hyde_engine.transform_query(optimized_query)
@@ -559,7 +623,8 @@ Partial Answer (cite source):"""
                 query=hyde_result['hypothetical_document'],
                 user_id=user_id,
                 session_id=session_id,
-                k=10
+                k=10,
+                cross_session=True
             )
 
             # Step 1: MAP Phase
@@ -634,7 +699,8 @@ Comprehensive Answer:"""
                 user_id=user_id,
                 session_id=session_id,
                 k=20,
-                alpha=0.6
+                alpha=0.6,
+                cross_session=True
             )
             all_retrieved_docs.extend(results)
 

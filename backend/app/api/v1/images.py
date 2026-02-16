@@ -167,11 +167,13 @@ async def search_images(
     from app.services.ai.vector_store import vector_store
 
     # 1. Search in vector store for image types
+    # Use cross_session=True to allow searching all user images
     results = vector_store.search(
         query=query,
         user_id=str(current_user.id),
         doc_type="image",
-        k=limit
+        k=limit,
+        cross_session=True
     )
 
     image_ids = [res["metadata"]["image_id"] for res in results if "image_id" in res["metadata"]]

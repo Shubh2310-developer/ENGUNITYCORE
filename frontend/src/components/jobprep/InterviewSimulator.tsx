@@ -26,6 +26,13 @@ interface Question {
   hints: string[];
 }
 
+interface Round {
+  type: 'recruiter' | 'technical' | 'system_design' | 'behavioral';
+  label: string;
+  status: 'pending' | 'active' | 'completed';
+  score?: number;
+}
+
 interface Evaluation {
   score: number;
   technical_accuracy: number;
@@ -43,12 +50,23 @@ interface InterviewSimulatorProps {
 export const InterviewSimulator: React.FC<InterviewSimulatorProps> = ({ roleId, onComplete, placementMode = false }) => {
   const [step, setStep] = useState<'setup' | 'active' | 'evaluation'>('setup');
   const [difficulty, setDifficulty] = useState('mid-level');
+  const [companyStyle, setCompanyStyle] = useState('General');
+  const [persona, setPersona] = useState('Professional');
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [userResponse, setUserResponse] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [simId, setSimId] = useState<string | null>(null);
   const [timer, setTimer] = useState(0);
+
+  // Multi-round state
+  const [rounds, setRounds] = useState<Round[]>([
+    { type: 'recruiter', label: 'Recruiter Screen', status: 'pending' },
+    { type: 'technical', label: 'Technical Assessment', status: 'pending' },
+    { type: 'system_design', label: 'System Design', status: 'pending' },
+    { type: 'behavioral', label: 'Cultural Fit', status: 'pending' }
+  ]);
+  const [currentRoundIdx, setCurrentRoundIdx] = useState(0);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -63,14 +81,21 @@ export const InterviewSimulator: React.FC<InterviewSimulatorProps> = ({ roleId, 
   const startSimulation = async () => {
     try {
       const sim = await jobPrepService.startSimulation({
-        simulation_type: placementMode ? 'Placement Evaluation' : 'Technical Interview',
+        simulation_type: placementMode ? 'Placement Evaluation' : 'Multi-round Interview',
         difficulty_level: difficulty,
+        company_style: companyStyle,
+        persona_style: persona,
         target_role_id: roleId,
-        placement_mode: placementMode
+        placement_mode: placementMode,
+        interview_rounds: rounds
       });
       setSimId(sim.id);
 
-      const questionData = await fetchQuestion();
+      const updatedRounds = [...rounds];
+      updatedRounds[0].status = 'active';
+      setRounds(updatedRounds);
+
+      const questionData = await fetchQuestion(sim.id, updatedRounds[0].type);
       setCurrentQuestion(questionData);
       setStep('active');
       setTimer(0);
@@ -79,8 +104,9 @@ export const InterviewSimulator: React.FC<InterviewSimulatorProps> = ({ roleId, 
     }
   };
 
-  const fetchQuestion = async () => {
-    return await jobPrepService.getSimulationQuestion(roleId, difficulty);
+  const fetchQuestion = async (id: string, roundType?: string) => {
+    // In a real implementation, the backend would use roundType to tailor the question
+    return await jobPrepService.getSimulationQuestion(roleId, difficulty, id);
   };
 
   const handleSubmitResponse = async () => {
@@ -89,8 +115,27 @@ export const InterviewSimulator: React.FC<InterviewSimulatorProps> = ({ roleId, 
     setIsSubmitting(true);
     try {
       const evalData = await jobPrepService.evaluateSimulationResponse(simId, currentQuestion.question, userResponse);
-      setEvaluation(evalData);
-      setStep('evaluation');
+
+      const updatedRounds = [...rounds];
+      updatedRounds[currentRoundIdx].status = 'completed';
+      updatedRounds[currentRoundIdx].score = evalData.score;
+
+      if (currentRoundIdx < rounds.length - 1) {
+        // Move to next round
+        const nextIdx = currentRoundIdx + 1;
+        updatedRounds[nextIdx].status = 'active';
+        setCurrentRoundIdx(nextIdx);
+        setRounds(updatedRounds);
+        setUserResponse('');
+        const nextQuestion = await fetchQuestion(simId, updatedRounds[nextIdx].type);
+        setCurrentQuestion(nextQuestion);
+        setTimer(0);
+      } else {
+        // Final evaluation
+        setRounds(updatedRounds);
+        setEvaluation(evalData);
+        setStep('evaluation');
+      }
     } catch (err) {
       console.error("Failed to evaluate response", err);
     } finally {
@@ -136,6 +181,36 @@ export const InterviewSimulator: React.FC<InterviewSimulatorProps> = ({ roleId, 
               </div>
             </div>
 
+            <div className="space-y-4 mb-8">
+              <label className="block text-sm font-bold text-slate-700">Interview Style</label>
+              <div className="grid grid-cols-2 gap-2">
+                {['General', 'FAANG', 'Startup', 'Research'].map(style => (
+                  <button
+                    key={style}
+                    onClick={() => setCompanyStyle(style)}
+                    className={`${styles.selectBtn} ${companyStyle === style ? styles.active : ''}`}
+                  >
+                    {style}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-4 mb-8">
+              <label className="block text-sm font-bold text-slate-700">Interviewer Persona</label>
+              <div className="grid grid-cols-2 gap-2">
+                {['Professional', 'Friendly', 'Tough', 'Technical Lead'].map(p => (
+                  <button
+                    key={p}
+                    onClick={() => setPersona(p)}
+                    className={`${styles.selectBtn} ${persona === p ? styles.active : ''}`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <button onClick={startSimulation} className={styles.btnPrimaryLarge}>
               Launch Simulator
             </button>
@@ -147,53 +222,79 @@ export const InterviewSimulator: React.FC<InterviewSimulatorProps> = ({ roleId, 
             key="active"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className={`${styles.activeSession} ${placementMode ? styles.placementModeActive : ''}`}
+            className={`${styles.activeSession} ${placementMode ? styles.placementModeActive : ''} flex flex-col md:flex-row gap-8`}
           >
-            <div className="flex justify-between items-center mb-6">
-              <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold ${placementMode ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
-                <Timer size={14} />
-                {formatTime(timer)}
+            <div className="flex-1 flex flex-col">
+              <div className="flex justify-between items-center mb-6">
+                <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold ${placementMode ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
+                  <Timer size={14} />
+                  {formatTime(timer)}
+                </div>
+                <div className="flex items-center gap-2">
+                  {placementMode && (
+                    <span className="flex items-center gap-1 text-[10px] font-black text-red-600 uppercase tracking-tighter animate-pulse">
+                      <ShieldAlert size={12} /> Placement Mode Strict
+                    </span>
+                  )}
+                  <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                    Round {currentRoundIdx + 1}/{rounds.length}: {rounds[currentRoundIdx].label}
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                {placementMode && (
-                   <span className="flex items-center gap-1 text-[10px] font-black text-red-600 uppercase tracking-tighter animate-pulse">
-                     <ShieldAlert size={12} /> Placement Mode Strict
-                   </span>
-                )}
-                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                  {placementMode ? 'Final Evaluation' : 'Technical Interview'} • {difficulty}
+
+              <div className={styles.questionCard}>
+                <div className="flex items-start gap-4">
+                  <div className="p-2 bg-blue-600 rounded-lg">
+                    <Sparkles className="text-white" size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900 mb-2">{persona} Interviewer:</h3>
+                    <p className="text-slate-700 text-lg leading-relaxed italic">"{currentQuestion.question}"</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex-1 mt-8 relative flex flex-col">
+                <textarea
+                  className={`${styles.responseArea} flex-1`}
+                  placeholder="Type your response here... (Be as detailed as possible)"
+                  value={userResponse}
+                  onChange={(e) => setUserResponse(e.target.value)}
+                />
+                <div className="mt-4 flex justify-end">
+                  <button
+                    onClick={handleSubmitResponse}
+                    disabled={isSubmitting || !userResponse.trim()}
+                    className={styles.submitBtn}
+                  >
+                    {isSubmitting ? <RefreshCcw className="animate-spin" size={18} /> : <Send size={18} />}
+                    {currentRoundIdx < rounds.length - 1 ? 'Submit & Next Round' : 'Submit Final Response'}
+                  </button>
                 </div>
               </div>
             </div>
 
-            <div className={styles.questionCard}>
-              <div className="flex items-start gap-4">
-                <div className="p-2 bg-blue-600 rounded-lg">
-                  <Sparkles className="text-white" size={20} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900 mb-2">Interviewer Question:</h3>
-                  <p className="text-slate-700 text-lg leading-relaxed italic">"{currentQuestion.question}"</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex-1 mt-8 relative">
-              <textarea
-                className={styles.responseArea}
-                placeholder="Type your response here... (Be as detailed as possible)"
-                value={userResponse}
-                onChange={(e) => setUserResponse(e.target.value)}
-              />
-              <div className="absolute bottom-4 right-4 flex gap-2">
-                <button
-                   onClick={handleSubmitResponse}
-                   disabled={isSubmitting || !userResponse.trim()}
-                   className={styles.submitBtn}
-                >
-                  {isSubmitting ? <RefreshCcw className="animate-spin" size={18} /> : <Send size={18} />}
-                  Submit Response
-                </button>
+            <div className="w-full md:w-64 space-y-4">
+              <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Interview Progress</h4>
+              <div className="space-y-2">
+                {rounds.map((r, idx) => (
+                  <div
+                    key={idx}
+                    className={`p-3 rounded-xl border flex items-center justify-between transition-all ${
+                      r.status === 'active' ? 'bg-blue-50 border-blue-200 ring-2 ring-blue-100' :
+                      r.status === 'completed' ? 'bg-slate-50 border-slate-100 opacity-60' :
+                      'bg-white border-slate-100 opacity-40'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      {r.status === 'completed' ? <CheckCircle className="text-green-500" size={14} /> :
+                       r.status === 'active' ? <div className="w-3.5 h-3.5 rounded-full bg-blue-500 animate-pulse" /> :
+                       <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-200" />}
+                      <span className={`text-xs font-bold ${r.status === 'active' ? 'text-blue-700' : 'text-slate-600'}`}>{r.label}</span>
+                    </div>
+                    {r.score !== undefined && <span className="text-[10px] font-black text-blue-600">{r.score}%</span>}
+                  </div>
+                ))}
               </div>
             </div>
           </motion.div>

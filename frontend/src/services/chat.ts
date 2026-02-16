@@ -34,6 +34,7 @@ export interface Message {
   memory_active?: boolean;
   memory_summary?: string;
   context_compressed?: boolean;
+  steps?: Array<{ thought: string; output: string }>;
   latency?: number;
 }
 

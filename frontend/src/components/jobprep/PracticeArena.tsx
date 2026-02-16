@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Zap,
@@ -11,7 +11,9 @@ import {
   RefreshCcw,
   ArrowLeft,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  Clock,
+  AlertCircle
 } from 'lucide-react';
 import styles from './jobprep-components.module.css';
 import { useJobPrepStore } from '@/stores/jobPrepStore';
@@ -37,11 +39,42 @@ export const PracticeArena = () => {
   const [userText, setUserText] = useState('');
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [feedback, setFeedback] = useState<any>(null);
+  const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
+
+  // Timer state
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [isPressureMode, setIsPressureMode] = useState(false);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (activeChallenge && timeLeft !== null && timeLeft > 0 && !feedback) {
+      timer = setInterval(() => {
+        setTimeLeft(prev => (prev !== null ? prev - 1 : null));
+      }, 1000);
+    } else if (timeLeft === 0 && !feedback) {
+      handleSubmit();
+    }
+    return () => clearInterval(timer);
+  }, [activeChallenge, timeLeft, feedback]);
 
   const handleStart = (challenge: Challenge) => {
-    setActiveChallenge(challenge);
+    setActiveChallenge({ ...challenge, difficulty: difficulty.charAt(0).toUpperCase() + difficulty.slice(1) });
     setUserText('');
     setFeedback(null);
+
+    if (isPressureMode) {
+      // Extract minutes from "X min" string
+      const mins = parseInt(challenge.time.split(' ')[0]);
+      setTimeLeft(mins * 60);
+    } else {
+      setTimeLeft(null);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const handleSubmit = async () => {
@@ -49,7 +82,12 @@ export const PracticeArena = () => {
 
     setIsEvaluating(true);
     try {
-      const result = await evaluatePractice(activeChallenge.title, userText);
+      const result = await evaluatePractice(
+        activeChallenge.title,
+        userText,
+        activeChallenge.type,
+        difficulty
+      );
       setFeedback(result);
     } catch (err) {
       console.error("Evaluation failed", err);
@@ -69,14 +107,23 @@ export const PracticeArena = () => {
           <ArrowLeft size={16} /> Back to Library
         </button>
 
-        <div className="flex items-center gap-4 mb-8">
-           <div className="p-3 bg-blue-50 rounded-xl">
-             {activeChallenge.type === 'concept' ? <Zap className="text-blue-600" /> : activeChallenge.type === 'technical' ? <Code2 className="text-blue-600" /> : <MessageSquare className="text-blue-600" />}
+        <div className="flex items-center justify-between mb-8">
+           <div className="flex items-center gap-4">
+             <div className="p-3 bg-blue-50 rounded-xl">
+               {activeChallenge.type === 'concept' ? <Zap className="text-blue-600" /> : activeChallenge.type === 'technical' ? <Code2 className="text-blue-600" /> : <MessageSquare className="text-blue-600" />}
+             </div>
+             <div>
+               <h3 className="text-xl font-bold text-slate-900">{activeChallenge.title}</h3>
+               <span className="text-xs font-bold text-blue-600 uppercase tracking-widest">{activeChallenge.category} • {activeChallenge.difficulty}</span>
+             </div>
            </div>
-           <div>
-             <h3 className="text-xl font-bold text-slate-900">{activeChallenge.title}</h3>
-             <span className="text-xs font-bold text-blue-600 uppercase tracking-widest">{activeChallenge.category} • {activeChallenge.difficulty}</span>
-           </div>
+
+           {timeLeft !== null && (
+             <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-mono font-bold ${timeLeft < 60 ? 'bg-red-50 text-red-600 animate-pulse' : 'bg-slate-100 text-slate-600'}`}>
+               <Clock size={18} />
+               {formatTime(timeLeft)}
+             </div>
+           )}
         </div>
 
         <div className="space-y-6">
@@ -89,7 +136,15 @@ export const PracticeArena = () => {
              placeholder="Your answer..."
              value={userText}
              onChange={(e) => setUserText(e.target.value)}
+             disabled={isEvaluating || !!feedback}
            />
+
+           {timeLeft === 0 && !feedback && (
+             <div className="p-4 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-red-700">
+               <AlertCircle size={20} />
+               <p className="text-sm font-bold">Time's up! Autosubmitting your response...</p>
+             </div>
+           )}
 
            {feedback ? (
              <div className="p-6 bg-blue-50 border border-blue-100 rounded-2xl">
@@ -141,6 +196,42 @@ export const PracticeArena = () => {
 
   return (
     <div className="space-y-8">
+        <div className="flex justify-between items-center bg-white p-6 rounded-2xl border border-slate-200">
+        <div>
+          <h3 className="font-bold text-lg text-slate-900">Adaptive Practice Mode</h3>
+          <p className="text-sm text-slate-500">AI scales difficulty based on your recent performance.</p>
+        </div>
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3 pr-6 border-r border-slate-200">
+            <div className="text-right">
+              <div className="text-[10px] font-bold text-slate-400 uppercase">Pressure Mode</div>
+              <div className="text-xs font-bold text-slate-600">{isPressureMode ? 'Timed' : 'Relaxed'}</div>
+            </div>
+            <button
+              onClick={() => setIsPressureMode(!isPressureMode)}
+              className={`w-12 h-6 rounded-full transition-colors relative ${isPressureMode ? 'bg-red-500' : 'bg-slate-200'}`}
+            >
+              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isPressureMode ? 'left-7' : 'left-1'}`} />
+            </button>
+          </div>
+          <div className="flex gap-2">
+            {(['easy', 'medium', 'hard'] as const).map((lvl) => (
+              <button
+                key={lvl}
+                onClick={() => setDifficulty(lvl)}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                  difficulty === lvl
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
+                    : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                {lvl.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
           { title: "Concept Stress Tests", icon: Zap, color: "blue", desc: "Deep challenges focusing on 'Why' over 'How'." },

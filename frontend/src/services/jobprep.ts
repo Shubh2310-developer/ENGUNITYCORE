@@ -172,8 +172,13 @@ export const jobPrepService = {
     },
 
     // Practice
-    evaluatePractice: async (topic: string, answer: string): Promise<any> => {
-        const response = await axios.post(`${API_BASE}/jobprep/practice/evaluate`, { topic, user_answer: answer }, getAuthHeaders());
+    evaluatePractice: async (topic: string, answer: string, practiceType: string, difficulty: string): Promise<any> => {
+        const response = await axios.post(`${API_BASE}/jobprep/practice/evaluate`, {
+            topic,
+            user_answer: answer,
+            practice_type: practiceType,
+            difficulty: difficulty
+        }, getAuthHeaders());
         return response.data;
     },
 
@@ -184,6 +189,18 @@ export const jobPrepService = {
     },
     getReadinessHistory: async (): Promise<any[]> => {
         const response = await axios.get(`${API_BASE}/jobprep/analysis/readiness-history`, getAuthHeaders());
+        return response.data;
+    },
+    getReadinessForecast: async (): Promise<any> => {
+        const response = await axios.get(`${API_BASE}/jobprep/analysis/readiness-forecast`, getAuthHeaders());
+        return response.data;
+    },
+    getRoleCurriculum: async (roleId: string): Promise<any[]> => {
+        const response = await axios.get(`${API_BASE}/jobprep/roles/${roleId}/curriculum`, getAuthHeaders());
+        return response.data;
+    },
+    evaluateEvidence: async (evidenceId: string): Promise<any> => {
+        const response = await axios.post(`${API_BASE}/jobprep/evidence/${evidenceId}/evaluate`, {}, getAuthHeaders());
         return response.data;
     },
 

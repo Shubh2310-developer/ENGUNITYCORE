@@ -219,7 +219,7 @@ async def upload_document(
             file_type=file.content_type or extension,
             metadata={
                 "document_id": file_id,
-                "user_id": current_user.id,
+                "user_id": str(current_user.id),
                 "title": title or file.filename,
                 "filename": file.filename,
                 "session_id": session_id # Tag chunks with session_id if available

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
 from app.core.database import get_db
@@ -292,11 +292,12 @@ def create_simulation(
 async def get_simulation_question(
     role_id: UUID,
     difficulty: str = "mid-level",
+    sim_id: Optional[UUID] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     service = JobPrepService(db)
-    return await service.generate_interview_question(role_id, difficulty)
+    return await service.generate_interview_question(role_id, difficulty, sim_id)
 
 @router.post("/simulations/{sim_id}/evaluate")
 async def evaluate_response(
@@ -367,7 +368,13 @@ async def evaluate_practice(
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
-    evaluation = await service.evaluate_practice_attempt(profile.id, eval_in.topic, eval_in.user_answer)
+    evaluation = await service.evaluate_practice_attempt(
+        profile.id,
+        eval_in.topic,
+        eval_in.user_answer,
+        eval_in.practice_type,
+        eval_in.difficulty
+    )
     if not evaluation:
         raise HTTPException(status_code=500, detail="AI Evaluation failed")
     return evaluation
@@ -393,3 +400,32 @@ def get_readiness_history(
     if not profile:
         return []
     return profile.readiness_assessments
+
+@router.get("/analysis/readiness-forecast")
+def get_readiness_forecast(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    service = JobPrepService(db)
+    profile = service.get_profile(current_user.id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    return service.get_readiness_forecast(profile.id)
+
+@router.get("/roles/{role_id}/curriculum")
+async def get_role_curriculum(
+    role_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    service = JobPrepService(db)
+    return await service.generate_role_curriculum(role_id)
+
+@router.post("/evidence/{evidence_id}/evaluate")
+async def evaluate_evidence(
+    evidence_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    service = JobPrepService(db)
+    return await service.evaluate_evidence_quality(evidence_id)

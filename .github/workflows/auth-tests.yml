@@ -1,0 +1,51 @@
+name: Auth Flow Tests
+
+on:
+  push:
+    paths: ['frontend/src/app/(auth)/**', 'frontend/src/services/auth.ts',
+            'frontend/src/stores/authStore.ts', 'backend/app/api/v1/auth.py']
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: cd frontend && npm ci
+      - run: cd frontend && npx vitest run --coverage
+      - uses: actions/upload-artifact@v4
+        with: { name: coverage, path: frontend/coverage/ }
+
+  backend-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env: { POSTGRES_DB: test, POSTGRES_USER: test, POSTGRES_PASSWORD: test }
+        ports: ['5432:5432']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.10' }
+      - run: cd backend && pip install -r requirements.txt && pip install pytest httpx
+      - run: cd backend && pytest tests/ -v --tb=short
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+          SECRET_KEY: test-secret-key-for-ci
+
+  e2e-tests:
+    runs-on: ubuntu-latest
+    needs: [unit-tests, backend-tests]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: cd frontend && npm ci
+      - run: npx playwright install --with-deps
+      - run: cd frontend && npx playwright test e2e/auth/
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: playwright-report, path: frontend/playwright-report/ }

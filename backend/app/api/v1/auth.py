@@ -1,5 +1,5 @@
 from typing import Any
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from datetime import timedelta
@@ -9,6 +9,7 @@ import logging
 from app.core import security
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.rate_limit import limiter
 from app.models.user import User as UserModel
 from app.schemas.token import Token, TokenPayload
 from app.schemas.user import User as UserSchema, UserCreate
@@ -92,7 +93,7 @@ def get_current_user(
                     # Auto-create user for OAuth logins
                     user = UserModel(
                         email=email,
-                        password_hash="oauth_placeholder",
+                        password_hash="!",
                         role="user",
                         is_active=True,
                         provider="github"
@@ -165,7 +166,7 @@ def register_user(
     db_obj = UserModel(
         email=user_in.email,
         password_hash=security.get_password_hash(user_in.password),
-        role=user_in.role or "user",
+        role="user",  # Hardcoded — never trust client-provided role
         is_active=user_in.is_active if user_in.is_active is not None else True,
     )
     db.add(db_obj)
@@ -174,8 +175,9 @@ def register_user(
     return db_obj
 
 @router.post("/login", response_model=Token)
+@limiter.limit("5/minute")
 def login_access_token(
-    db: Session = Depends(get_db), form_data: OAuth2PasswordRequestForm = Depends()
+    request: Request, db: Session = Depends(get_db), form_data: OAuth2PasswordRequestForm = Depends()
 ) -> Any:
     """
     OAuth2 compatible token login, get an access token for future requests

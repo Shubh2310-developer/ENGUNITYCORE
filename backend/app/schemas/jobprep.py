@@ -13,6 +13,11 @@ class JobPrepProfileBase(BaseModel):
     preferred_companies: List[str] = Field(default_factory=list, max_length=20)
     work_authorization: Optional[str] = Field(None, max_length=100)
     remote_preference: Optional[str] = Field(None, max_length=50)
+    industry_focus: Optional[str] = Field(None, max_length=100)
+    salary_expectation_min: Optional[int] = Field(None, ge=0)
+    salary_expectation_max: Optional[int] = Field(None, ge=0)
+    timezone: Optional[str] = Field(None, max_length=50)
+    learning_style: Optional[str] = Field(None, max_length=50)
     notifications_enabled: bool = True
 
     @validator('preferred_companies')
@@ -54,6 +59,9 @@ class JobPrepTargetRoleBase(BaseModel):
     nice_to_have_skills: List[str] = Field(default_factory=list, max_length=50)
     typical_interview_rounds: List[str] = Field(default_factory=list, max_length=20)
     preparation_focus_areas: List[str] = Field(default_factory=list, max_length=30)
+    role_curriculum: Optional[List[Dict[str, Any]]] = None
+    company_type_variant: Optional[str] = Field(None, max_length=100)
+    interview_pattern: Optional[Dict[str, Any]] = None
     is_primary: bool = False
     is_active: bool = True
 
@@ -116,6 +124,7 @@ class JobPrepSkillUpdate(JobPrepSkillBase):
     evidence_count: Optional[int] = Field(None, ge=0, le=1000)
     evidence_target: Optional[int] = Field(None, ge=0, le=100)
     evidence_strength: Optional[Decimal] = None
+    quality_score: Optional[Decimal] = None
     practice_attempts: Optional[int] = Field(None, ge=0, le=10000)
     is_gap: Optional[bool] = None
 
@@ -249,6 +258,8 @@ class JobPrepInterviewSimulationBase(BaseModel):
     simulation_type: str
     difficulty_level: str
     company_style: Optional[str] = None
+    persona_style: Optional[str] = None
+    interview_rounds: Optional[List[Dict[str, Any]]] = None
     target_role_id: Optional[UUID] = None
     placement_mode: bool = False
 
@@ -293,6 +304,8 @@ class JobPrepInterviewSimulation(JobPrepInterviewSimulationBase):
 class JobPrepPracticeEvaluate(BaseModel):
     topic: str = Field(..., min_length=1, max_length=500)
     user_answer: str = Field(..., min_length=1, max_length=50000)
+    practice_type: str = Field("conceptual", max_length=50)
+    difficulty: str = Field("medium", max_length=50)
 
     @validator('topic', 'user_answer')
     def sanitize_input(cls, v):

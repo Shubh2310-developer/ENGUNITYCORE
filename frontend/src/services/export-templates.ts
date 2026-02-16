@@ -90,6 +90,8 @@ export class ProfessionalTemplate {
     const profileData = [
       ['Current Status:', profile.current_status || 'N/A'],
       ['Experience Level:', profile.experience_level || 'N/A'],
+      ['Industry Focus:', profile.industry_focus || 'N/A'],
+      ['Salary Target:', `$${profile.salary_expectation_min || 0} - $${profile.salary_expectation_max || 0}`],
       ['Readiness Score:', `${profile.overall_readiness_score || 0}%`],
       ['Target Timeline:', profile.target_timeline || 'N/A']
     ];

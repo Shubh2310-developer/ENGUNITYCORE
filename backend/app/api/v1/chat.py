@@ -242,7 +242,7 @@ async def send_message(
     # 2. Save user message to MongoDB
     user_msg_data = {
         "session_id": session_id,
-        "user_id": current_user.id,
+        "user_id": str(current_user.id),
         "role": "user",
         "content": message_in.content,
         "image_urls": message_in.image_urls,
@@ -256,7 +256,7 @@ async def send_message(
     # 3. Build context for AI
     context, retrieved_docs, context_meta = await build_context(
         session_id=session_id,
-        user_id=current_user.id,
+        user_id=str(current_user.id),
         query=message_in.content
     )
 
@@ -276,7 +276,7 @@ async def send_message(
     # 5. Save assistant message to MongoDB
     assistant_msg_data = {
         "session_id": session_id,
-        "user_id": current_user.id,
+        "user_id": str(current_user.id),
         "role": "assistant",
         "content": assistant_reply,
         "timestamp": datetime.now(),
@@ -291,11 +291,17 @@ async def send_message(
         assistant_msg_data["id"] = str(uuid.uuid4())
 
     # 6. Update session timestamp and title if needed
-    if session.title in ["New Conversation", "New Chat"] or session.title.endswith("..."):
+    # Generate a smart title if it's currently a placeholder or generic
+    is_generic = not session.title or session.title in ["New Conversation", "New Chat"] or session.title.endswith("...")
+    if is_generic:
         try:
-            session.title = await ai_router.generate_title(message_in.content)
-        except Exception:
-            session.title = message_in.content[:50]
+            generated_title = await ai_router.generate_title(message_in.content)
+            if generated_title and len(generated_title) > 3:
+                session.title = generated_title
+        except Exception as e:
+            print(f"Title generation failed: {e}")
+            if not session.title or session.title in ["New Conversation", "New Chat"]:
+                session.title = message_in.content[:47] + "..."
 
     session.updated_at = datetime.now()
     db.commit()
@@ -332,7 +338,7 @@ async def stream_message(
     # 2. Save user message to MongoDB
     user_msg_data = {
         "session_id": session_id,
-        "user_id": current_user.id,
+        "user_id": str(current_user.id),
         "role": "user",
         "content": message_in.content,
         "image_urls": message_in.image_urls,
@@ -347,7 +353,7 @@ async def stream_message(
     # 3. Build context for AI
     context, retrieved_docs, context_meta = await build_context(
         session_id=session_id,
-        user_id=current_user.id,
+        user_id=str(current_user.id),
         query=message_in.content
     )
 
@@ -372,7 +378,7 @@ async def stream_message(
             # 5. Save assistant message to MongoDB after stream finishes
             assistant_msg_data = {
                 "session_id": session_id,
-                "user_id": current_user.id,
+                "user_id": str(current_user.id),
                 "role": "assistant",
                 "content": full_content,
                 "timestamp": datetime.now(),
@@ -390,13 +396,21 @@ async def stream_message(
             # 6. Update session metadata in background or at the end
             # We do it here as we are in an async function
             generated_title = None
-            if session.title in ["New Conversation", "New Chat"] or session.title.endswith("..."):
+            is_generic = not session.title or session.title in ["New Conversation", "New Chat"] or session.title.endswith("...")
+            if is_generic:
                 try:
                     generated_title = await ai_router.generate_title(message_in.content)
-                    session.title = generated_title
-                except Exception:
-                    session.title = message_in.content[:50]
+                    if generated_title and len(generated_title) > 3:
+                        session.title = generated_title
+                    else:
+                        generated_title = session.title or "New Chat"
+                except Exception as e:
+                    print(f"Stream title generation failed: {e}")
+                    if not session.title or session.title in ["New Conversation", "New Chat"]:
+                        session.title = message_in.content[:47] + "..."
                     generated_title = session.title
+            else:
+                generated_title = session.title
 
             session.updated_at = datetime.now()
             db.commit()

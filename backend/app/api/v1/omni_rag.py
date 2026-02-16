@@ -80,7 +80,7 @@ async def process_omni_rag_query(
     # 2. Save user message to MongoDB
     user_msg_data = {
         "session_id": session_id,
-        "user_id": current_user.id,
+        "user_id": str(current_user.id),
         "role": "user",
         "content": request.query,
         "image_urls": request.image_urls,
@@ -121,7 +121,7 @@ async def process_omni_rag_query(
         rag_metadata = result.get('metadata', {})
         assistant_msg_data = {
             "session_id": session_id,
-            "user_id": current_user.id,
+            "user_id": str(current_user.id),
             "role": "assistant",
             "content": result['response'],
             "timestamp": datetime.now(),
@@ -132,11 +132,18 @@ async def process_omni_rag_query(
             await mongodb.db.chat_messages.insert_one(assistant_msg_data)
 
         # 6. Update session title if needed
-        if session.title.endswith("..."):
+        # Generate a smart title if it's currently a placeholder or generic
+        is_generic = not session.title or session.title in ["New Conversation", "New Chat"] or session.title.endswith("...")
+        if is_generic:
             try:
-                session.title = await ai_router.generate_title(request.query)
-            except:
-                pass
+                generated_title = await ai_router.generate_title(request.query)
+                if generated_title and len(generated_title) > 3:
+                    session.title = generated_title
+            except Exception as e:
+                logger.warning(f"Omni-RAG title generation failed: {e}")
+                if not session.title or session.title in ["New Conversation", "New Chat"]:
+                    session.title = request.query[:47] + "..."
+
         session.updated_at = datetime.now()
         db.commit()
 
@@ -370,7 +377,7 @@ async def stream_omni_rag_query(
     # 2. Save user message to MongoDB
     user_msg_data = {
         "session_id": session_id,
-        "user_id": current_user.id,
+        "user_id": str(current_user.id),
         "role": "user",
         "content": request.query,
         "image_urls": request.image_urls,
@@ -419,7 +426,7 @@ async def stream_omni_rag_query(
             # Flatten metadata for schema consistency with ChatMessage schema
             assistant_msg_data = {
                 "session_id": session_id,
-                "user_id": current_user.id,
+                "user_id": str(current_user.id),
                 "role": "assistant",
                 "content": full_response,
                 "timestamp": datetime.now(),
@@ -434,13 +441,22 @@ async def stream_omni_rag_query(
 
             # Update session
             generated_title = None
-            if session.title in ["New Conversation", "New Chat"] or session.title.endswith("..."):
+            is_generic = not session.title or session.title in ["New Conversation", "New Chat"] or session.title.endswith("...")
+            if is_generic:
                 try:
                     generated_title = await ai_router.generate_title(request.query)
-                    session.title = generated_title
-                except:
-                    session.title = request.query[:50]
+                    if generated_title and len(generated_title) > 3:
+                        session.title = generated_title
+                    else:
+                        generated_title = session.title or "New Chat"
+                except Exception as e:
+                    logger.warning(f"Omni-RAG stream title generation failed: {e}")
+                    if not session.title or session.title in ["New Conversation", "New Chat"]:
+                        session.title = request.query[:47] + "..."
                     generated_title = session.title
+            else:
+                generated_title = session.title
+
             session.updated_at = datetime.now()
             db.commit()
 

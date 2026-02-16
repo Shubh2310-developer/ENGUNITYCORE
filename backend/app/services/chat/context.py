@@ -31,7 +31,8 @@ async def build_context(session_id: str, user_id: str = None, query: str = None,
             vector_store = get_vector_store()
             # Enhanced search with hybrid logic
             # Pass session_id to filter documents to only this chat session
-            results = vector_store.search(query, user_id=user_id, session_id=session_id, k=5, alpha=0.5)
+            # Use cross_session=True by default to allow users to access their documents across all chats
+            results = vector_store.search(query, user_id=user_id, session_id=session_id, k=5, alpha=0.5, cross_session=True)
             if results:
                 rag_context = "\n\n[CONTEXT FROM KNOWLEDGE BASE]\n"
                 doc_names = set()

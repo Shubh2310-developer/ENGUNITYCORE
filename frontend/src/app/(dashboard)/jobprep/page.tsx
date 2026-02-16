@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
+import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Briefcase, Target, GraduationCap, Award, ShieldCheck,
@@ -14,11 +15,36 @@ import {
 } from 'lucide-react';
 import styles from './jobprep.module.css';
 import { useJobPrepStore } from '@/stores/jobPrepStore';
-import { InterviewSimulator } from '@/components/jobprep/InterviewSimulator';
-import { PracticeArena } from '@/components/jobprep/PracticeArena';
 import { Modal } from '@/components/shared/Modal';
 import NotificationSystem, { useNotifications } from '@/components/shared/NotificationSystem';
 import { exportService } from '@/services/export';
+
+// --- Lazy Loaded Components ---
+const JobPrepOverviewPanel = dynamic(() => import('@/components/jobprep/JobPrepOverviewPanel').then(m => m.JobPrepOverviewPanel), {
+  loading: () => <div className="animate-pulse bg-slate-100 h-96 rounded-2xl" />
+});
+
+const RoleDetailDrawer = dynamic(() => import('@/components/jobprep/RoleDetailDrawer').then(m => m.RoleDetailDrawer));
+
+const SkillTrendChart = dynamic(() => import('@/components/jobprep/SkillTrendChart').then(m => m.SkillTrendChart), {
+  loading: () => <div className="animate-pulse bg-slate-100 h-64 rounded-2xl" />
+});
+
+const InterviewTimeline = dynamic(() => import('@/components/jobprep/InterviewTimeline').then(m => m.InterviewTimeline), {
+  loading: () => <div className="animate-pulse bg-slate-100 h-96 rounded-2xl" />
+});
+
+const ProjectImpactDashboard = dynamic(() => import('@/components/jobprep/ProjectImpactDashboard').then(m => m.ProjectImpactDashboard), {
+  loading: () => <div className="animate-pulse bg-slate-100 h-96 rounded-2xl" />
+});
+
+const PracticeArena = dynamic(() => import('@/components/jobprep/PracticeArena').then(m => m.PracticeArena), {
+  loading: () => <div className="animate-pulse bg-slate-100 h-96 rounded-2xl" />
+});
+
+const InterviewSimulator = dynamic(() => import('@/components/jobprep/InterviewSimulator').then(m => m.InterviewSimulator), {
+  loading: () => <div className="animate-pulse bg-slate-100 h-96 rounded-2xl" />
+});
 
 // --- Visual Components ---
 
@@ -163,41 +189,82 @@ const JobPrepHub = () => {
   // Analysis state
   const [skillGaps, setSkillGaps] = useState<any[]>([]);
   const [readinessHistory, setReadinessHistory] = useState<any[]>([]);
+  const [readinessForecast, setReadinessForecast] = useState<any>(null);
 
   // Modal states
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [isSkillModalOpen, setIsSkillModalOpen] = useState(false);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isGithubModalOpen, setIsGithubModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [selectedSkillForEvidence, setSelectedSkillForEvidence] = useState<any>(null);
   const [evidenceForm, setEvidenceForm] = useState({ title: '', evidence_type: 'project', description: '', source_url: '' });
 
   // Form states
+  const [profileForm, setProfileForm] = useState({
+    current_status: 'preparing',
+    target_timeline: '3 months',
+    experience_level: 'mid',
+    industry_focus: '',
+    salary_expectation_min: 0,
+    salary_expectation_max: 0,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    learning_style: 'visual',
+    preferred_companies: [] as string[],
+    notifications_enabled: true
+  });
   const [roleForm, setRoleForm] = useState({ role_title: '', role_category: '', seniority_level: 'mid' });
   const [skillForm, setSkillForm] = useState({ skill_name: '', skill_category: '', target_level: 3 });
   const [projectForm, setProjectForm] = useState({ title: '', description: '', tech_stack: '' });
   const [githubForm, setGithubForm] = useState({ owner: '', repo: '' });
 
+  const [selectedRoleForDetail, setSelectedRoleForDetail] = useState<any>(null);
+
   useEffect(() => {
     const initializeJobPrep = async () => {
       try {
-        await fetchProfile();
-        await fetchTargetRoles();
-        await fetchSkills();
-        await fetchProjects();
-        await fetchSimulations();
+        // Parallel load sequence for performance
+        await Promise.all([
+          fetchProfile(),
+          fetchTargetRoles(),
+          fetchSkills(),
+          fetchProjects(),
+          fetchSimulations()
+        ]);
 
-        const gaps = await fetchSkillGaps();
+        const [gaps, history, forecast] = await Promise.all([
+          fetchSkillGaps(),
+          fetchReadinessHistory(),
+          useJobPrepStore.getState().fetchReadinessForecast()
+        ]);
+
         setSkillGaps(gaps);
-        const history = await fetchReadinessHistory();
         setReadinessHistory(history);
+        setReadinessForecast(forecast);
       } catch (error) {
         console.error('Failed to initialize JobPrep:', error);
       }
     };
-    
+
     initializeJobPrep();
   }, [fetchProfile, fetchTargetRoles, fetchSkills, fetchProjects, fetchSimulations, fetchSkillGaps, fetchReadinessHistory]);
+
+  useEffect(() => {
+    if (profile) {
+      setProfileForm({
+        current_status: profile.current_status || 'preparing',
+        target_timeline: profile.target_timeline || '3 months',
+        experience_level: profile.experience_level || 'mid',
+        industry_focus: profile.industry_focus || '',
+        salary_expectation_min: profile.salary_expectation_min || 0,
+        salary_expectation_max: profile.salary_expectation_max || 0,
+        timezone: profile.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+        learning_style: profile.learning_style || 'visual',
+        preferred_companies: profile.preferred_companies || [],
+        notifications_enabled: profile.notifications_enabled !== undefined ? profile.notifications_enabled : true
+      });
+    }
+  }, [profile]);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -330,11 +397,18 @@ const JobPrepHub = () => {
   };
 
   const handleOnboarding = async () => {
-    await createProfile({
-      current_status: 'preparing',
-      target_timeline: '3 months',
-      experience_level: 'mid'
-    });
+    await createProfile(profileForm);
+  };
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await updateProfile(profileForm);
+      setIsSettingsModalOpen(false);
+      success('Profile Updated', 'Your career preferences have been saved.');
+    } catch (err) {
+      error('Update Failed', 'Could not update profile settings.');
+    }
   };
 
   const renderContent = () => {
@@ -348,20 +422,97 @@ const JobPrepHub = () => {
 
     if (!profile) {
       return (
-        <div className="max-w-2xl mx-auto py-12 text-center">
+        <div className="max-w-4xl mx-auto py-12">
           <div className="bg-white p-12 rounded-3xl shadow-xl border border-slate-100">
-            <div className="w-20 h-20 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-8">
-              <GraduationCap size={40} className="text-blue-600" />
+            <div className="flex items-center gap-6 mb-8">
+              <div className="w-20 h-20 bg-blue-50 rounded-2xl flex items-center justify-center">
+                <GraduationCap size={40} className="text-blue-600" />
+              </div>
+              <div>
+                <h2 className="text-3xl font-bold text-slate-900">Career Readiness Onboarding</h2>
+                <p className="text-slate-500">Configure your intent to unlock personalized AI intelligence.</p>
+              </div>
             </div>
-            <h2 className="text-3xl font-bold text-slate-900 mb-4">Start Your Career Prep</h2>
-            <p className="text-slate-600 text-lg mb-8 leading-relaxed">
-              Unlock personalized roadmap, AI-powered mock interviews, and project analysis to land your dream role.
-            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Current Status</label>
+                  <select
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                    value={profileForm.current_status}
+                    onChange={e => setProfileForm({...profileForm, current_status: e.target.value})}
+                  >
+                    <option value="preparing">Preparing (Not active yet)</option>
+                    <option value="active">Actively Interviewing</option>
+                    <option value="offers">Evaluating Offers</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Target Timeline</label>
+                  <input
+                    type="text"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g. 3 months"
+                    value={profileForm.target_timeline}
+                    onChange={e => setProfileForm({...profileForm, target_timeline: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Industry Focus</label>
+                  <input
+                    type="text"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g. Fintech, AI, Healthcare"
+                    value={profileForm.industry_focus}
+                    onChange={e => setProfileForm({...profileForm, industry_focus: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Experience Level</label>
+                  <select
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                    value={profileForm.experience_level}
+                    onChange={e => setProfileForm({...profileForm, experience_level: e.target.value})}
+                  >
+                    <option value="entry">Entry Level</option>
+                    <option value="mid">Mid Level</option>
+                    <option value="senior">Senior Level</option>
+                    <option value="staff">Staff/Lead</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Learning Style</label>
+                  <select
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                    value={profileForm.learning_style}
+                    onChange={e => setProfileForm({...profileForm, learning_style: e.target.value})}
+                  >
+                    <option value="visual">Visual (Charts & Diagrams)</option>
+                    <option value="practical">Practical (Hands-on Practice)</option>
+                    <option value="theoretical">Theoretical (Deep Dives)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Salary Expectations (Min)</label>
+                  <input
+                    type="number"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                    value={profileForm.salary_expectation_min}
+                    onChange={e => setProfileForm({...profileForm, salary_expectation_min: parseInt(e.target.value) || 0})}
+                  />
+                </div>
+              </div>
+            </div>
+
             <button
               onClick={handleOnboarding}
               className={`${styles.btnPrimary} w-full justify-center py-4 text-lg font-bold shadow-lg shadow-blue-200`}
             >
-              Get Started Now
+              Initialize My Career Hub
             </button>
           </div>
         </div>
@@ -371,98 +522,19 @@ const JobPrepHub = () => {
     switch (activeTab) {
       case 'overview':
         return (
-          <div className="space-y-8">
-            <div className={`rounded-2xl p-8 text-white relative overflow-hidden shadow-lg transition-colors duration-500 ${placementMode ? 'bg-slate-900' : 'bg-gradient-to-br from-blue-600 to-blue-700'}`}>
-              <div className="relative z-10 max-w-2xl">
-                <div className="flex items-center gap-2 mb-4">
-                  {placementMode && <ShieldAlert className="text-red-400 animate-pulse" size={20} />}
-                  <h2 className="text-3xl font-bold">{placementMode ? 'Placement Mode Active' : 'Train the Way Interviews Actually Test You'}</h2>
-                </div>
-                <p className="text-blue-100 text-lg mb-6 leading-relaxed">
-                  {placementMode
-                    ? 'No hints. No pauses. Real-time evaluation against industry standards.'
-                    : 'Build provable skills, simulate real pressure, and enter interviews with confidence.'}
-                </p>
-                <div className="flex gap-4">
-                  <button
-                    onClick={() => {
-                      setActiveTab('simulator');
-                      setShowSimulator(true);
-                    }}
-                    className={`${placementMode ? 'bg-red-600 hover:bg-red-700' : 'bg-white text-blue-600 hover:bg-blue-50'} px-6 py-2.5 rounded-lg font-bold transition-colors shadow-sm`}
-                  >
-                    {placementMode ? 'Start Evaluation' : 'Start Session'}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className={styles.statsGrid}>
-              <StatCard label="Ready Score" value={`${profile.overall_readiness_score}%`} icon={Target} />
-              <StatCard label="Skills" value={skills.length} icon={Award} />
-              <StatCard label="Roles" value={targetRoles.length} icon={Briefcase} />
-              <StatCard label="Simulations" value={simulations.length} icon={Mic2} />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className={styles.card}>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-blue-50 rounded-lg">
-                    <Compass className="w-6 h-6 text-blue-600" />
-                  </div>
-                  <h3 className="font-bold text-lg text-slate-900">Intelligence</h3>
-                </div>
-                <p className="text-slate-600 text-sm mb-4">Analyze market trends for your target role.</p>
-                <div className="h-20 bg-slate-50 rounded-lg flex items-center justify-center">
-                  <RadarChart
-                    size={60}
-                    data={skills.length > 0 ? skills.slice(0, 5).map(s => (s.current_level / 5) * 100) : [60, 40, 70, 50, 80]}
-                  />
-                </div>
-              </div>
-              <div className={styles.card}>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-amber-50 rounded-lg">
-                    <Award className="w-6 h-6 text-amber-600" />
-                  </div>
-                  <h3 className="font-bold text-lg text-slate-900">Evidence</h3>
-                </div>
-                <p className="text-slate-600 text-sm mb-4">Verify your skills with concrete proof.</p>
-                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-amber-400"
-                      style={{
-                        width: `${Math.min(100, (skills.reduce((acc, s) => acc + (s.evidence_count || 0), 0) / (skills.length * 2 || 1)) * 100)}%`
-                      }}
-                    ></div>
-                </div>
-              </div>
-              <div className={styles.card}>
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2 bg-green-50 rounded-lg">
-                    <Activity className="w-6 h-6 text-green-600" />
-                  </div>
-                  <h3 className="font-bold text-lg text-slate-900">Simulation</h3>
-                </div>
-                <p className="text-slate-600 text-sm mb-4">Practice with adaptive AI interviewers.</p>
-                <div className="flex items-end gap-1 h-10">
-                  {simulations.length > 0 ? (
-                    simulations.slice(-5).map((sim, i) => (
-                      <div
-                        key={i}
-                        className="flex-1 bg-green-200 rounded-t"
-                        style={{ height: `${(sim.overall_score || 0)}%` }}
-                      />
-                    ))
-                  ) : (
-                    [30, 60, 40, 80, 50].map((h, i) => (
-                      <div key={i} className="flex-1 bg-green-200 rounded-t" style={{ height: `${h}%` }} />
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+          <JobPrepOverviewPanel
+            profile={profile}
+            skillsCount={skills.length}
+            rolesCount={targetRoles.length}
+            simulationsCount={simulations.length}
+            placementMode={placementMode}
+            timeLeft={timeLeft}
+            onStartSession={() => {
+              setActiveTab('simulator');
+              setShowSimulator(true);
+            }}
+            onTogglePlacementMode={handleTogglePlacementMode}
+          />
         );
 
       case 'roles':
@@ -478,8 +550,8 @@ const JobPrepHub = () => {
               {targetRoles.map(role => (
                 <div key={role.id} className={styles.card}>
                   <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="text-xl font-bold text-slate-900">{role.role_title}</h3>
+                    <div className="cursor-pointer" onClick={() => setSelectedRoleForDetail(role)}>
+                      <h3 className="text-xl font-bold text-slate-900 hover:text-blue-600 transition-colors">{role.role_title}</h3>
                       <p className="text-slate-500">{role.role_category}</p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -498,62 +570,38 @@ const JobPrepHub = () => {
                     </div>
                     <span className="font-bold text-slate-900">{role.readiness_score}%</span>
                   </div>
-                  <div className="mt-6 space-y-4">
+                  <div className="mt-6 flex gap-2">
                     <button
                       onClick={() => useJobPrepStore.getState().analyzeRole(role.id)}
-                      className="w-full py-2 bg-slate-50 text-slate-700 rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-100 transition-colors"
+                      className="flex-1 py-2 bg-slate-50 text-slate-700 rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-100 transition-colors"
                     >
                       <Sparkles size={14} className="text-blue-600" />
-                      {role.market_demand_description ? 'Refresh AI Analysis' : 'Get AI Intelligence'}
+                      AI Analysis
                     </button>
-
-                    {role.market_demand_description && (
-                      <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-3">
-                        <div>
-                          <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Market Outlook</h4>
-                          <p className="text-xs text-slate-600 leading-relaxed">{role.market_demand_description}</p>
-                        </div>
-                        <div className="flex justify-between items-center py-2 border-y border-slate-200/50">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase">Est. Salary</span>
-                          <span className="text-xs font-bold text-green-600">{role.suggested_salary_range}</span>
-                        </div>
-                        {role.preparation_focus_areas && role.preparation_focus_areas.length > 0 && (
-                          <div>
-                            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Preparation Focus</h4>
-                            <div className="flex flex-wrap gap-1">
-                              {role.preparation_focus_areas.map((area: string, i: number) => (
-                                <span key={i} className="text-[9px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{area}</span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {role.typical_interview_rounds && role.typical_interview_rounds.length > 0 && (
-                      <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
-                        <h4 className="text-xs font-bold text-blue-800 uppercase mb-2">Interview Roadmap:</h4>
-                        <ul className="space-y-1">
-                          {role.typical_interview_rounds.map((round: string, i: number) => (
-                            <li key={i} className="text-xs text-blue-700 flex items-center gap-2">
-                              <div className="w-4 h-4 rounded-full bg-blue-200 flex items-center justify-center text-[8px] font-bold">{i+1}</div>
-                              {round}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                    <button
+                      onClick={() => setSelectedRoleForDetail(role)}
+                      className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors shadow-sm"
+                    >
+                      View Details
+                    </button>
                   </div>
                 </div>
               ))}
             </div>
+            <RoleDetailDrawer
+              role={selectedRoleForDetail}
+              isOpen={!!selectedRoleForDetail}
+              onClose={() => setSelectedRoleForDetail(null)}
+            />
           </div>
         );
 
       case 'skills':
         return (
-          <div className="space-y-6">
-             <div className="flex justify-between items-center">
+          <div className="space-y-8">
+            <SkillTrendChart skills={skills} />
+
+            <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold text-slate-900">Skill Matrix</h2>
               <button className={styles.btnSecondary} onClick={() => setIsSkillModalOpen(true)}>
                 <Plus size={16} /> Add Skill
@@ -616,9 +664,31 @@ const JobPrepHub = () => {
                             <div key={art.id} className="p-3 bg-slate-50 border border-slate-100 rounded-xl flex justify-between items-center group">
                               <div className="flex-1 min-w-0">
                                 <div className="text-sm font-bold text-slate-900 truncate">{art.title}</div>
-                                <div className="text-[10px] text-slate-500 uppercase">{art.evidence_type.replace('_', ' ')}</div>
+                                <div className="text-[10px] text-slate-500 uppercase flex items-center gap-2">
+                                  {art.evidence_type.replace('_', ' ')}
+                                  {art.verified && (
+                                    <span className="bg-green-100 text-green-700 px-1 rounded flex items-center gap-0.5 text-[8px] font-black">
+                                      <ShieldCheck size={8} /> VERIFIED
+                                    </span>
+                                  )}
+                                </div>
+                                {art.quality_score > 0 && (
+                                  <div className="flex items-center gap-1 mt-1">
+                                    <div className="h-1 w-12 bg-slate-200 rounded-full overflow-hidden">
+                                      <div className="h-full bg-green-500" style={{ width: `${art.quality_score * 100}%` }} />
+                                    </div>
+                                    <span className="text-[9px] font-bold text-green-600">AI Quality: {Math.round(art.quality_score * 100)}%</span>
+                                  </div>
+                                )}
                               </div>
                               <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => useJobPrepStore.getState().evaluateEvidence(art.id)}
+                                  className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                  title="AI Quality Evaluation"
+                                >
+                                  <Sparkles size={14} />
+                                </button>
                                 {art.source_url && (
                                   <a href={art.source_url} target="_blank" rel="noreferrer" className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors">
                                     <ExternalLink size={14} />
@@ -626,7 +696,6 @@ const JobPrepHub = () => {
                                 )}
                                 <button
                                   onClick={async () => {
-                                    const { useJobPrepStore } = await import('@/stores/jobPrepStore');
                                     await useJobPrepStore.getState().deleteSkillEvidence(art.id);
                                     // Refresh local artifacts list
                                     const evidence = await useJobPrepStore.getState().fetchSkillEvidence(selectedSkillForEvidence.id);
@@ -707,121 +776,18 @@ const JobPrepHub = () => {
           );
         }
         return (
-          <div className="space-y-8">
-            <div className="flex justify-between items-center">
-              <div>
-                <h2 className="text-2xl font-bold text-slate-950">Interview Simulator</h2>
-                <p className="text-slate-950">Realistic simulations that interrupt, challenge, and push you.</p>
-              </div>
-              <button className={styles.btnPrimary} onClick={() => setShowSimulator(true)} disabled={targetRoles.length === 0}>
-                <Plus size={16} />
-                New Simulation
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                <div className="lg:col-span-4">
-                   <div className={styles.card}>
-                      <h3 className={styles.cardTitle}>Simulation History</h3>
-                      <div className="space-y-4">
-                        {simulations.length === 0 ? (
-                            <p className="text-slate-500 text-center py-8">No simulations yet.</p>
-                        ) : simulations.map(sim => (
-                           <div key={sim.id} className="p-4 border border-slate-100 rounded-xl flex justify-between items-center">
-                              <div>
-                                <h4 className="font-bold">{sim.simulation_type}</h4>
-                                <span className="text-xs text-slate-400">{new Date(sim.created_at).toLocaleDateString()}</span>
-                              </div>
-                              <div className="text-right">
-                                <span className="font-black text-blue-600 text-xl">{sim.overall_score}%</span>
-                                <div className="text-[10px] font-bold uppercase text-slate-400">{sim.hiring_decision}</div>
-                              </div>
-                           </div>
-                        ))}
-                      </div>
-                   </div>
-                </div>
-            </div>
-          </div>
+          <InterviewTimeline simulations={simulations} />
         );
 
       case 'projects':
         return (
-          <div className="space-y-6">
-             <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-slate-900">Project Proof</h2>
-              <div className="flex gap-2">
-                <button className={styles.btnSecondary} onClick={() => setIsGithubModalOpen(true)}>
-                  <Github size={16} /> Import GitHub
-                </button>
-                <button className={styles.btnPrimary} onClick={() => setIsProjectModalOpen(true)}>
-                  <Plus size={16} /> Add Project
-                </button>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {projects.length === 0 ? (
-                <div className="md:col-span-2 py-20 text-center bg-white rounded-3xl border-2 border-dashed border-slate-200">
-                  <Layers size={48} className="mx-auto text-slate-300 mb-4" />
-                  <p className="text-slate-500 font-medium">No projects added yet. Import from GitHub to get started.</p>
-                </div>
-              ) : projects.map(project => (
-                <div key={project.id} className={styles.card}>
-                  <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-xl font-bold text-slate-900">{project.title}</h3>
-                    <div className="flex items-center gap-2">
-                      {project.github_url && <Github size={18} className="text-slate-400" />}
-                      <button
-                        onClick={() => deleteProject(project.id)}
-                        className="p-1 text-slate-400 hover:text-red-600 border-none bg-transparent cursor-pointer"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  </div>
-                  <p className="text-slate-600 text-sm mb-4 line-clamp-2">{project.description}</p>
-
-                  <div className="flex flex-wrap gap-2 mb-6">
-                    {project.tech_stack?.map(s => <span key={s} className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-full">{s}</span>)}
-                  </div>
-
-                  {project.complexity_score !== null && (
-                    <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50 rounded-xl mb-6 border border-slate-100">
-                      <div className="text-center">
-                        <div className="text-[10px] text-slate-400 font-bold uppercase">Complex</div>
-                        <div className="text-sm font-black text-slate-900">{Math.round((project.complexity_score || 0) * 100)}%</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-[10px] text-slate-400 font-bold uppercase">Innovate</div>
-                        <div className="text-sm font-black text-slate-900">{Math.round((project.innovation_score || 0) * 100)}%</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-[10px] text-slate-400 font-bold uppercase">Value</div>
-                        <div className="text-sm font-black text-slate-900">{Math.round((project.interview_value_score || 0) * 100)}%</div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="space-y-2 mb-6">
-                    {project.talking_points?.slice(0, 2).map((tp, i) => (
-                      <div key={i} className="flex items-start gap-2 text-xs text-slate-500 italic">
-                        <MessageSquare size={12} className="mt-0.5 shrink-0" />
-                        "{tp}"
-                      </div>
-                    ))}
-                  </div>
-
-                  <button
-                    onClick={() => analyzeProject(project.id)}
-                    className="w-full py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
-                  >
-                    <Activity size={14} className="text-blue-600" />
-                    {project.complexity_score ? 'Refresh Analysis' : 'Analyze with AI'}
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
+          <ProjectImpactDashboard
+            projects={projects}
+            onAnalyze={analyzeProject}
+            onDelete={deleteProject}
+            onImportGithub={() => setIsGithubModalOpen(true)}
+            onAddProject={() => setIsProjectModalOpen(true)}
+          />
         );
 
       case 'tracker':
@@ -875,6 +841,32 @@ const JobPrepHub = () => {
                   <p className="text-sm text-slate-600 px-4 leading-relaxed">
                     Based on your skills and evidence, you are currently prepared for {profile.overall_readiness_score > 70 ? 'mid-to-senior' : profile.overall_readiness_score > 40 ? 'entry-to-mid' : 'internship'} level roles.
                   </p>
+                </div>
+
+                <div className={styles.card}>
+                  <div className="flex items-center gap-2 mb-4">
+                    <TrendingUp size={18} className="text-blue-500" />
+                    <h4 className="text-sm font-bold text-slate-900 uppercase tracking-widest">Readiness Forecast</h4>
+                  </div>
+                  {readinessForecast ? (
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-end">
+                        <span className="text-xs text-slate-500 font-medium">30-Day Projection</span>
+                        <span className="text-2xl font-black text-blue-600">{readinessForecast.projected_score_30d}%</span>
+                      </div>
+                      <div className="p-3 bg-blue-50 rounded-xl border border-blue-100">
+                        <p className="text-xs text-blue-700 leading-relaxed">
+                          Your current velocity is <span className="font-bold">{readinessForecast.velocity} points/day</span>.
+                          At this rate, you'll be highly ready in approximately
+                          <span className="font-bold"> {Math.ceil((100 - readinessForecast.current_score) / (readinessForecast.velocity || 1))} days</span>.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-center text-slate-400 text-xs italic">
+                      Forecast unavailable. Keep training to generate data.
+                    </div>
+                  )}
                 </div>
 
                 <div className={styles.card}>
@@ -1000,11 +992,32 @@ const JobPrepHub = () => {
           <div className="h-6 w-px bg-slate-200"></div>
           <div className="flex items-center gap-6">
             <span className={styles.topNavLink}>Roadmap</span>
-            <span className={styles.topNavLink}>Archives</span>
+            <button
+              onClick={() => setIsSettingsModalOpen(true)}
+              className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all border-none bg-transparent cursor-pointer"
+            >
+              <Settings size={20} />
+            </button>
           </div>
         </div>
 
         <div className={styles.topNavRight}>
+          <div className="flex items-center gap-2 pr-4 border-r border-slate-200">
+            <button
+              onClick={() => handleExportProfile('pdf')}
+              className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all border-none bg-transparent cursor-pointer"
+              title="Export PDF Resume"
+            >
+              <Download size={20} />
+            </button>
+            <button
+              onClick={() => setIsSettingsModalOpen(true)}
+              className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all border-none bg-transparent cursor-pointer"
+              title="Career Settings"
+            >
+              <Settings size={20} />
+            </button>
+          </div>
           {placementMode && (
             <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-sm font-mono font-bold animate-pulse border border-red-100">
               <Clock size={16} /> {formatTime(timeLeft)}
@@ -1199,6 +1212,148 @@ const JobPrepHub = () => {
           <button type="submit" className={styles.btnPrimary + " w-full justify-center py-2 mt-2"}>
             <Github size={18} /> Import & Analyze
           </button>
+        </form>
+      </Modal>
+
+      <Modal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} title="Career Profile Settings">
+        <form onSubmit={handleUpdateProfile} className="space-y-6">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Status</label>
+              <select
+                className="w-full p-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                value={profileForm.current_status}
+                onChange={e => setProfileForm({...profileForm, current_status: e.target.value})}
+              >
+                <option value="preparing">Preparing</option>
+                <option value="active">Searching</option>
+                <option value="offers">Offer Stage</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Experience</label>
+              <select
+                className="w-full p-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                value={profileForm.experience_level}
+                onChange={e => setProfileForm({...profileForm, experience_level: e.target.value})}
+              >
+                <option value="entry">Entry</option>
+                <option value="mid">Mid</option>
+                <option value="senior">Senior</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-1">Industry Focus</label>
+            <input
+              type="text"
+              className="w-full p-2 border border-slate-200 rounded-lg"
+              value={profileForm.industry_focus}
+              onChange={e => setProfileForm({...profileForm, industry_focus: e.target.value})}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Salary Min</label>
+              <input
+                type="number"
+                className="w-full p-2 border border-slate-200 rounded-lg"
+                value={profileForm.salary_expectation_min}
+                onChange={e => setProfileForm({...profileForm, salary_expectation_min: parseInt(e.target.value) || 0})}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Salary Max</label>
+              <input
+                type="number"
+                className="w-full p-2 border border-slate-200 rounded-lg"
+                value={profileForm.salary_expectation_max}
+                onChange={e => setProfileForm({...profileForm, salary_expectation_max: parseInt(e.target.value) || 0})}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Learning Style</label>
+              <select
+                className="w-full p-2 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                value={profileForm.learning_style}
+                onChange={e => setProfileForm({...profileForm, learning_style: e.target.value})}
+              >
+                <option value="visual">Visual</option>
+                <option value="practical">Practical</option>
+                <option value="theoretical">Theoretical</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Timezone</label>
+              <input
+                type="text"
+                className="w-full p-2 border border-slate-200 rounded-lg"
+                value={profileForm.timezone}
+                onChange={e => setProfileForm({...profileForm, timezone: e.target.value})}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">Target Companies</label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {profileForm.preferred_companies.map((company, idx) => (
+                <span key={idx} className="bg-blue-100 text-blue-700 px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1">
+                  {company}
+                  <button
+                    type="button"
+                    onClick={() => setProfileForm({
+                      ...profileForm,
+                      preferred_companies: profileForm.preferred_companies.filter((_, i) => i !== idx)
+                    })}
+                    className="hover:text-blue-900 border-none bg-transparent cursor-pointer p-0 flex items-center"
+                  >
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
+            </div>
+            <input
+              type="text"
+              className="w-full p-2 border border-slate-200 rounded-lg"
+              placeholder="Add company and press Enter..."
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  const target = e.target as HTMLInputElement;
+                  const val = target.value.trim();
+                  if (val && !profileForm.preferred_companies.includes(val)) {
+                    setProfileForm({
+                      ...profileForm,
+                      preferred_companies: [...profileForm.preferred_companies, val]
+                    });
+                    target.value = '';
+                  }
+                }
+              }}
+            />
+          </div>
+
+          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+            <div>
+              <h4 className="text-sm font-bold text-slate-900">Weekly Reminders</h4>
+              <p className="text-xs text-slate-500">Get notified for assessments and role analysis updates.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setProfileForm({...profileForm, notifications_enabled: !profileForm.notifications_enabled})}
+              className={`w-12 h-6 rounded-full transition-colors relative ${profileForm.notifications_enabled ? 'bg-blue-600' : 'bg-slate-300'}`}
+            >
+              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${profileForm.notifications_enabled ? 'left-7' : 'left-1'}`} />
+            </button>
+          </div>
+
+          <button type="submit" className={styles.btnPrimary + " w-full justify-center py-2"}>Save Preferences</button>
         </form>
       </Modal>
     </div>
