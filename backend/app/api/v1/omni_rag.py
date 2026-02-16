@@ -4,7 +4,7 @@ from typing import Optional, List
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.api.v1.auth import get_current_user
-from app.core.database import get_db
+from app.core.database import get_db, SessionLocal, SessionLocal
 from app.core.mongodb import mongodb
 from app.models.user import User
 from app.models.chat import ChatSession
@@ -396,6 +396,10 @@ async def stream_omni_rag_query(
     )
 
     async def event_generator():
+        # Create a dedicated session for the streaming context
+        # The injected 'db' session will be closed by FastAPI as soon as the response starts
+        stream_db = SessionLocal()
+
         full_response = ""
         final_metadata = {}
         final_metadata.update(context_meta) # Start with memory metadata
@@ -413,7 +417,7 @@ async def stream_omni_rag_query(
                 strategy=request.strategy,
                 image_urls=request.image_urls,
                 image_ids=request.image_ids,
-                db=db,
+                db=stream_db, # Use the streaming session
                 memory_summary=context_meta.get("memory_summary")
             ):
                 if event['type'] == 'content':
@@ -439,31 +443,35 @@ async def stream_omni_rag_query(
             else:
                 msg_id = str(uuid.uuid4())
 
-            # Update session
-            generated_title = None
-            is_generic = not session.title or session.title in ["New Conversation", "New Chat"] or session.title.endswith("...")
-            if is_generic:
-                try:
-                    generated_title = await ai_router.generate_title(request.query)
-                    if generated_title and len(generated_title) > 3:
-                        session.title = generated_title
-                    else:
-                        generated_title = session.title or "New Chat"
-                except Exception as e:
-                    logger.warning(f"Omni-RAG stream title generation failed: {e}")
-                    if not session.title or session.title in ["New Conversation", "New Chat"]:
-                        session.title = request.query[:47] + "..."
-                    generated_title = session.title
-            else:
-                generated_title = session.title
+            # Update session - Re-fetch using stream_db
+            chat_session = stream_db.query(ChatSession).filter(ChatSession.id == session_id).first()
+            if chat_session:
+                generated_title = None
+                is_generic = not chat_session.title or chat_session.title in ["New Conversation", "New Chat"] or chat_session.title.endswith("...")
+                if is_generic:
+                    try:
+                        generated_title = await ai_router.generate_title(request.query)
+                        if generated_title and len(generated_title) > 3:
+                            chat_session.title = generated_title
+                        else:
+                            generated_title = chat_session.title or "New Chat"
+                    except Exception as e:
+                        logger.warning(f"Omni-RAG stream title generation failed: {e}")
+                        if not chat_session.title or chat_session.title in ["New Conversation", "New Chat"]:
+                            chat_session.title = request.query[:47] + "..."
+                        generated_title = chat_session.title
+                else:
+                    generated_title = chat_session.title
 
-            session.updated_at = datetime.now()
-            db.commit()
+                chat_session.updated_at = datetime.now()
+                stream_db.commit()
 
-            yield f"data: {json.dumps({'type': 'done', 'message_id': msg_id, 'title': generated_title})}\n\n"
+                yield f"data: {json.dumps({'type': 'done', 'message_id': msg_id, 'title': generated_title})}\n\n"
 
         except Exception as e:
             logger.error(f"Error in Omni-RAG streaming: {str(e)}")
             yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+        finally:
+            stream_db.close()
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")

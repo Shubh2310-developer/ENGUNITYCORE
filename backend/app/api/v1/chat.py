@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Body
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app.api.v1.auth import get_current_user
-from app.core.database import get_db
+from app.core.database import get_db, SessionLocal
 from app.core.mongodb import mongodb
 from app.models.user import User
 from app.models.chat import ChatSession
@@ -359,6 +359,9 @@ async def stream_message(
 
     # 4. Define the streaming generator
     async def event_generator():
+        # Create a dedicated session for the streaming context
+        stream_db = SessionLocal()
+
         full_content = ""
         try:
             # Yield initial metadata including retrieved docs and memory status
@@ -370,7 +373,7 @@ async def stream_message(
                 session_id=session_id,
                 image_urls=message_in.image_urls,
                 image_ids=message_in.image_ids,
-                db=db
+                db=stream_db
             ):
                 full_content += chunk
                 yield f"data: {json.dumps({'type': 'content', 'content': chunk})}\n\n"
@@ -395,31 +398,38 @@ async def stream_message(
 
             # 6. Update session metadata in background or at the end
             # We do it here as we are in an async function
-            generated_title = None
-            is_generic = not session.title or session.title in ["New Conversation", "New Chat"] or session.title.endswith("...")
-            if is_generic:
-                try:
-                    generated_title = await ai_router.generate_title(message_in.content)
-                    if generated_title and len(generated_title) > 3:
-                        session.title = generated_title
-                    else:
-                        generated_title = session.title or "New Chat"
-                except Exception as e:
-                    print(f"Stream title generation failed: {e}")
-                    if not session.title or session.title in ["New Conversation", "New Chat"]:
-                        session.title = message_in.content[:47] + "..."
-                    generated_title = session.title
-            else:
-                generated_title = session.title
 
-            session.updated_at = datetime.now()
-            db.commit()
+            # Re-fetch session using stream_db to ensure it's attached to current session
+            chat_session = stream_db.query(ChatSession).filter(ChatSession.id == session_id).first()
 
-            # Yield final message info
-            yield f"data: {json.dumps({'type': 'done', 'message_id': msg_id, 'title': generated_title})}\n\n"
+            if chat_session:
+                generated_title = None
+                is_generic = not chat_session.title or chat_session.title in ["New Conversation", "New Chat"] or chat_session.title.endswith("...")
+                if is_generic:
+                    try:
+                        generated_title = await ai_router.generate_title(message_in.content)
+                        if generated_title and len(generated_title) > 3:
+                            chat_session.title = generated_title
+                        else:
+                            generated_title = chat_session.title or "New Chat"
+                    except Exception as e:
+                        print(f"Stream title generation failed: {e}")
+                        if not chat_session.title or chat_session.title in ["New Conversation", "New Chat"]:
+                            chat_session.title = message_in.content[:47] + "..."
+                        generated_title = chat_session.title
+                else:
+                    generated_title = chat_session.title
+
+                chat_session.updated_at = datetime.now()
+                stream_db.commit()
+
+                # Yield final message info
+                yield f"data: {json.dumps({'type': 'done', 'message_id': msg_id, 'title': generated_title})}\n\n"
 
         except Exception as e:
             error_msg = f"Error: {str(e)}"
             yield f"data: {json.dumps({'type': 'error', 'content': error_msg})}\n\n"
+        finally:
+            stream_db.close()
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
