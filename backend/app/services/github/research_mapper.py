@@ -1,27 +1,10 @@
-import json
-import os
 from typing import Dict, Any, List
-from groq import Groq
+from app.services.ai.groq_client import groq_client
 from app.core.config import settings
 
 class ResearchMapper:
     def __init__(self):
-        self._client = None
         self.model = "llama-3.1-70b-versatile"
-
-    @property
-    def client(self):
-        if self._client is None:
-            # Use single key or first from comma-separated list
-            api_key = settings.GROQ_API_KEY
-            if not api_key and settings.GROQ_API_KEYS:
-                api_key = settings.GROQ_API_KEYS.split(',')[0].strip()
-
-            if not api_key:
-                raise ValueError("GROQ_API_KEY is not configured in .env")
-
-            self._client = Groq(api_key=api_key)
-        return self._client
 
     async def map_to_papers(self, repo_info: Dict, code_analysis: Dict) -> List[Dict]:
         """Map repository implementation to research papers"""
@@ -55,14 +38,20 @@ Respond ONLY in JSON format:
 """
 
         try:
-            completion = self.client.chat.completions.create(
-                model=self.model,
+            response = await groq_client.get_completion(
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,
-                response_format={"type": "json_object"}
+                model=self.model
             )
 
-            result = json.loads(completion.choices[0].message.content)
+            # Clean potential markdown formatting
+            import re
+            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            if json_match:
+                result = json.loads(json_match.group())
+            else:
+                result = json.loads(response)
+
             return result.get("papers", [])
         except Exception as e:
             print(f"Error mapping research papers: {e}")

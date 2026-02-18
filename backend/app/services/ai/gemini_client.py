@@ -24,11 +24,11 @@ class GeminiClient:
         image_source can be a base64 string or a URL.
         Strictly follows the 'perception-only' rule.
         Includes exponential backoff for 429 errors.
-        Returns None if analysis fails.
+        Returns a local-mode warning if API key is missing.
         """
         if not self.api_key:
-            logger.error("Gemini API key not found")
-            return None
+            logger.warning("Gemini API key not found. Image analysis disabled in local mode.")
+            return "[Local Mode: Vision analysis unavailable without GEMINI_API_KEY. Please provide a key or install a local VLM.]"
 
         image_data = ""
         mime_type = "image/jpeg"

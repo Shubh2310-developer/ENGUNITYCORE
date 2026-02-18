@@ -65,12 +65,36 @@ class RecursiveReasoningAgent:
             final_match = re.search(r'FINAL\((.*?)\)', response, re.DOTALL)
             final_var_match = re.search(r'FINAL_VAR\((.*?)\)', response, re.DOTALL)
 
+            # ENFORCE MULTI-STEP PROTOCOL: If FINAL() is called too early (before 3 reasoning steps)
+            if (final_match or final_var_match) and step_idx < 3:
+                logger.warning(f"RLM attempted to finalize too early at step {step_idx}. Enforcing multi-step protocol.")
+                history.append({"role": "assistant", "content": response})
+                history.append({
+                    "role": "user",
+                    "content": "You are in EXHAUSTIVE mode. You must complete at least 3 reasoning steps (Analysis, Retrieval, and Synthesis) using `repl` blocks before finalizing. Please continue your research."
+                })
+                # Log the intercepted attempt as a step
+                steps.append({
+                    "thought": response,
+                    "output": "INTERCEPTED: Attempted to finalize too early. Enforcing multi-step research."
+                })
+                continue
+
             if final_match:
                 final_answer = final_match.group(1).strip()
+                # Append the final thought to steps before breaking
+                steps.append({
+                    "thought": response,
+                    "output": "FINAL_ANSWER_REACHED"
+                })
                 break
             elif final_var_match:
                 var_name = final_var_match.group(1).strip()
                 final_answer = str(sandbox.get_variable(var_name))
+                steps.append({
+                    "thought": response,
+                    "output": f"FINAL_VAR_REACHED: {var_name}"
+                })
                 break
 
             # 5. Extract and execute code

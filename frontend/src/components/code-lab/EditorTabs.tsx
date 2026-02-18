@@ -10,23 +10,23 @@ export const EditorTabs = () => {
   const openFiles = files.filter(f => openFileIds.includes(f.id));
 
   if (openFiles.length === 0) {
-    return <div className="h-9 bg-[#E5E7EB] border-b border-[#E2E8F0]" />;
+    return <div className="h-9 bg-[#F1F5F9] border-b border-[#CBD5E1]" />;
   }
 
   return (
-    <div className="flex bg-[#E5E7EB] border-b border-[#E2E8F0] overflow-x-auto no-scrollbar scrollbar-hide h-9 items-center">
+    <div className="flex bg-[#F1F5F9] border-b border-[#CBD5E1] overflow-x-auto no-scrollbar scrollbar-hide h-9 items-center">
       {openFiles.map((file) => (
         <div
           key={file.id}
-          className={`flex items-center gap-2 px-4 h-full min-w-[120px] max-w-[200px] border-r border-[#E2E8F0] cursor-pointer group transition-all relative ${activeFileId === file.id
-              ? 'bg-white text-[#0F172A] border-t-2 border-t-[#2563EB]'
-              : 'bg-[#E5E7EB] text-[#64748B] hover:bg-[#D1D5DB] hover:text-[#334155]'
+          className={`flex items-center gap-2 px-4 h-full min-w-[120px] max-w-[200px] border-r border-[#CBD5E1] cursor-pointer group transition-all relative ${activeFileId === file.id
+              ? 'bg-white text-[#0F172A] border-t-2 border-t-[#2563EB] shadow-[0_-2px_4px_rgba(0,0,0,0.02)]'
+              : 'bg-[#F1F5F9] text-[#475569] hover:bg-[#E2E8F0] hover:text-[#1E293B]'
             }`}
           onClick={() => setActiveFile(file.id)}
         >
-          <span className="text-[11px] font-semibold tracking-wide truncate flex-1">
+          <span className={`text-[11px] font-bold tracking-tight truncate flex-1 ${activeFileId === file.id ? 'opacity-100' : 'opacity-80'}`}>
             {file.name}
-            {file.isDirty && <span className="ml-1 text-[#DC2626]">•</span>}
+            {file.isDirty && <span className="ml-1 text-[#DC2626] font-black">•</span>}
           </span>
           <div className="flex items-center gap-1">
             {file.isDirty && (

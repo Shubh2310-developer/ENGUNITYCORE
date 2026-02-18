@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.core.database import get_db, Base
 from app.models.user import User as UserModel
+from app.models.code import CodeProject as ProjectModel, CodeFile as FileModel
 
 # Use in-memory SQLite for tests
 SQLALCHEMY_TEST_DATABASE_URL = "sqlite:///./test.db"
@@ -23,9 +24,13 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 
 @pytest.fixture(scope="function", autouse=False)
 def setup_database():
-    """Create only the users table (SQLite-compatible) before each test and drop after."""
+    """Create necessary tables (SQLite-compatible) before each test and drop after."""
     UserModel.__table__.create(bind=engine, checkfirst=True)
+    ProjectModel.__table__.create(bind=engine, checkfirst=True)
+    FileModel.__table__.create(bind=engine, checkfirst=True)
     yield
+    FileModel.__table__.drop(bind=engine, checkfirst=True)
+    ProjectModel.__table__.drop(bind=engine, checkfirst=True)
     UserModel.__table__.drop(bind=engine, checkfirst=True)
 
 

@@ -16,13 +16,17 @@ import {
   Square,
   Bug,
   GitBranch,
-  Beaker
+  Beaker,
+  Users,
+  Monitor,
+  FolderOpen
 } from 'lucide-react';
 import { FileExplorer } from '@/components/code-lab/FileExplorer';
 import { GlobalSearch } from '@/components/code-lab/GlobalSearch';
 import { DebugSidebar } from '@/components/code-lab/DebugSidebar';
 import { GitSidebar } from '@/components/code-lab/GitSidebar';
 import { TestRunner } from '@/components/code-lab/TestRunner';
+import { TeamChat } from '@/components/code-lab/TeamChat';
 import { DebugToolbar } from '@/components/code-lab/DebugToolbar';
 import { EditorTabs } from '@/components/code-lab/EditorTabs';
 import { Breadcrumbs } from '@/components/code-lab/Breadcrumbs';
@@ -32,6 +36,7 @@ import { StatusBar } from '@/components/code-lab/StatusBar';
 import { AIRefinePanel } from '@/components/code-lab/AIRefinePanel';
 import { NotificationOverlay } from '@/components/code-lab/NotificationOverlay';
 import { CommandPalette } from '@/components/code-lab/CommandPalette';
+import { PreviewPanel } from '@/components/code-lab/PreviewPanel';
 import { useCodeStore } from '@/stores/codeStore';
 import { useRouter } from 'next/navigation';
 import styles from './codelab.module.css';
@@ -53,7 +58,9 @@ export default function CodeLabPage() {
     saveFile,
     activeFileId,
     setNotification,
-    debugSession
+    debugSession,
+    activeRightTab,
+    setActiveRightTab
   } = useCodeStore();
 
   // State for execution control and stdin input
@@ -244,6 +251,11 @@ export default function CodeLabPage() {
     setActiveSidebarTab('test');
   };
 
+  const handleTeam = () => {
+    setSidebarOpen(true);
+    setActiveSidebarTab('team');
+  };
+
   const handleNewFile = () => {
     const fileName = prompt('Enter file name:');
     if (fileName) {
@@ -266,16 +278,16 @@ export default function CodeLabPage() {
       >
 
         {/* --- HEADER --- */}
-        <div className={styles.header}>
+        <div className={`${styles.header} backdrop-blur-md bg-white/80`}>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded flex items-center justify-center bg-[#2563EB] text-white">
+              <div className="w-7 h-7 rounded flex items-center justify-center bg-[#2563EB] text-white shadow-sm">
                 <Code2 className="w-4 h-4" />
               </div>
-              <span className="text-sm font-semibold text-[#0F172A]">Code Studio</span>
+              <span className="text-sm font-bold text-[#0F172A] tracking-tight">Code Studio</span>
             </div>
 
-            <div className="h-4 w-[1px] bg-[#E2E8F0]" />
+            <div className="h-4 w-[1px] bg-[#CBD5E1]" />
 
             <div className="flex items-center gap-1">
               <button
@@ -284,6 +296,13 @@ export default function CodeLabPage() {
                 title="Toggle Sidebar"
               >
                 <Layout className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => { setSidebarOpen(true); setActiveSidebarTab('explorer'); }}
+                className={`${styles.button} ${activeSidebarTab === 'explorer' && isSidebarOpen ? '!text-[#2563EB] !bg-[#EEF2FF]' : ''}`}
+                title="File Explorer"
+              >
+                <FolderOpen className="w-4 h-4" />
               </button>
               <button
                 onClick={handleSearch}
@@ -314,6 +333,13 @@ export default function CodeLabPage() {
                 <Beaker className="w-4 h-4" />
               </button>
               <button
+                onClick={handleTeam}
+                className={styles.button}
+                title="Team Chat"
+              >
+                <Users className="w-4 h-4" />
+              </button>
+              <button
                 onClick={handleNewFile}
                 className={styles.button}
                 title="New File"
@@ -329,14 +355,14 @@ export default function CodeLabPage() {
                 const activeFile = activeFileId || 'Code Change';
                 router.push(`/decisionvault?source=code&title=${encodeURIComponent(`Refactor: ${activeFile}`)}&problem=${encodeURIComponent(`Architectural decision required for ${activeFile}`)}`);
               }}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-all text-xs font-bold"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 transition-all text-xs font-bold shadow-sm"
               title="Log Architecture Decision"
             >
               <Shield className="w-3.5 h-3.5" />
               <span>Log Decision</span>
             </button>
 
-            <div className="h-4 w-[1px] bg-[#E2E8F0] mx-1" />
+            <div className="h-4 w-[1px] bg-[#CBD5E1] mx-1" />
 
             {isExecuting ? (
               <button
@@ -371,17 +397,18 @@ export default function CodeLabPage() {
         <aside className={styles.explorer}>
           <div className={`h-full w-[280px] flex flex-col ${!isSidebarOpen && 'hidden'}`}>
             {/* Sidebar Header */}
-            <div className="h-9 flex items-center justify-between px-3 border-b border-[#E2E8F0] bg-[#F8FAFC]">
-              <span className="text-[10px] font-semibold text-[#475569] uppercase tracking-wider">
+            <div className="h-9 flex items-center justify-between px-3 border-b border-[#CBD5E1] bg-[#F1F5F9]">
+              <span className="text-[10px] font-bold text-[#475569] uppercase tracking-wider">
                 {activeSidebarTab === 'explorer' && 'Explorer'}
                 {activeSidebarTab === 'search' && 'Search'}
                 {activeSidebarTab === 'debug' && 'Debug'}
                 {activeSidebarTab === 'git' && 'Source Control'}
                 {activeSidebarTab === 'test' && 'Test Runner'}
+                {activeSidebarTab === 'team' && 'Team Chat'}
               </span>
               <button
                 onClick={() => setSidebarOpen(false)}
-                className="p-1 hover:bg-[#E0E7FF] rounded transition-all text-[#475569] hover:text-[#0F172A]"
+                className="p-1 hover:bg-[#E2E8F0] rounded transition-all text-[#475569] hover:text-[#0F172A]"
                 title="Close Sidebar"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
@@ -392,13 +419,14 @@ export default function CodeLabPage() {
             {activeSidebarTab === 'debug' && <DebugSidebar />}
             {activeSidebarTab === 'git' && <GitSidebar />}
             {activeSidebarTab === 'test' && <TestRunner />}
+            {activeSidebarTab === 'team' && <TeamChat />}
           </div>
         </aside>
 
         {/* --- MAIN EDITOR --- */}
         <main className={styles.editor}>
           {/* Tabs */}
-          <div className="flex flex-col border-b border-[#E2E8F0]">
+          <div className="flex flex-col border-b border-[#CBD5E1] bg-[#F8FAFC]">
             <EditorTabs />
             <Breadcrumbs />
             {debugSession.status !== 'idle' && <DebugToolbar />}
@@ -418,18 +446,65 @@ export default function CodeLabPage() {
         {/* --- RIGHT PANEL (AI REFINE) --- */}
         <aside className={styles.panel}>
           {isAIRefineOpen ? (
-            <AIRefinePanel />
+            <div className="flex flex-col h-full w-full">
+              {/* Right Panel Tabs */}
+              <div className="flex items-center border-b border-[#CBD5E1] bg-[#F1F5F9]">
+                <button
+                  onClick={() => setActiveRightTab('ai')}
+                  className={`flex items-center gap-2 px-4 py-2 text-xs font-bold border-r border-[#CBD5E1] transition-colors ${
+                    activeRightTab === 'ai'
+                      ? 'bg-white text-[#2563EB] border-t-2 border-t-[#2563EB]'
+                      : 'text-[#64748B] hover:text-[#0F172A] hover:bg-[#E2E8F0]'
+                  }`}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  AI Refine
+                </button>
+                <button
+                  onClick={() => setActiveRightTab('preview')}
+                  className={`flex items-center gap-2 px-4 py-2 text-xs font-bold border-r border-[#CBD5E1] transition-colors ${
+                    activeRightTab === 'preview'
+                      ? 'bg-white text-[#2563EB] border-t-2 border-t-[#2563EB]'
+                      : 'text-[#64748B] hover:text-[#0F172A] hover:bg-[#E2E8F0]'
+                  }`}
+                >
+                  <Monitor className="w-3.5 h-3.5" />
+                  Preview
+                </button>
+                <div className="flex-1" />
+                <button
+                  onClick={() => setAIRefineOpen(false)}
+                  className="p-2 text-[#64748B] hover:text-[#0F172A] hover:bg-[#E2E8F0]"
+                  title="Close Panel"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Panel Content */}
+              <div className="flex-1 overflow-hidden">
+                {activeRightTab === 'ai' && <AIRefinePanel />}
+                {activeRightTab === 'preview' && <PreviewPanel />}
+              </div>
+            </div>
           ) : (
             // Collapsed State
             <div className="w-full h-full flex flex-col items-center py-3 gap-3 bg-[#F1F5F9]">
               <button
-                onClick={() => setAIRefineOpen(true)}
+                onClick={() => { setAIRefineOpen(true); setActiveRightTab('ai'); }}
                 className={styles.button}
                 title="Open AI Refine"
               >
                 <Sparkles className="w-4 h-4" />
               </button>
-              <div className="w-5 h-[1px] bg-[#E2E8F0]" />
+              <button
+                onClick={() => { setAIRefineOpen(true); setActiveRightTab('preview'); }}
+                className={styles.button}
+                title="Open Preview"
+              >
+                <Monitor className="w-4 h-4" />
+              </button>
+              <div className="w-5 h-[1px] bg-[#CBD5E1]" />
               <button
                 onClick={() => { setSidebarOpen(true); setActiveSidebarTab('search'); }}
                 className={styles.button}

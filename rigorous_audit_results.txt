@@ -1,0 +1,45 @@
+🔹 Registering user rigorous_audit_1771340733@example.com...
+🚀 Starting Rigorous 5-Query Benchmark...
+
+--- Query 1: 'How has the architectural design of large language...' ---
+   Testing Mode: QUICK... ✅ (359 words, 6 sources in 130.9s)
+   Testing Mode: STANDARD... ❌ (Failed: 500)
+   Testing Mode: DEEP... ❌ (Failed: 500)
+   Testing Mode: EXHAUSTIVE... ❌ (Failed: 500)
+
+--- Query 2: 'Compare the scalability strategies of Kubernetes v...' ---
+   Testing Mode: QUICK... ❌ (Exception: HTTPConnectionPool(host='localhost', port=8000): Read timed out. (read timeout=900))
+   Testing Mode: STANDARD... ❌ (Exception: HTTPConnectionPool(host='localhost', port=8000): Read timed out. (read timeout=900))
+   Testing Mode: DEEP... ✅ (512 words, 6 sources in 211.9s)
+   Testing Mode: EXHAUSTIVE... ✅ (734 words, 10 sources in 163.2s)
+
+--- Query 3: 'What are the security implications of using zero-k...' ---
+   Testing Mode: QUICK... ✅ (297 words, 5 sources in 78.0s)
+   Testing Mode: STANDARD... ✅ (524 words, 5 sources in 159.3s)
+   Testing Mode: DEEP... ✅ (459 words, 5 sources in 170.9s)
+   Testing Mode: EXHAUSTIVE... ✅ (641 words, 10 sources in 240.6s)
+
+--- Query 4: 'Explain the historical development and current sta...' ---
+   Testing Mode: QUICK... ✅ (399 words, 5 sources in 72.7s)
+   Testing Mode: STANDARD... ✅ (619 words, 5 sources in 88.2s)
+   Testing Mode: DEEP... ✅ (421 words, 5 sources in 81.8s)
+   Testing Mode: EXHAUSTIVE... ✅ (691 words, 10 sources in 97.0s)
+
+--- Query 5: 'How do edge computing architectures handle real-ti...' ---
+   Testing Mode: QUICK... ✅ (327 words, 5 sources in 74.5s)
+   Testing Mode: STANDARD... ✅ (581 words, 5 sources in 93.1s)
+   Testing Mode: DEEP... ✅ (483 words, 5 sources in 156.7s)
+   Testing Mode: EXHAUSTIVE... ✅ (753 words, 5 sources in 186.4s)
+
+============================================================
+📊 AGGREGATE RIGOROUS AUDIT RESULTS (Averages)
+============================================================
+Mode         | Avg Words  | Avg Sources  | Avg Latency 
+-------------------------------------------------------
+QUICK        | 345.5      | 5.2          | 89.0        s
+STANDARD     | 574.7      | 5.0          | 113.5       s
+DEEP         | 468.8      | 5.2          | 155.3       s
+EXHAUSTIVE   | 704.8      | 8.8          | 171.8       s
+
+Exhaustive/Quick Word Ratio: 2.04x (Target: >3x)
+Exhaustive/Quick Source Ratio: 1.67x (Target: >2x)

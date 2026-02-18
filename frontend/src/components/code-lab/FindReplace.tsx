@@ -15,14 +15,14 @@ export const useFindReplace = (editor: any, monaco: any) => {
     // Register replace command (Cmd+H) - Monaco default is Cmd+H for replace
 
     // Custom: Find in Files (Cmd+Shift+F)
-    const findInFilesDisposable = editor.addCommand(
-      monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyF,
-      () => {
-        // Switch to search sidebar
+    const findInFilesDisposable = editor.addAction({
+      id: 'find-in-files',
+      label: 'Find in Files',
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyF],
+      run: () => {
         setActiveSidebarTab('search');
-        // Ideally focus the search input in the sidebar (would need a ref or event)
       }
-    );
+    });
 
     return () => {
       findInFilesDisposable?.dispose();

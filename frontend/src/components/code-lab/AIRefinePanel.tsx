@@ -177,36 +177,36 @@ export const AIRefinePanel = () => {
   return (
     <div className={styles['chat-container']}>
       {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-[#E2E8F0] bg-[#F1F5F9]">
+      <div className="flex items-center justify-between p-3 border-b border-[#CBD5E1] bg-[#F1F5F9]">
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-[#2563EB]" />
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-[#475569]">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[#475569]">
             Refine AI {activeFile && `- ${activeFile.name}`}
           </span>
         </div>
         <button
           onClick={() => setAIRefineOpen(false)}
-          className="text-[#64748B] hover:text-[#0F172A] hover:bg-[#E2E8F0] transition-colors p-1 rounded"
+          className="text-[#64748B] hover:text-[#0F172A] hover:bg-[#E2E8F0] transition-all p-1 rounded active:scale-95"
           title="Close Panel"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white">
+      <div className="flex-1 overflow-y-auto p-4 space-y-5 bg-white">
         {/* Message History */}
         <div>
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-[#94A3B8] mb-2 block">Conversation</span>
-          <div className="flex flex-col gap-3">
+          <span className="text-[9px] font-bold uppercase tracking-widest text-[#94A3B8] mb-3 block opacity-80">Workspace Conversation</span>
+          <div className="flex flex-col gap-4">
             {messages.map((m, i) => (
               <div
                 key={i}
-                className={`p-3 rounded-lg text-sm ${m.role === 'user'
-                    ? 'bg-[#2563EB] text-white ml-4'
-                    : 'bg-[#F1F5F9] text-[#0F172A] border border-[#E2E8F0] mr-4'
+                className={`p-3.5 rounded-xl text-[13px] leading-relaxed shadow-sm transition-all border ${m.role === 'user'
+                    ? 'bg-[#2563EB] text-white ml-6 border-[#2563EB]/10'
+                    : 'bg-[#F8FAFC] text-[#0F172A] border-[#E2E8F0] mr-6'
                   }`}
               >
-                <div className="prose prose-sm max-w-none dark:prose-invert">
+                <div className="prose prose-sm max-w-none prose-slate">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {m.content}
                   </ReactMarkdown>
@@ -214,9 +214,9 @@ export const AIRefinePanel = () => {
               </div>
             ))}
             {isProcessing && (
-              <div className="flex items-center gap-2 text-[#64748B] text-sm">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>AI is thinking...</span>
+              <div className="flex items-center gap-2 text-[#2563EB] text-[11px] font-bold uppercase tracking-tight ml-1">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span className="animate-pulse">AI is thinking...</span>
               </div>
             )}
           </div>
@@ -224,16 +224,18 @@ export const AIRefinePanel = () => {
 
         {/* Suggestions */}
         <div>
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-[#94A3B8] mb-2 block">Quick Actions</span>
-          <div className="flex flex-col gap-2">
+          <span className="text-[9px] font-bold uppercase tracking-widest text-[#94A3B8] mb-3 block opacity-80">Intelligent Actions</span>
+          <div className="grid grid-cols-1 gap-2">
             {suggestions.map((s, i) => (
               <button
                 key={i}
                 onClick={() => handleSuggestionClick(s.action)}
                 disabled={isProcessing || !activeFile}
-                className="flex items-center gap-3 w-full text-left p-3 bg-white border border-[#E2E8F0] rounded-lg text-[#475569] hover:bg-[#F1F5F9] hover:text-[#0F172A] transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-3 w-full text-left p-3 bg-white border border-[#E2E8F0] rounded-xl text-[#475569] hover:bg-[#F8FAFC] hover:text-[#2563EB] hover:border-[#2563EB]/30 hover:shadow-md transition-all text-xs font-bold disabled:opacity-50 disabled:scale-100 group active:scale-[0.98]"
               >
-                <s.icon className="w-4 h-4 text-[#2563EB]" />
+                <div className="w-8 h-8 rounded-lg bg-[#F1F5F9] flex items-center justify-center group-hover:bg-white group-hover:text-[#2563EB] transition-colors border border-transparent group-hover:border-[#2563EB]/10">
+                  <s.icon className="w-4 h-4" />
+                </div>
                 <span>{s.label}</span>
               </button>
             ))}
@@ -242,23 +244,26 @@ export const AIRefinePanel = () => {
 
         {/* Pro Tip */}
         {activeFile && (
-          <div className="p-3 bg-[#EEF2FF] border border-[#C7D2FE] rounded-lg">
-            <div className="flex items-center gap-2 mb-2 text-[#2563EB]">
-              <FileCode className="w-3.5 h-3.5" />
-              <span className="text-[10px] font-semibold uppercase">Current File</span>
+          <div className="p-4 bg-[#F0F7FF] border border-[#BFDBFE] rounded-xl shadow-[0_4px_12px_rgba(37,99,235,0.04)]">
+            <div className="flex items-center gap-2 mb-2.5 text-[#2563EB]">
+              <FileCode className="w-4 h-4" />
+              <span className="text-[10px] font-black uppercase tracking-tighter">Active Context</span>
             </div>
-            <p className="text-xs text-[#475569] leading-relaxed">
-              Language: <code className="text-[#4F46E5] bg-white px-1 rounded">{activeFile.language}</code>
-              <br />
-              Lines: <code className="text-[#4F46E5] bg-white px-1 rounded">{activeFile.content?.split('\n').length || 0}</code>
-            </p>
+            <div className="space-y-1.5">
+              <p className="text-[11px] text-[#1E40AF] font-bold flex justify-between">
+                Language: <code className="bg-white/60 px-1.5 py-0.5 rounded border border-[#BFDBFE]/30 text-[#2563EB] font-mono">{activeFile.language}</code>
+              </p>
+              <p className="text-[11px] text-[#1E40AF] font-bold flex justify-between">
+                Lines: <code className="bg-white/60 px-1.5 py-0.5 rounded border border-[#BFDBFE]/30 text-[#2563EB] font-mono">{activeFile.content?.split('\n').length || 0}</code>
+              </p>
+            </div>
           </div>
         )}
       </div>
 
       {/* Input Area */}
-      <div className="p-3 border-t border-[#E2E8F0] bg-[#F1F5F9]">
-        <div className="relative">
+      <div className="p-4 border-t border-[#CBD5E1] bg-[#F1F5F9]">
+        <div className="relative group">
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
@@ -269,20 +274,21 @@ export const AIRefinePanel = () => {
               }
             }}
             disabled={isProcessing}
-            placeholder={activeFile ? "Ask AI to help with your code..." : "Open a file to get started"}
-            className="w-full bg-white border border-[#E2E8F0] rounded-lg p-3 pr-12 text-sm text-[#0F172A] placeholder-[#94A3B8] resize-none focus:outline-none focus:border-[#2563EB] min-h-[72px] disabled:opacity-50"
+            placeholder={activeFile ? "Refine code, fix bugs, or explain..." : "Open a file to start AI chat"}
+            className="w-full bg-white border border-[#CBD5E1] rounded-xl p-3.5 pr-14 text-[13px] text-[#0F172A] placeholder-[#94A3B8] resize-none focus:outline-none focus:border-[#2563EB] focus:ring-4 focus:ring-[#2563EB]/5 min-h-[84px] disabled:opacity-50 shadow-sm transition-all"
           />
           <button
             onClick={handleSend}
             disabled={isProcessing || !prompt.trim()}
-            className="absolute bottom-3 right-3 p-1.5 bg-[#2563EB] text-white rounded hover:bg-[#1D4ED8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="absolute bottom-4 right-4 p-2 bg-[#2563EB] text-white rounded-lg hover:bg-[#1D4ED8] hover:scale-110 active:scale-95 transition-all shadow-lg disabled:opacity-40 disabled:scale-100 disabled:shadow-none"
           >
-            {isProcessing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+            {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </button>
         </div>
-        <p className="text-[10px] text-[#64748B] mt-2">
-          💡 Tip: Press Enter to send, Shift+Enter for new line
-        </p>
+        <div className="flex items-center justify-between mt-2.5 px-1">
+          <span className="text-[9px] font-bold text-[#94A3B8] uppercase tracking-widest">Shift+Enter for newline</span>
+          <Zap className="w-3 h-3 text-[#2563EB] opacity-40" />
+        </div>
       </div>
     </div>
   );

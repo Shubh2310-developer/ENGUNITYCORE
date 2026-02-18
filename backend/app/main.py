@@ -31,6 +31,8 @@ from app.api.v1.debug import router as debug_router
 from app.api.v1.git import router as git_router
 from app.api.v1.testing import router as testing_router
 from app.api.v1.jobprep import router as jobprep_router
+from app.api.v1.agent_tools import router as agent_tools_router
+from app.api.v1.coding_team import router as coding_team_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -150,3 +152,5 @@ app.include_router(debug_router, prefix=f"{settings.API_V1_STR}/debug", tags=["d
 app.include_router(git_router, prefix=f"{settings.API_V1_STR}/git", tags=["git"])
 app.include_router(testing_router, prefix=f"{settings.API_V1_STR}/testing", tags=["testing"])
 app.include_router(jobprep_router, prefix=f"{settings.API_V1_STR}/jobprep", tags=["jobprep"])
+app.include_router(agent_tools_router, prefix=f"{settings.API_V1_STR}/agent-tools", tags=["agent-tools"])
+app.include_router(coding_team_router, prefix=f"{settings.API_V1_STR}/coding-team", tags=["coding-team"])

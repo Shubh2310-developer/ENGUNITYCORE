@@ -18,11 +18,12 @@ const Editor = dynamic(() => import('@monaco-editor/react'), {
 });
 
 export const CodeEditor = () => {
-  const { files, activeFileId, updateFileContent, saveFile, setNotification, setCursorPosition } = useCodeStore();
+  const { files, activeFileId, updateFileContent, saveFile, setNotification, setCursorPosition, aiSuggestionsEnabled } = useCodeStore();
   const activeFile = files.find(f => f.id === activeFileId);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
+  const aiProviderDisposablesRef = useRef<any[]>([]);
 
   // Enable Find & Replace
   useFindReplace(editorRef.current, monacoRef.current);
@@ -45,29 +46,29 @@ export const CodeEditor = () => {
 
   if (!activeFile) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-void-950 text-starlight-400 select-none relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-void-800/50 via-void-950 to-void-950" />
+      <div className="flex-1 flex flex-col items-center justify-center bg-[#F8FAFC] text-[#64748B] select-none relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-50/50 via-[#F8FAFC] to-[#F8FAFC]" />
 
         <div className="relative z-10 flex flex-col items-center">
           <div className="w-32 h-32 mb-8 relative group">
-            <div className="absolute inset-0 bg-cyber-teal/5 rounded-full blur-3xl group-hover:bg-cyber-teal/10 transition-all duration-700" />
-            <div className="relative h-full w-full border border-white/5 rounded-3xl flex items-center justify-center bg-void-900/40 backdrop-blur-md shadow-2xl group-hover:scale-105 transition-all duration-500 ring-1 ring-white/5 group-hover:ring-cyber-teal/20">
-              <Code2 className="w-12 h-12 text-starlight-400/20 group-hover:text-cyber-teal/50 transition-all duration-500" />
+            <div className="absolute inset-0 bg-[#2563EB]/5 rounded-full blur-3xl group-hover:bg-[#2563EB]/10 transition-all duration-700" />
+            <div className="relative h-full w-full border border-[#CBD5E1] rounded-3xl flex items-center justify-center bg-white backdrop-blur-md shadow-2xl group-hover:scale-105 transition-all duration-500 ring-1 ring-[#CBD5E1]/50 group-hover:ring-[#2563EB]/20">
+              <Code2 className="w-12 h-12 text-[#2563EB]/20 group-hover:text-[#2563EB]/50 transition-all duration-500" />
             </div>
           </div>
 
-          <h3 className="text-lg font-bold text-starlight-100 tracking-tight mb-2">No File Selected</h3>
-          <p className="font-mono text-[10px] font-medium tracking-[0.2em] uppercase text-starlight-400/40">Select a file from the explorer to begin</p>
+          <h3 className="text-xl font-bold text-[#0F172A] tracking-tight mb-2">No File Open</h3>
+          <p className="font-bold text-[10px] tracking-[0.2em] uppercase text-[#94A3B8]">Select a file from the explorer to begin coding</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 w-full h-full min-w-0 overflow-hidden bg-void-950 relative">
-      <div className="absolute inset-0 w-full h-full overflow-hidden">
+    <div className="flex-1 w-full h-full min-w-0 overflow-hidden bg-white relative">
+      <div className="absolute inset-0 w-full h-full overflow-hidden border-l border-[#CBD5E1]">
         <Editor
-          theme="engunity-dark"
+          theme="engunity-light"
           language={activeFile.language || 'plaintext'}
           value={activeFile.content}
           onChange={(value: string | undefined) => updateFileContent(activeFile.id, value || '')}
@@ -118,27 +119,27 @@ export const CodeEditor = () => {
             wordWrap: 'on',
           }}
           beforeMount={(monaco: any) => {
-            monaco.editor.defineTheme('engunity-dark', {
-              base: 'vs-dark',
+            monaco.editor.defineTheme('engunity-light', {
+              base: 'vs',
               inherit: true,
               rules: [
                 { token: 'comment', foreground: '64748b', fontStyle: 'italic' },
-                { token: 'keyword', foreground: '2dd4bf' },
-                { token: 'string', foreground: '4ade80' },
-                { token: 'number', foreground: 'fbbf24' },
-                { token: 'type', foreground: '0ea5e9' },
-                { token: 'function', foreground: '0ea5e9' },
+                { token: 'keyword', foreground: '2563eb', fontStyle: 'bold' },
+                { token: 'string', foreground: '059669' },
+                { token: 'number', foreground: 'd97706' },
+                { token: 'type', foreground: '7c3aed' },
+                { token: 'function', foreground: '2563eb' },
               ],
               colors: {
-                'editor.background': '#030712',
-                'editor.lineHighlightBackground': '#ffffff03',
-                'editorCursor.foreground': '#00f2ff',
-                'editor.selectionBackground': '#00f2ff20',
-                'editorIndentGuide.background': '#ffffff05',
-                'editorIndentGuide.activeBackground': '#ffffff10',
-                'editorLineNumber.foreground': '#334155',
-                'editorLineNumber.activeForeground': '#94a3b8',
-                'editor.inactiveSelectionBackground': '#00f2ff10',
+                'editor.background': '#ffffff',
+                'editor.lineHighlightBackground': '#f1f5f9',
+                'editorCursor.foreground': '#2563eb',
+                'editor.selectionBackground': '#2563eb20',
+                'editorIndentGuide.background': '#e2e8f0',
+                'editorIndentGuide.activeBackground': '#cbd5e1',
+                'editorLineNumber.foreground': '#94a3b8',
+                'editorLineNumber.activeForeground': '#0f172a',
+                'editor.inactiveSelectionBackground': '#2563eb10',
               }
             });
           }}
@@ -146,11 +147,15 @@ export const CodeEditor = () => {
             editorRef.current = editor;
             monacoRef.current = monaco;
 
-            // Register AI Inline Completion Provider
-            const aiProvider = new AIInlineCompletionProvider(monaco);
-            monaco.languages.registerInlineCompletionsProvider('python', aiProvider);
-            monaco.languages.registerInlineCompletionsProvider('javascript', aiProvider);
-            monaco.languages.registerInlineCompletionsProvider('typescript', aiProvider);
+            // Register AI Inline Completion Provider (if enabled)
+            if (useCodeStore.getState().aiSuggestionsEnabled) {
+              const aiProvider = new AIInlineCompletionProvider(monaco);
+              aiProviderDisposablesRef.current = [
+                monaco.languages.registerInlineCompletionsProvider('python', aiProvider),
+                monaco.languages.registerInlineCompletionsProvider('javascript', aiProvider),
+                monaco.languages.registerInlineCompletionsProvider('typescript', aiProvider),
+              ];
+            }
 
             // Manual Resize Handling
             const container = editor.getContainerDomNode().parentElement;

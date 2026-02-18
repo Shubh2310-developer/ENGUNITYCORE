@@ -1,8 +1,13 @@
-import * as monaco from 'monaco-editor';
+import type * as monaco from 'monaco-editor';
 
 export class AIInlineCompletionProvider implements monaco.languages.InlineCompletionsProvider {
   private debounceMs = 300;
   private abortController: AbortController | null = null;
+  private monaco: any;
+
+  constructor(monacoInstance?: any) {
+    this.monaco = monacoInstance;
+  }
 
   async provideInlineCompletions(
     model: monaco.editor.ITextModel,
@@ -33,12 +38,13 @@ export class AIInlineCompletionProvider implements monaco.languages.InlineComple
     });
 
     try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : '';
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/code/ai-inline-complete`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             // Add auth token if available in localStorage/cookies
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           before: textBeforeCursor,

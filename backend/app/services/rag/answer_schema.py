@@ -15,6 +15,7 @@ class AnswerComplexity(str, Enum):
     SIMPLE = "SIMPLE"
     SINGLE_HOP = "SINGLE_HOP"
     MULTI_HOP = "MULTI_HOP"
+    RECURSIVE_INTENSIVE = "RECURSIVE_INTENSIVE"
 
 
 class AnswerSchema(BaseModel):
@@ -178,8 +179,35 @@ Structure your answer as follows:
    - Evaluation criteria
 
 Target length: 400-800 words.
+""",
+    AnswerComplexity.RECURSIVE_INTENSIVE: """
+Structure your answer as a COMPREHENSIVE RESEARCH REPORT:
+
+1. **Executive Summary** (1 paragraph)
+   - Synthesis of all findings
+
+2. **Methodology** (Brief)
+   - Data sources analyzed
+
+3. **Detailed Findings** (Bulk of the report)
+   - Multi-section analysis with ### headings
+   - Aggregated data from multiple sources
+   - Specific examples and evidence
+   - Use tables and lists for readability
+
+4. **Comparative Analysis / Synthesis**
+   - Cross-referencing different documents and graph relations
+
+5. **Conclusions & Recommendations**
+   - High-impact suggestions based on the exhaustive audit
+
+6. **Audit Trail**
+   - List of specific documents and entities reviewed
+
+Target length: 800-1200 words. Exhaustive detail is mandatory.
 """
 }
+
 
 
 def get_schema_prompt(complexity: AnswerComplexity) -> str:
@@ -237,7 +265,8 @@ def validate_answer_structure(answer: str, complexity: AnswerComplexity) -> dict
     length_ranges = {
         AnswerComplexity.SIMPLE: (50, 200),
         AnswerComplexity.SINGLE_HOP: (150, 500),
-        AnswerComplexity.MULTI_HOP: (300, 1000)
+        AnswerComplexity.MULTI_HOP: (300, 1000),
+        AnswerComplexity.RECURSIVE_INTENSIVE: (800, 2000)
     }
     
     min_words, max_words = length_ranges[complexity]

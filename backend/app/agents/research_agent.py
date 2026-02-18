@@ -179,6 +179,15 @@ class DeepResearchAgent:
                 include_graph=request.include_graph_search
             )
             
+            yield ResearchStreamEvent(
+                event_type="status",
+                data={
+                    "message": f"DEBUG: Found {len(iteration_sources)} raw sources",
+                    "phase": "searching_debug"
+                },
+                timestamp=datetime.utcnow(),
+                progress_percent=progress_base + 2
+            )
             for source in iteration_sources[:3]:  # Stream top 3 discoveries
                 content_preview = source.get("content", "")
                 if not content_preview:
@@ -577,8 +586,15 @@ Return ONLY the JSON array."""
             "summary": "Provide a concise executive summary (3-5 paragraphs).",
             "bullet_points": "Provide key findings as organized bullet points."
         }
-        
+
+        depth_constraints = ""
+        if request.depth == ResearchDepth.QUICK:
+            depth_constraints = "Keep the report brief and concise (around 300-500 words). Use only the most relevant 2-3 sources."
+        elif request.depth == ResearchDepth.EXHAUSTIVE:
+            depth_constraints = "Provide an EXHAUSTIVE and extremely detailed report (at least 1500-2000 words). You MUST use and cite ALL provided sources. Elaborate on every minor detail and connection."
+
         prompt = f"""Synthesize a research report from these sources.
+{depth_constraints}
 
 Research Question: "{request.query}"
 Target Format: {format_instructions.get(request.output_format, format_instructions["detailed"])}

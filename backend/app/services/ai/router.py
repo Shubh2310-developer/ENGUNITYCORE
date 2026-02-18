@@ -1,5 +1,6 @@
 from typing import List, Dict, Any, Optional
 from app.services.ai.groq_client import groq_client
+from app.services.ai.ollama_client import ollama_client
 from app.services.ai.cache import ai_cache
 from app.services.ai.logger import ai_logger
 
@@ -43,9 +44,21 @@ class AIRouter:
                 )
             return cached_response
 
-        # 2. Route to LLM (Groq for now)
-        # Simple routing logic: Performance uses Groq (Llama3)
-        response = await groq_client.get_completion(messages)
+        # 2. Route to LLM (Groq with Ollama Fallback)
+        try:
+            # Primary: Groq (Llama3)
+            response = await groq_client.get_completion(messages)
+            model_used = "groq-llama3"
+        except Exception as e:
+            from loguru import logger
+            logger.warning(f"Groq primary failed, falling back to local Ollama: {e}")
+            # Fallback: Local Ollama
+            try:
+                response = await ollama_client.chat_completion(messages)
+                model_used = "local-ollama-llama3.2"
+            except Exception as ollama_err:
+                logger.error(f"Both Groq and Ollama failed: {ollama_err}")
+                raise
 
         # 3. Cache the response in Redis
         await ai_cache.set(messages, response)
@@ -56,7 +69,7 @@ class AIRouter:
                 event_type="ai_completion",
                 user_id=user_id,
                 session_id=session_id,
-                model="groq-llama3",
+                model=model_used,
                 details={"messages": messages, "response": response}
             )
 
@@ -92,10 +105,25 @@ class AIRouter:
                 messages[-1]["content"] = f"{visual_context}\n\nUser Question: {messages[-1]['content']}"
 
         full_content = ""
+        model_used = "groq-llama3"
 
-        async for chunk in groq_client.get_streaming_completion(messages):
-            full_content += chunk
-            yield chunk
+        try:
+            async for chunk in groq_client.get_streaming_completion(messages):
+                full_content += chunk
+                yield chunk
+        except Exception as e:
+            from loguru import logger
+            logger.warning(f"Groq streaming failed, falling back to local Ollama: {e}")
+            model_used = "local-ollama-llama3.2"
+            yield "⚠️ *Connection to Cloud AI lost. Switching to Local Engine...*\n\n"
+
+            try:
+                async for chunk in ollama_client.stream_chat(messages):
+                    full_content += chunk
+                    yield chunk
+            except Exception as ollama_err:
+                logger.error(f"Streaming fallback failed: {ollama_err}")
+                yield "\n\n❌ *Error: Both Cloud and Local AI engines are unavailable.*"
 
         # Log completion after stream finishes
         if user_id:
@@ -103,7 +131,7 @@ class AIRouter:
                 event_type="ai_streaming_completion",
                 user_id=user_id,
                 session_id=session_id,
-                model="groq-llama3",
+                model=model_used,
                 details={"messages": messages, "response": full_content}
             )
 
@@ -126,17 +154,21 @@ class AIRouter:
         ]
 
         try:
-            # Use the faster/smaller model for title generation
+            # Try Groq first
             title = await groq_client.get_completion(
                 prompt,
                 temperature=0.3,
                 max_tokens=20,
                 model="llama-3.1-8b-instant"
             )
-            # Clean up the response just in case
-            return title.strip().strip('"').strip("'").split('\n')[0][:50]
-        except Exception as e:
-            print(f"Error generating title: {e}")
-            return user_message[:30] + "..."
+        except Exception:
+            try:
+                # Fallback to local Ollama
+                title = await ollama_client.chat_completion(prompt)
+            except Exception:
+                return user_message[:30] + "..."
+
+        # Clean up the response just in case
+        return title.strip().strip('"').strip("'").split('\n')[0][:50]
 
 ai_router = AIRouter()

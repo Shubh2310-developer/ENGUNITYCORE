@@ -1,28 +1,11 @@
-import json
 from typing import Dict, Any, List
-from groq import Groq
+from app.services.ai.groq_client import groq_client
 from app.services.github.client import github_client
 from app.core.config import settings
 
 class GitHubAnalyzer:
     def __init__(self):
-        self._client = None
         self.model = "llama-3.1-70b-versatile"
-
-    @property
-    def client(self):
-        if self._client is None:
-            # Use single key or first from comma-separated list
-            api_key = settings.GROQ_API_KEY
-            if not api_key and settings.GROQ_API_KEYS:
-                api_key = settings.GROQ_API_KEYS.split(',')[0].strip()
-
-            if not api_key:
-                # We'll allow the class to be instantiated, but fail when client is accessed
-                raise ValueError("GROQ_API_KEY is not configured in .env")
-
-            self._client = Groq(api_key=api_key)
-        return self._client
 
     async def analyze_repository(self, owner: str, repo_name: str) -> Dict[str, Any]:
         """Perform comprehensive AI analysis of repository"""
@@ -116,17 +99,24 @@ Respond ONLY in JSON format:
 """
 
         try:
-            completion = self.client.chat.completions.create(
-                model=self.model,
+            response = await groq_client.get_completion(
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,
-                max_tokens=1000,
-                response_format={"type": "json_object"}
+                model=self.model
             )
 
-            result = json.loads(completion.choices[0].message.content)
+            # Clean potential markdown formatting
+            import re
+            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            if json_match:
+                result = json.loads(json_match.group())
+            else:
+                result = json.loads(response)
+
             return result
         except Exception as e:
+            from loguru import logger
+            logger.error(f"GitHub structural analysis failed: {e}")
             return {
                 "summary": "Analysis in progress",
                 "modules": [],

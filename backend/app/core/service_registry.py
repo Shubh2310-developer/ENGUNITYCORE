@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from app.services.ai.vector_store import VectorStore
     from app.services.rag.reranker import FlashRankReranker
     from app.services.rag.classifier import QueryComplexityClassifier
+    from app.services.rag.pipeline import OmniRAGPipeline
 
 
 class ServiceRegistry:
@@ -33,11 +34,13 @@ class ServiceRegistry:
         self.vector_store: Optional['VectorStore'] = None
         self.reranker: Optional['FlashRankReranker'] = None
         self.classifier: Optional['QueryComplexityClassifier'] = None
+        self.omni_rag: Optional['OmniRAGPipeline'] = None
         
         # Track loading status
         self._vector_store_loading = False
         self._reranker_loading = False
         self._classifier_loading = False
+        self._omni_rag_loading = False
         
         # Check if AI is enabled (for dev mode with --reload)
         self.ai_enabled = os.getenv("ENABLE_AI", "true").lower() == "true"
@@ -113,6 +116,27 @@ class ServiceRegistry:
                 self._classifier_loading = False
         
         return self.classifier
+
+    def get_omni_rag(self) -> 'OmniRAGPipeline':
+        """Lazy load OmniRAG Pipeline on first access"""
+        if not self.ai_enabled:
+            raise RuntimeError("AI services are disabled (ENABLE_AI=false)")
+
+        if self.omni_rag is None and not self._omni_rag_loading:
+            self._omni_rag_loading = True
+            try:
+                logger.info("🔄 Lazy loading OmniRAG Pipeline...")
+                from app.api.v1.omni_rag import get_omni_rag_pipeline
+                self.omni_rag = get_omni_rag_pipeline()
+                logger.success("✅ OmniRAG Pipeline loaded successfully")
+            except Exception as e:
+                logger.error(f"❌ Failed to load OmniRAG Pipeline: {e}")
+                self._omni_rag_loading = False
+                raise
+            finally:
+                self._omni_rag_loading = False
+        
+        return self.omni_rag
     
     def warmup_all(self):
         """Background warmup - load all AI services"""
@@ -125,6 +149,7 @@ class ServiceRegistry:
             self.get_vector_store()
             self.get_reranker()
             self.get_classifier()
+            # self.get_omni_rag() 
             logger.success("✅ All AI services warmed up")
         except Exception as e:
             logger.error(f"❌ AI warmup failed: {e}")

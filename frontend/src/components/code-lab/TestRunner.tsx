@@ -55,97 +55,96 @@ export const TestRunner = () => {
   };
 
   return (
-    <div className="h-full flex flex-col bg-void-950 text-starlight-400 text-sm">
-      <div className="p-3 font-semibold text-xs uppercase tracking-wider border-b border-white/5 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Beaker className="w-4 h-4" />
-          Test Runner
-        </div>
-        <div className="flex items-center gap-2">
-          <select
-            value={selectedLanguage}
-            onChange={(e) => setSelectedLanguage(e.target.value)}
-            className="bg-void-900 border border-white/10 rounded text-xs px-2 py-1 focus:outline-none"
-          >
-            <option value="python">Python</option>
-            <option value="javascript">JavaScript</option>
-            <option value="go">Go</option>
-          </select>
-          <button
-            onClick={runTests}
-            disabled={isRunning}
-            className={`p-1.5 bg-green-500/10 text-green-500 hover:bg-green-500/20 rounded transition-colors disabled:opacity-50 ${isRunning ? 'animate-pulse' : ''}`}
-            title="Run Tests"
-          >
-            <Play className="w-3 h-3" />
-          </button>
-        </div>
+    <div className="h-full flex flex-col bg-[#F8FAFC] text-[#1E293B] text-sm shadow-[inset_-1px_0_0_0_rgba(0,0,0,0.02)]">
+      <div className="px-3 py-2 border-b border-[#CBD5E1] flex items-center justify-end gap-2 bg-[#F1F5F9]">
+        <select
+          value={selectedLanguage}
+          onChange={(e) => setSelectedLanguage(e.target.value)}
+          className="bg-white border border-[#CBD5E1] rounded text-[10px] px-2 py-1 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/10 font-bold uppercase transition-all"
+        >
+          <option value="python">Python</option>
+          <option value="javascript">JavaScript</option>
+          <option value="go">Go</option>
+        </select>
+        <button
+          onClick={runTests}
+          disabled={isRunning}
+          className={`p-1.5 bg-[#2563EB] text-white hover:bg-[#1D4ED8] rounded-md transition-all shadow-sm active:scale-95 disabled:opacity-40 ${isRunning ? 'animate-pulse' : ''}`}
+          title="Run Tests"
+        >
+          <Play className="w-3 h-3 fill-current" />
+        </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto bg-white">
         {results ? (
           <div className="p-4 space-y-4">
             {/* Summary */}
-            <div className="grid grid-cols-4 gap-2 text-center text-xs">
-              <div className="p-2 bg-void-900 rounded border border-white/5">
-                <div className="text-starlight-400/60 mb-1">Total</div>
-                <div className="font-mono text-lg text-starlight-100">{results.total}</div>
+            <div className="grid grid-cols-4 gap-2 text-center text-[10px] font-bold uppercase tracking-tight">
+              <div className="p-2 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0] shadow-sm">
+                <div className="text-[#64748B] mb-1">Total</div>
+                <div className="font-mono text-base text-[#0F172A]">{results.total}</div>
               </div>
-              <div className="p-2 bg-green-500/10 rounded border border-green-500/20">
-                <div className="text-green-400/60 mb-1">Passed</div>
-                <div className="font-mono text-lg text-green-400">{results.passed}</div>
+              <div className="p-2 bg-emerald-50 rounded-lg border border-emerald-100 shadow-sm">
+                <div className="text-emerald-600 mb-1">Passed</div>
+                <div className="font-mono text-base text-emerald-700">{results.passed}</div>
               </div>
-              <div className="p-2 bg-red-500/10 rounded border border-red-500/20">
-                <div className="text-red-400/60 mb-1">Failed</div>
-                <div className="font-mono text-lg text-red-400">{results.failed}</div>
+              <div className="p-2 bg-red-50 rounded-lg border border-red-100 shadow-sm">
+                <div className="text-red-600 mb-1">Failed</div>
+                <div className="font-mono text-base text-red-700">{results.failed}</div>
               </div>
-              <div className="p-2 bg-void-900 rounded border border-white/5">
-                <div className="text-starlight-400/60 mb-1">Duration</div>
-                <div className="font-mono text-lg text-starlight-100">{results.duration.toFixed(2)}s</div>
+              <div className="p-2 bg-[#F8FAFC] rounded-lg border border-[#E2E8F0] shadow-sm">
+                <div className="text-[#64748B] mb-1">Time</div>
+                <div className="font-mono text-base text-[#0F172A]">{results.duration.toFixed(1)}s</div>
               </div>
             </div>
 
             {/* Test List */}
             <div className="space-y-2">
-              <div className="text-xs font-semibold uppercase tracking-wider text-starlight-400/60">Test Results</div>
+              <div className="text-[10px] font-bold uppercase tracking-widest text-[#94A3B8]">Test Results</div>
               {results.results.length === 0 && (
-                <div className="text-xs italic text-starlight-400/40 text-center py-4">No individual test results parsed</div>
+                <div className="text-[10px] font-bold uppercase tracking-widest text-[#94A3B8] text-center py-6 opacity-50 bg-[#F8FAFC] rounded-lg border border-dashed border-[#E2E8F0]">No results parsed</div>
               )}
-              {results.results.map((test, i) => (
-                <div key={i} className="border border-white/5 rounded overflow-hidden">
-                  <div className="flex items-center gap-2 p-2 bg-void-900 text-xs">
-                    {test.status === 'passed' && <CheckCircle className="w-3 h-3 text-green-500" />}
-                    {test.status === 'failed' && <XCircle className="w-3 h-3 text-red-500" />}
-                    {test.status === 'skipped' && <AlertCircle className="w-3 h-3 text-yellow-500" />}
-                    <span className="flex-1 font-mono text-starlight-200 truncate">{test.name}</span>
-                    <span className="flex items-center gap-1 text-starlight-400/50">
-                      <Clock className="w-3 h-3" />
-                      {test.duration.toFixed(3)}s
-                    </span>
-                  </div>
-                  {test.message && (
-                    <div className="p-2 bg-void-950 border-t border-white/5 text-xs font-mono text-red-400 whitespace-pre-wrap overflow-x-auto">
-                      {test.message}
+              <div className="space-y-1">
+                {results.results.map((test, i) => (
+                  <div key={i} className="border border-[#E2E8F0] rounded-lg overflow-hidden shadow-sm hover:border-[#CBD5E1] transition-colors">
+                    <div className="flex items-center gap-2 p-2 bg-[#F8FAFC] text-[11px]">
+                      {test.status === 'passed' && <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />}
+                      {test.status === 'failed' && <XCircle className="w-3.5 h-3.5 text-red-500" />}
+                      {test.status === 'skipped' && <AlertCircle className="w-3.5 h-3.5 text-amber-500" />}
+                      <span className="flex-1 font-mono font-bold text-[#1E293B] truncate">{test.name}</span>
+                      <span className="flex items-center gap-1 text-[#94A3B8] font-bold">
+                        <Clock className="w-3 h-3" />
+                        {test.duration.toFixed(3)}s
+                      </span>
                     </div>
-                  )}
-                </div>
-              ))}
+                    {test.message && (
+                      <div className="p-3 bg-white border-t border-[#E2E8F0] text-[11px] font-mono text-red-600 whitespace-pre-wrap overflow-x-auto leading-relaxed">
+                        {test.message}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Output Log */}
             {results.output && (
               <div className="space-y-2">
-                <div className="text-xs font-semibold uppercase tracking-wider text-starlight-400/60">Console Output</div>
-                <pre className="p-3 bg-void-900 rounded text-[10px] font-mono text-starlight-300 overflow-x-auto whitespace-pre-wrap">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-[#94A3B8]">Full Console Output</div>
+                <pre className="p-3 bg-[#0F172A] rounded-lg text-[10px] font-mono text-slate-300 overflow-x-auto whitespace-pre-wrap leading-relaxed shadow-lg border border-white/5">
                   {results.output}
                 </pre>
               </div>
             )}
           </div>
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-starlight-400/40 p-4 text-center">
-            <Beaker className="w-12 h-12 mb-4 opacity-20" />
-            <p className="text-xs">Run tests to see results here</p>
+          <div className="h-full flex flex-col items-center justify-center text-[#94A3B8] p-8 text-center bg-[#F8FAFC]/50">
+            <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center mb-4 border border-[#E2E8F0] shadow-sm">
+              <Beaker className="w-8 h-8 opacity-20" />
+            </div>
+            <p className="text-xs font-bold uppercase tracking-widest opacity-60">Ready to test</p>
+            <p className="text-[10px] mt-2 leading-relaxed px-4">Select your project language and click run to execute the test suite.</p>
           </div>
         )}
       </div>

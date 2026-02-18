@@ -38,12 +38,12 @@ export const GitSidebar = () => {
 
   if (!gitStatus && !isGitLoading) {
     return (
-      <div className="h-full flex flex-col items-center justify-center p-4 text-center bg-void-950 text-starlight-400">
+      <div className="h-full flex flex-col items-center justify-center p-4 text-center bg-[#F8FAFC] text-[#64748B] shadow-[inset_-1px_0_0_0_rgba(0,0,0,0.02)]">
         <GitBranch className="w-12 h-12 mb-4 opacity-20" />
-        <p className="mb-4 text-sm">No Git repository found.</p>
+        <p className="mb-4 text-sm font-medium">No Git repository found.</p>
         <button
           onClick={handleInit}
-          className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md text-xs font-bold transition-colors"
+          className="px-4 py-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-md text-xs font-bold transition-all shadow-md active:scale-95"
         >
           Initialize Repository
         </button>
@@ -60,125 +60,121 @@ export const GitSidebar = () => {
   const stagedFilesList = allChangedFiles.filter(f => stagedFiles.includes(f.name));
 
   return (
-    <div className="h-full flex flex-col bg-void-950 text-starlight-400 text-sm">
-      <div className="p-3 font-semibold text-xs uppercase tracking-wider border-b border-white/5 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <GitBranch className="w-4 h-4" />
-          Source Control
-        </div>
+    <div className="h-full flex flex-col bg-[#F8FAFC] text-[#1E293B] text-sm shadow-[inset_-1px_0_0_0_rgba(0,0,0,0.02)]">
+      <div className="px-3 py-2 border-b border-[#CBD5E1] flex items-center justify-end bg-[#F1F5F9]">
         <button
           onClick={() => refreshGitStatus(projectId)}
-          className={`p-1 hover:bg-white/5 rounded ${isGitLoading ? 'animate-spin' : ''}`}
-          title="Refresh"
+          className={`p-1 hover:bg-[#E2E8F0] rounded transition-colors ${isGitLoading ? 'animate-spin' : ''}`}
+          title="Refresh Status"
         >
-          <RefreshCw className="w-3 h-3" />
+          <RefreshCw className="w-3 h-3 text-[#475569]" />
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto bg-white">
         {/* Status Section */}
-        <div className="p-4 border-b border-white/5">
-            <div className="flex items-center justify-between mb-4">
-                <div className="text-xs font-mono text-cyber-teal">
-                    Branch: {gitStatus?.active_branch || '...'}
+        <div className="p-4 border-b border-[#E2E8F0] bg-[#F8FAFC]/50">
+            <div className="flex items-center justify-between mb-3">
+                <div className="text-[10px] font-bold font-mono text-[#2563EB] bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                    BRANCH: {gitStatus?.active_branch || '...'}
                 </div>
             </div>
 
             <textarea
                 value={commitMessage}
                 onChange={(e) => setCommitMessage(e.target.value)}
-                placeholder="Message (e.g. 'Fix bug')"
-                className="w-full bg-void-900 border border-white/10 rounded p-2 text-xs text-starlight-200 focus:outline-none focus:border-cyber-teal/50 mb-2 resize-none h-20"
+                placeholder="Message (e.g. 'Fix regression in auth')"
+                className="w-full bg-white border border-[#CBD5E1] rounded-lg p-2.5 text-xs text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/10 mb-3 resize-none h-20 shadow-sm transition-all"
             />
 
             <button
                 onClick={handleCommit}
                 disabled={!commitMessage.trim() || isGitLoading || stagedFiles.length === 0}
-                className="w-full py-1.5 bg-primary-600/20 hover:bg-primary-600/40 text-primary-400 border border-primary-600/50 rounded text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full py-2 bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-lg text-xs font-bold transition-all shadow-md active:scale-95 disabled:opacity-40 disabled:scale-100 disabled:shadow-none flex items-center justify-center gap-2"
             >
-                <Check className="w-3 h-3" />
+                <Check className="w-3.5 h-3.5" />
                 Commit Staged
             </button>
         </div>
 
         {/* Staged Changes Section */}
-        <div className="border-b border-white/5">
-            <div className="p-2 bg-void-900 font-medium text-xs flex items-center gap-2">
-                <Check className="w-3 h-3" />
+        <div className="border-b border-[#E2E8F0]">
+            <div className="p-2.5 bg-[#F1F5F9] font-bold text-[10px] uppercase tracking-wider text-[#64748B] flex items-center gap-2 border-b border-[#E2E8F0]">
+                <Check className="w-3 h-3 text-[#2563EB]" />
                 Staged Changes ({stagedFilesList.length})
             </div>
-            <div className="p-2 space-y-1">
+            <div className="p-1 space-y-0.5">
                 {stagedFilesList.map(file => (
-                    <div key={file.name} className="flex items-center gap-2 text-xs hover:bg-white/5 p-1 rounded cursor-pointer group">
+                    <div key={file.name} className="flex items-center gap-2 text-xs hover:bg-[#F1F5F9] p-2 rounded-md cursor-pointer group transition-colors">
                          <button
                             onClick={(e) => {
                                 e.stopPropagation();
                                 unstageFile(file.name);
                             }}
-                            className="p-0.5 hover:bg-white/10 rounded"
-                            title="Unstage"
+                            className="p-1 hover:bg-[#E2E8F0] rounded text-[#64748B] hover:text-[#2563EB] transition-colors"
+                            title="Unstage file"
                         >
-                            <Minus className="w-3 h-3 text-starlight-400" />
+                            <Minus className="w-3 h-3" />
                         </button>
-                        <span className={`${file.status === 'M' ? 'text-yellow-500' : 'text-green-500'} font-mono`}>{file.status}</span>
-                        <span className="truncate flex-1 text-starlight-300">{file.name}</span>
+                        <span className={`${file.status === 'M' ? 'text-amber-600 bg-amber-50' : 'text-emerald-600 bg-emerald-50'} font-bold font-mono text-[10px] px-1 rounded border border-black/5 w-5 text-center`}>{file.status}</span>
+                        <span className="truncate flex-1 text-[#1E293B] font-medium">{file.name}</span>
                     </div>
                 ))}
                  {stagedFilesList.length === 0 && (
-                    <div className="text-xs text-starlight-400/50 italic px-2">No staged changes</div>
+                    <div className="text-[10px] text-[#94A3B8] font-bold uppercase tracking-widest text-center py-4 opacity-50">No staged changes</div>
                 )}
             </div>
         </div>
 
         {/* Changes Section */}
-        <div className="border-b border-white/5">
-            <div className="p-2 bg-void-900 font-medium text-xs flex items-center gap-2">
-                <Plus className="w-3 h-3" />
+        <div className="border-b border-[#E2E8F0]">
+            <div className="p-2.5 bg-[#F1F5F9] font-bold text-[10px] uppercase tracking-wider text-[#64748B] flex items-center gap-2 border-b border-[#E2E8F0]">
+                <Plus className="w-3 h-3 text-[#2563EB]" />
                 Changes ({unstagedFilesList.length})
             </div>
-            <div className="p-2 space-y-1">
+            <div className="p-1 space-y-0.5">
                 {unstagedFilesList.map(file => (
-                    <div key={file.name} className="flex items-center gap-2 text-xs hover:bg-white/5 p-1 rounded cursor-pointer group">
+                    <div key={file.name} className="flex items-center gap-2 text-xs hover:bg-[#F1F5F9] p-2 rounded-md cursor-pointer group transition-colors">
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
                                 stageFile(file.name);
                             }}
-                            className="p-0.5 hover:bg-white/10 rounded"
-                            title="Stage"
+                            className="p-1 hover:bg-[#E2E8F0] rounded text-[#64748B] hover:text-[#2563EB] transition-colors"
+                            title="Stage file"
                         >
-                            <Plus className="w-3 h-3 text-starlight-400" />
+                            <Plus className="w-3 h-3" />
                         </button>
-                        <span className={`${file.status === 'M' ? 'text-yellow-500' : 'text-green-500'} font-mono`}>{file.status}</span>
-                        <span className="truncate flex-1 text-starlight-300">{file.name}</span>
+                        <span className={`${file.status === 'M' ? 'text-amber-600 bg-amber-50' : 'text-emerald-600 bg-emerald-50'} font-bold font-mono text-[10px] px-1 rounded border border-black/5 w-5 text-center`}>{file.status}</span>
+                        <span className="truncate flex-1 text-[#1E293B] font-medium">{file.name}</span>
                     </div>
                 ))}
                 {unstagedFilesList.length === 0 && (
-                    <div className="text-xs text-starlight-400/50 italic px-2">No changes detected</div>
+                    <div className="text-[10px] text-[#94A3B8] font-bold uppercase tracking-widest text-center py-4 opacity-50">Clean working tree</div>
                 )}
             </div>
         </div>
 
         {/* History Section */}
-        <div>
-            <div className="p-2 bg-void-900 font-medium text-xs flex items-center gap-2">
-                <Clock className="w-3 h-3" />
+        <div className="bg-[#F8FAFC]">
+            <div className="p-2.5 bg-[#F1F5F9] font-bold text-[10px] uppercase tracking-wider text-[#64748B] flex items-center gap-2 border-b border-[#E2E8F0]">
+                <Clock className="w-3 h-3 text-[#2563EB]" />
                 History
             </div>
-            <div className="p-2 space-y-3">
+            <div className="p-3 space-y-3">
                 {gitHistory.map((commit) => (
-                    <div key={commit.hexsha} className="text-xs border-l-2 border-white/10 pl-3 py-1">
-                        <div className="text-starlight-200 font-medium truncate" title={commit.message}>
+                    <div key={commit.hexsha} className="text-xs border-l-2 border-[#CBD5E1] hover:border-[#2563EB] pl-3 py-1.5 transition-colors bg-white rounded-r-md shadow-sm border border-[#E2E8F0]">
+                        <div className="text-[#0F172A] font-bold truncate leading-tight mb-1" title={commit.message}>
                             {commit.message}
                         </div>
-                        <div className="flex justify-between text-[10px] text-starlight-400/60 mt-1">
+                        <div className="flex justify-between text-[10px] text-[#64748B] font-bold uppercase tracking-tight">
                             <span>{commit.author}</span>
-                            <span className="font-mono">{commit.hexsha.substring(0, 7)}</span>
+                            <span className="font-mono text-[#2563EB] bg-blue-50 px-1 rounded">{commit.hexsha.substring(0, 7)}</span>
                         </div>
                     </div>
                 ))}
                 {gitHistory.length === 0 && (
-                    <div className="text-xs text-starlight-400/50 italic px-2">No commit history</div>
+                    <div className="text-[10px] text-[#94A3B8] font-bold uppercase tracking-widest text-center py-4 opacity-50">No history</div>
                 )}
             </div>
         </div>

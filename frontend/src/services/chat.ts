@@ -1,5 +1,6 @@
 import { useAuthStore } from '@/stores/authStore';
 import { ImageResponse } from './image';
+import { ResearchReport, ResearchStreamEvent, SourceEvaluation } from './research';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -36,6 +37,16 @@ export interface Message {
   context_compressed?: boolean;
   steps?: Array<{ thought: string; output: string }>;
   latency?: number;
+
+  // Deep Research extensions
+  isResearch?: boolean;
+  researchPhase?: string;
+  researchProgress?: number;
+  researchEvents?: ResearchStreamEvent[];
+  researchReport?: ResearchReport | null;
+  followUpQuestions?: string[];
+  relatedTopics?: string[];
+  sources?: SourceEvaluation[];
 }
 
 export interface ChatSession {

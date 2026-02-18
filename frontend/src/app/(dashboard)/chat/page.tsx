@@ -6,7 +6,6 @@ import {
   Send,
   Paperclip,
   Settings,
-  ChevronDown,
   Copy,
   Check,
   Loader2,
@@ -21,7 +20,6 @@ import {
   ChevronRight,
   RotateCcw,
   X,
-  LogOut,
   Shield,
   Zap,
   Download,
@@ -34,9 +32,9 @@ import { useRouter } from 'next/navigation';
 
 import { useAuthStore } from '@/stores/authStore';
 import { chatService, Message } from '@/services/chat';
-import { documentService } from '@/services/document';
 import { omniRagService } from '@/services/omniRag';
 import { imageService, ImageResponse } from '@/services/image';
+import { startDeepResearch, ResearchRequest, ResearchStreamEvent, ResearchReport } from '@/services/research';
 import styles from './chat.module.css';
 
 interface ChatSession {
@@ -105,6 +103,13 @@ export default function ChatPage() {
   const [stagedImages, setStagedImages] = useState<ImageResponse[]>([]);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
+  // Deep Research integration state
+  const [isResearchMode, setIsResearchMode] = useState(false);
+  const [researchProgress, setResearchProgress] = useState(0);
+  const [researchDepth, setResearchDepth] = useState<'quick' | 'standard' | 'deep' | 'exhaustive'>('standard');
+  const [researchEvents, setResearchEvents] = useState<ResearchStreamEvent[]>([]);
+  const [activeResearchId, setActiveResearchId] = useState<string | null>(null);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -116,6 +121,235 @@ export default function ChatPage() {
     const timer = setInterval(() => setNow(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
+
+  // Research helper functions
+  const isResearchQuery = useCallback((text: string): boolean => {
+    const researchPatterns = [
+      // Comparison queries - require substantial content between keywords
+      /compare\s+\w+(\s+\w+){1,8}\s+(vs|versus|with|and)\s+\w+/i,
+
+      // In-depth analysis requests
+      /in[- ]depth\s+(analysis|review|study|comparison|explanation|overview)/i,
+
+      // Comprehensive coverage requests
+      /comprehensive\s+(overview|guide|analysis|review|comparison)/i,
+
+      // Explicit research requests
+      /research\s+(paper|report|summary|question|topic)/i,
+
+      // Temporal research queries (trends, latest developments)
+      /what are the (latest|current|recent|newest)\s+(trends|developments|advances|best practices)/i,
+
+      // Multi-step reasoning indicators
+      /multi[- ](step|hop|stage|phase)\s+(analysis|reasoning|approach)/i,
+
+      // Academic research patterns
+      /(literature review|systematic review|meta[- ]analysis)/i,
+
+      // Decision-making research
+      /(pros and cons|advantages and disadvantages|trade[- ]offs?)\s+of/i,
+
+      // State-of-the-art queries
+      /(state of the art|sota|cutting[- ]edge|best practices)\s+(in|for|on)/i,
+
+      // Deep dive requests
+      /(deep dive|detailed analysis|thorough review|exhaustive study)\s+(into|on|of)/i,
+    ];
+
+    return researchPatterns.some(pattern => pattern.test(text));
+  }, []);
+
+  const buildResearchProgressContent = (
+    event: ResearchStreamEvent,
+    existingContent: string
+  ): string => {
+    switch (event.event_type) {
+      case 'status':
+        // Replace status messages (they're meant to show current state, not accumulate)
+        return `🔍 **${event.data.message || 'Researching...'}**`;
+
+      case 'sub_query':
+        const queries = event.data.sub_queries || [];
+        // Replace with decomposition view (major phase transition)
+        return `🧠 **Decomposed into ${queries.length} research angles:**\n\n${
+          queries.map((q: string, i: number) => `${i + 1}. ${q}`).join('\n')
+        }`;
+
+      case 'source_found':
+        // Append source discoveries to maintain research trail
+        const snippet = event.data.snippet || event.data.content_snippet || '';
+        return existingContent + `\n\n📄 **${event.data.source_name || 'New source'}**\n> ${
+          snippet.slice(0, 120)
+        }${snippet.length > 120 ? '...' : ''}`;
+
+      case 'search_query':
+        // Show active search queries
+        return existingContent + `\n\n🔎 Searching: _"${event.data.query || ''}"_`;
+
+      case 'evaluation':
+        // Show relevance evaluations
+        const score = event.data.relevance_score || event.data.score;
+        if (score !== undefined) {
+          return existingContent + `\n\n✓ Evaluated: ${(score * 100).toFixed(0)}% relevance`;
+        }
+        return existingContent;
+
+      default:
+        // Preserve content for unknown event types
+        return existingContent;
+    }
+  };
+
+  const formatResearchReportForChat = (report: ResearchReport): string => {
+    // Extract the main report content with fallback chain
+    const fullReport = report.detailed_findings?.[0]?.full_report || report.summary;
+
+    let content = `## 📋 Deep Research Report\n\n`;
+
+    // Metadata header with visual indicators for quick assessment
+    const confidenceEmoji = report.overall_confidence > 0.8 ? '✅' : report.overall_confidence > 0.5 ? '⚠️' : '❌';
+    content += `> ${confidenceEmoji} **Confidence:** ${(report.overall_confidence * 100).toFixed(0)}% · `;
+    content += `📚 **Sources:** ${report.sources.length} · `;
+
+    // Coverage score indicator (0-1 scale showing how well the query was answered)
+    if (report.coverage_score !== undefined) {
+      const coverageEmoji = report.coverage_score > 0.8 ? '🎯' : report.coverage_score > 0.5 ? '📊' : '📉';
+      content += `${coverageEmoji} **Coverage:** ${(report.coverage_score * 100).toFixed(0)}% · `;
+    }
+
+    content += `⏱️ **Duration:** ${report.duration_seconds?.toFixed(1)}s\n\n`;
+    content += `---\n\n`;
+
+    // Main research content (structured markdown from the agent)
+    content += fullReport;
+
+    // Key insights section (high-priority findings extracted during research)
+    if (report.key_insights && report.key_insights.length > 0) {
+      content += `\n\n### 💡 Key Insights\n\n`;
+      content += report.key_insights.map(i => `- ${i}`).join('\n');
+    }
+
+    // Related topics for further exploration (enables research chaining)
+    if (report.related_topics && report.related_topics.length > 0) {
+      content += `\n\n### 🔗 Related Topics\n\n`;
+      content += report.related_topics.slice(0, 5).map(t => `- ${t}`).join('\n');
+    }
+
+    return content;
+  };
+
+  const handleDeepResearch = async (query: string) => {
+    if (!query.trim() || isLoading) return;
+
+    setIsResearchMode(true);
+    setIsLoading(true);
+    setResearchProgress(0);
+    setResearchEvents([]);
+
+    const userMessageId = Date.now().toString();
+    const assistantMessageId = (Date.now() + 1).toString();
+    setActiveResearchId(assistantMessageId);
+
+    // 1. Add user message
+    const userMessage: Partial<Message> = {
+      role: 'user',
+      content: `🔍 **Deep Research:** ${query}`,
+      id: userMessageId,
+      timestamp: new Date().toISOString(),
+      status: 'done'
+    };
+    setMessages(prev => [...prev, userMessage]);
+
+    // 2. Add assistant placeholder with research mode flag
+    const assistantPlaceholder: Partial<Message> & { isResearch?: boolean } = {
+      role: 'assistant',
+      content: '',
+      id: assistantMessageId,
+      timestamp: new Date().toISOString(),
+      status: 'streaming',
+      isResearch: true,
+      // Research-specific metadata
+      researchPhase: 'decomposing',
+      researchProgress: 0,
+      researchEvents: [],
+      researchReport: null
+    };
+    setMessages(prev => [...prev, assistantPlaceholder]);
+
+    // 3. Build research request
+    const request: ResearchRequest = {
+      query,
+      depth: researchDepth,
+      include_web_search: true,
+      include_graph_search: true,
+      output_format: 'detailed',
+    };
+
+    const token = useAuthStore.getState().token || '';
+
+    // 4. Stream deep research
+    await startDeepResearch(
+      request,
+      token,
+      // onEvent callback
+      (event: ResearchStreamEvent) => {
+        setResearchProgress(event.progress_percent);
+        setResearchEvents(prev => [...prev, event]);
+
+        // Update the assistant message with research progress
+        setMessages(prev => prev.map(msg =>
+          msg.id === assistantMessageId
+            ? {
+                ...msg,
+                researchPhase: event.data.phase || msg.researchPhase,
+                researchProgress: event.progress_percent,
+                researchEvents: [...(msg.researchEvents || []), event],
+                // Build progressive content
+                content: buildResearchProgressContent(event, msg.content || '')
+              }
+            : msg
+        ));
+      },
+      // onComplete callback
+      (report: ResearchReport) => {
+        setMessages(prev => prev.map(msg =>
+          msg.id === assistantMessageId
+            ? {
+                ...msg,
+                content: formatResearchReportForChat(report),
+                status: 'done',
+                isResearch: true,
+                researchReport: report,
+                researchPhase: 'completed',
+                researchProgress: 100,
+                confidence: report.overall_confidence,
+                sources: report.sources,
+                followUpQuestions: report.follow_up_questions,
+                relatedTopics: report.related_topics
+              }
+            : msg
+        ));
+        setIsLoading(false);
+        setIsResearchMode(false);
+        setActiveResearchId(null);
+      },
+      // onError callback
+      (error: string) => {
+        setMessages(prev => prev.map(msg =>
+          msg.id === assistantMessageId
+            ? {
+                ...msg,
+                content: `❌ **Research Failed**\n\n${error}\n\nTry again with a simpler query or switch to standard chat mode.`,
+                status: 'error'
+              }
+            : msg
+        ));
+        setIsLoading(false);
+        setIsResearchMode(false);
+        setActiveResearchId(null);
+      }
+    );
+  };
 
   // Load latest session on mount
   useEffect(() => {
@@ -235,6 +469,24 @@ export default function ChatPage() {
         processedText = `Please provide a concise summary of the following: \n\n${args}`;
       } else if (command === '/code') {
         processedText = `Please help me write or refactor the following code: \n\n${args}`;
+      } else if (command === '/research') {
+        // Activate deep research mode
+        const researchQuery = args.trim();
+        if (!researchQuery) {
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: '🔍 **Deep Research Mode**\n\nUsage: `/research <your question>`\n\nExamples:\n- `/research Compare microservices vs monolith architecture`\n- `/research Explain transformer attention mechanisms in depth`\n- `/research What are the latest trends in federated learning?`',
+            id: Date.now().toString(),
+            timestamp: new Date().toISOString()
+          }]);
+          setInput('');
+          return;
+        }
+
+        // Trigger research pipeline instead of normal chat
+        await handleDeepResearch(researchQuery);
+        setInput('');
+        return;
       }
     }
 
@@ -913,6 +1165,47 @@ export default function ChatPage() {
                         <Bot className={styles.messageAvatarIcon} />
                       </div>
                       <div className={styles.messageAssistantContent}>
+                        {/* Deep Research Progress (inline in chat) */}
+                        {msg.isResearch && msg.status === 'streaming' && (
+                          <div className={styles.researchInlineCard}>
+                            <div className={styles.researchInlineHeader}>
+                              <Search className="w-4 h-4 text-blue-500" />
+                              <span className="font-bold text-sm text-slate-700">Deep Research in Progress</span>
+                              <span className={styles.researchPhaseBadge}>
+                                {msg.researchPhase || 'initializing'}
+                              </span>
+                            </div>
+
+                            {/* Progress Bar */}
+                            <div className={styles.researchProgressBar}>
+                              <div
+                                className={styles.researchProgressFill}
+                                style={{ width: `${msg.researchProgress || 0}%` }}
+                              />
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">
+                              {(msg.researchProgress || 0).toFixed(0)}% complete
+                            </p>
+
+                            {/* Live Event Log */}
+                            <details className="mt-3 text-xs">
+                              <summary className="cursor-pointer text-slate-400 hover:text-slate-600 font-semibold">
+                                Research Log ({(msg.researchEvents || []).length} events)
+                              </summary>
+                              <div className="mt-2 max-h-40 overflow-y-auto space-y-1">
+                                {(msg.researchEvents || []).map((evt: ResearchStreamEvent, i: number) => (
+                                  <div key={i} className="flex items-center gap-2 text-slate-500">
+                                    <span className="text-blue-400 font-mono text-[10px]">
+                                      {evt.event_type}
+                                    </span>
+                                    <span>{evt.data.message || ''}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </details>
+                          </div>
+                        )}
+
                         {/* Omni-RAG Metadata Badges */}
                         {(msg.strategy || msg.complexity || msg.used_web_search || msg.multi_queries || msg.memory_active) && (
                           <div className="flex flex-wrap gap-2 mb-3">
@@ -1064,6 +1357,63 @@ export default function ChatPage() {
                             {msg.content || ''}
                           </ReactMarkdown>
                         </div>
+
+                        {/* Research Sources (after completion) */}
+                        {msg.isResearch && msg.status === 'done' && msg.sources && msg.sources.length > 0 && (
+                          <div className={styles.researchSourcesSection}>
+                            <details>
+                              <summary className="cursor-pointer font-bold text-sm text-slate-700 flex items-center gap-2 py-2">
+                                📚 Sources ({msg.sources.length})
+                              </summary>
+                              <div className="grid grid-cols-1 gap-2 mt-2">
+                                {msg.sources.map((source: any, i: number) => (
+                                  <div
+                                    key={i}
+                                    className={styles.researchSourceCard}
+                                    onClick={() => source.url && window.open(source.url, '_blank')}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <strong className="text-sm text-slate-800">{source.source_name}</strong>
+                                      <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                                        source.relevance_score > 0.8
+                                          ? 'bg-green-100 text-green-700'
+                                          : source.relevance_score > 0.5
+                                            ? 'bg-amber-100 text-amber-700'
+                                            : 'bg-red-100 text-red-700'
+                                      }`}>
+                                        {(source.relevance_score * 100).toFixed(0)}%
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                                      {source.content_snippet}
+                                    </p>
+                                    {source.url && (
+                                      <p className="text-xs text-blue-500 mt-1 truncate">{source.url}</p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </details>
+                          </div>
+                        )}
+
+                        {/* Follow-up Research Questions */}
+                        {msg.isResearch && msg.status === 'done' && msg.followUpQuestions && msg.followUpQuestions.length > 0 && (
+                          <div className={styles.researchFollowUps}>
+                            <p className="text-xs font-bold text-slate-500 mb-2">🔮 Continue Researching</p>
+                            <div className="flex flex-wrap gap-2">
+                              {msg.followUpQuestions.map((q: string, i: number) => (
+                                <button
+                                  key={i}
+                                  onClick={() => handleDeepResearch(q)}
+                                  className={styles.researchFollowUpBtn}
+                                >
+                                  {q}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
 
                         {msg.retrieved_docs && msg.retrieved_docs.length > 0 && (
                           <div className={styles.ragStatus}>
@@ -1226,6 +1576,21 @@ export default function ChatPage() {
             )}
 
             <div className={styles.inputBox}>
+              {/* Research Suggestion Chip */}
+              {isResearchQuery(input) && !input.startsWith('/research') && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={styles.researchSuggestion}
+                >
+                  <Search className="w-3.5 h-3.5" />
+                  <span>This looks like a research query.</span>
+                  <button onClick={() => handleDeepResearch(input)}>
+                    🔬 Deep Research
+                  </button>
+                </motion.div>
+              )}
+
               <div className={styles.inputInner}>
                 {/* File Upload */}
                 <input
@@ -1260,6 +1625,34 @@ export default function ChatPage() {
                   >
                     {isUploadingImage ? <Loader2 className="animate-spin" /> : <ImageIcon />}
                   </button>
+
+                  {/* Deep Research Button */}
+                  <button
+                    onClick={() => {
+                      if (input.trim()) {
+                        handleDeepResearch(input);
+                        setInput('');
+                      }
+                    }}
+                    disabled={isLoading || !input.trim()}
+                    className={`${styles.inputActionBtn} ${styles.researchBtn}`}
+                    title="Deep Research Mode - Click to start comprehensive research"
+                  >
+                    <Search className="w-4 h-4" />
+                  </button>
+
+                  {/* Research Depth Selector - Always visible for easy access */}
+                  <select
+                    value={researchDepth}
+                    onChange={(e) => setResearchDepth(e.target.value as any)}
+                    className={styles.researchDepthSelect}
+                    title="Research Depth: Controls how thorough the research will be"
+                  >
+                    <option value="quick">⚡ Quick</option>
+                    <option value="standard">📖 Standard</option>
+                    <option value="deep">🔬 Deep</option>
+                    <option value="exhaustive">🧠 Exhaustive</option>
+                  </select>
 
                   <select
                     value={selectedStrategy}

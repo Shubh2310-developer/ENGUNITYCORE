@@ -139,33 +139,72 @@ class OmniRAGPipeline:
              messages.append({"role": "user", "content": query})
 
         if complexity == "SIMPLE":
-            # Direct generation
+            # 1. Light retrieval check to prevent hallucination (grounding)
+            grounding_docs = self.vector_store.search(
+                query=optimized_query,
+                user_id=user_id,
+                session_id=session_id,
+                k=3, # Minimal retrieval for speed
+                cross_session=True
+            )
+
+            grounding_context = ""
+            if grounding_docs:
+                grounding_context = "\n\n[Grounding Context]\n" + "\n".join([d['content'] for d in grounding_docs])
+
+            # 2. Direct generation with grounding
             messages = history or []
-            if visual_context:
-                messages.append({"role": "user", "content": llm_query})
-            elif not any(msg.get("role") == "user" and msg.get("content") == query for msg in messages):
-                 messages.append({"role": "user", "content": query})
+
+            # Create a system message if not present or prepend grounding to user query
+            grounded_user_content = query
+            if grounding_context or visual_context:
+                grounded_user_content = f"{visual_context}\n\n{grounding_context}\n\nUser Question: {query}"
+
+            if not any(msg.get("role") == "user" and msg.get("content") == query for msg in messages):
+                 messages.append({"role": "user", "content": grounded_user_content})
+            else:
+                # Update the last user message with grounding context if it matches the current query
+                for msg in reversed(messages):
+                    if msg.get("role") == "user" and msg.get("content") == query:
+                        msg["content"] = grounded_user_content
+                        break
 
             response = await self.llm_client.get_completion(messages)
             return {
                 "query": query,
                 "strategy": "direct_generation",
                 "response": response,
-                "documents": [],
-                "metadata": {"complexity": complexity}
+                "documents": grounding_docs,
+                "metadata": {"complexity": complexity, "grounded": bool(grounding_docs)}
             }
 
         if complexity == "RECURSIVE_INTENSIVE":
-            # 1. Gather full context from all sources for the recursive agent
-            # For simplicity in this prototype, we'll fetch more documents than usual
-            all_docs = self.vector_store.search(
+            # 1. Gather full context from ALL sources (Vector + Graph) for the recursive agent
+
+            # A. Vector Search (High recall)
+            vector_docs = self.vector_store.search(
                 query=optimized_query,
                 user_id=user_id,
                 session_id=session_id,
-                k=50, # Larger K for recursive processing
-                cross_session=True # Allow retrieving documents from other sessions
+                k=40, # High K for exhaustive coverage
+                cross_session=True
             )
-            context_text = "\n\n".join([doc['content'] for doc in all_docs])
+
+            # B. Graph Search (Relational context)
+            graph_communities = self.knowledge_graph.search_communities(
+                optimized_query,
+                embedder=self.embedder,
+                top_k=5,
+                user_id=user_id
+            )
+
+            # C. Synthesis of contexts
+            context_text = "--- VECTOR CONTEXT ---\n"
+            context_text += "\n\n".join([doc['content'] for doc in vector_docs])
+
+            if graph_communities:
+                context_text += "\n\n--- RELATIONAL GRAPH CONTEXT ---\n"
+                context_text += "\n\n".join([f"Community {c['community_id']}: {c['summary']}" for c in graph_communities])
 
             # 2. Run recursive solver
             result = await self.recursive_agent.solve(optimized_query, context_text)
@@ -174,11 +213,12 @@ class OmniRAGPipeline:
                 "query": query,
                 "strategy": "recursive_intensive",
                 "response": result['response'],
-                "documents": all_docs[:5], # Still return top docs for UI
+                "documents": vector_docs[:5], # Return top docs for UI
                 "metadata": {
                     **result['metadata'],
                     "complexity": complexity,
-                    "steps": result['steps']
+                    "steps": result['steps'],
+                    "graph_sources": len(graph_communities)
                 }
             }
 
@@ -427,16 +467,21 @@ Instructions:
         Multi-hop queries: GraphRAG + Vector search + Map-Reduce
         """
         # ... rest of method
-        # Search relevant communities
-        relevant_communities = self.knowledge_graph.search_communities(query, embedder=self.embedder, top_k=3, user_id=user_id)
+        # Search relevant communities (Aggressive Relational Search)
+        relevant_communities = self.knowledge_graph.search_communities(
+            query,
+            embedder=self.embedder,
+            top_k=5, # Increased from 3
+            user_id=user_id
+        )
 
-        # HyDE + Vector Search
+        # HyDE + Vector Search (Aggressive Semantic Search)
         hyde_result = await self.hyde_engine.transform_query(query)
         vector_results = self.vector_store.search(
             query=hyde_result['hypothetical_document'],
             user_id=user_id,
             session_id=session_id,
-            k=10,
+            k=20, # Increased from 10
             cross_session=True
         )
 
@@ -447,8 +492,8 @@ Instructions:
         for comm in relevant_communities:
             map_tasks.append(self._generate_partial_answer(query, comm['summary'], f"Community {comm['community_id']}"))
 
-        # Partial answers from specific documents
-        for doc in vector_results[:5]:
+        # Partial answers from specific documents (Aggressive context usage)
+        for doc in vector_results[:10]: # Increased from 5
             map_tasks.append(self._generate_partial_answer(query, doc['content'], doc['metadata'].get('filename', 'Unknown')))
 
         partial_answers = list(await asyncio.gather(*map_tasks))
@@ -572,32 +617,70 @@ Partial Answer (cite source):"""
              messages.append({"role": "user", "content": query})
 
         if complexity == "SIMPLE":
-            messages = history or []
-            if visual_context:
-                messages.append({"role": "user", "content": llm_query})
-            elif not any(msg.get("role") == "user" and msg.get("content") == query for msg in messages):
-                 messages.append({"role": "user", "content": query})
-
-            async for chunk in self.llm_client.get_streaming_completion(messages):
-                yield {"type": "content", "content": chunk}
-            yield {"type": "done", "strategy": "direct_generation"}
-            return
-
-        if complexity == "RECURSIVE_INTENSIVE":
-            # 1. Gather full context
-            all_docs = self.vector_store.search(
+            # 1. Light retrieval check for grounding (Quick mode hallucination mitigation)
+            grounding_docs = self.vector_store.search(
                 query=optimized_query,
                 user_id=user_id,
                 session_id=session_id,
-                k=50,
+                k=3,
                 cross_session=True
             )
-            context_text = "\n\n".join([doc['content'] for doc in all_docs])
+
+            grounding_context = ""
+            if grounding_docs:
+                grounding_context = "\n\n[Grounding Context]\n" + "\n".join([d['content'] for d in grounding_docs])
+                yield {"type": "metadata", "grounded": True}
+
+            messages = history or []
+            grounded_user_content = query
+            if grounding_context or visual_context:
+                 grounded_user_content = f"{visual_context}\n\n{grounding_context}\n\nUser Question: {query}"
+
+            if not any(msg.get("role") == "user" and msg.get("content") == query for msg in messages):
+                 messages.append({"role": "user", "content": grounded_user_content})
+            else:
+                for msg in reversed(messages):
+                    if msg.get("role") == "user" and msg.get("content") == query:
+                        msg["content"] = grounded_user_content
+                        break
+
+            async for chunk in self.llm_client.get_streaming_completion(messages):
+                yield {"type": "content", "content": chunk}
+            yield {"type": "done", "strategy": "direct_generation", "documents": grounding_docs}
+            return
+
+        if complexity == "RECURSIVE_INTENSIVE":
+            # 1. Gather full context from ALL sources (Vector + Graph)
+
+            # A. Vector Search
+            vector_docs = self.vector_store.search(
+                query=optimized_query,
+                user_id=user_id,
+                session_id=session_id,
+                k=40,
+                cross_session=True
+            )
+
+            # B. Graph Search
+            graph_communities = self.knowledge_graph.search_communities(
+                optimized_query,
+                embedder=self.embedder,
+                top_k=5,
+                user_id=user_id
+            )
+
+            # C. Synthesized Context
+            context_text = "--- VECTOR CONTEXT ---\n"
+            context_text += "\n\n".join([doc['content'] for doc in vector_docs])
+
+            if graph_communities:
+                context_text += "\n\n--- RELATIONAL GRAPH CONTEXT ---\n"
+                context_text += "\n\n".join([f"Community {c['community_id']}: {c['summary']}" for c in graph_communities])
 
             # 2. Run recursive solver
             result = await self.recursive_agent.solve(optimized_query, context_text)
 
-            yield {"type": "metadata", "strategy": "recursive_intensive", "steps_count": len(result['steps'])}
+            yield {"type": "metadata", "strategy": "recursive_intensive", "steps_count": len(result['steps']), "graph_sources": len(graph_communities)}
 
             # Stream the steps as content
             for step in result['steps']:
@@ -608,7 +691,7 @@ Partial Answer (cite source):"""
             yield {
                 "type": "metadata",
                 "confidence": 0.9,
-                "retrieved_docs": [doc['metadata'].get('filename') for doc in all_docs[:5]]
+                "retrieved_docs": [doc['metadata'].get('filename') for doc in vector_docs[:5]]
             }
             yield {"type": "done", "strategy": "recursive_intensive"}
             return
@@ -618,12 +701,12 @@ Partial Answer (cite source):"""
             hyde_result = await self.hyde_engine.transform_query(optimized_query)
             yield {"type": "metadata", "hyde_doc": hyde_result['hypothetical_document']}
 
-            relevant_communities = self.knowledge_graph.search_communities(optimized_query, embedder=self.embedder, top_k=3, user_id=user_id)
+            relevant_communities = self.knowledge_graph.search_communities(optimized_query, embedder=self.embedder, top_k=5, user_id=user_id)
             vector_results = self.vector_store.search(
                 query=hyde_result['hypothetical_document'],
                 user_id=user_id,
                 session_id=session_id,
-                k=10,
+                k=20,
                 cross_session=True
             )
 
@@ -631,7 +714,7 @@ Partial Answer (cite source):"""
             map_tasks = []
             for comm in relevant_communities:
                 map_tasks.append(self._generate_partial_answer(optimized_query, comm['summary'], f"Community {comm['community_id']}"))
-            for doc in vector_results[:5]:
+            for doc in vector_results[:10]: # Increased from 5 to match process_query
                 map_tasks.append(self._generate_partial_answer(optimized_query, doc['content'], doc['metadata'].get('filename', 'Unknown')))
 
             partial_answers = list(await asyncio.gather(*map_tasks))

@@ -48,10 +48,12 @@ interface CodeState {
   stagedFiles: string[];
   isGitLoading: boolean;
 
+  aiSuggestionsEnabled: boolean;
   isAIRefineOpen: boolean;
   isSidebarOpen: boolean;
   isCommandPaletteOpen: boolean;
-  activeSidebarTab: 'explorer' | 'search' | 'debug' | 'git' | 'test';
+  activeSidebarTab: 'explorer' | 'search' | 'debug' | 'git' | 'test' | 'team';
+  activeRightTab: 'ai' | 'preview';
   terminalCommand: string | null;
   terminalTimestamp: number;
   activeBottomTab: 'terminal' | 'console' | 'errors' | 'tasks' | 'debug_console';
@@ -66,6 +68,7 @@ interface CodeState {
   setActiveFile: (id: string) => void;
   updateFileContent: (id: string, content: string) => void;
   renameFile: (id: string, newName: string) => void;
+  moveFile: (fileId: string, newParentId: string | undefined) => void;
   saveFile: (id: string) => void;
   setCursorPosition: (ln: number, col: number) => void;
 
@@ -90,10 +93,12 @@ interface CodeState {
   stageFile: (file: string) => void;
   unstageFile: (file: string) => void;
 
+  setAISuggestionsEnabled: (enabled: boolean) => void;
   setAIRefineOpen: (isOpen: boolean) => void;
   setSidebarOpen: (isOpen: boolean) => void;
   setCommandPaletteOpen: (isOpen: boolean) => void;
-  setActiveSidebarTab: (tab: 'explorer' | 'search' | 'debug' | 'git' | 'test') => void;
+  setActiveSidebarTab: (tab: 'explorer' | 'search' | 'debug' | 'git' | 'test' | 'team') => void;
+  setActiveRightTab: (tab: 'ai' | 'preview') => void;
   setActiveBottomTab: (tab: 'terminal' | 'console' | 'errors' | 'tasks' | 'debug_console') => void;
   runCommand: (command: string) => void;
   addFile: (name: string, type: 'file' | 'folder', parentId?: string) => void;
@@ -168,10 +173,12 @@ export const useCodeStore = create<CodeState>((set, get) => ({
   stagedFiles: [],
   isGitLoading: false,
 
+  aiSuggestionsEnabled: true,
   isAIRefineOpen: true,
   isSidebarOpen: true,
   isCommandPaletteOpen: false,
   activeSidebarTab: 'explorer',
+  activeRightTab: 'ai',
   terminalCommand: null,
   terminalTimestamp: 0,
   activeBottomTab: 'terminal',
@@ -221,6 +228,31 @@ export const useCodeStore = create<CodeState>((set, get) => ({
   renameFile: (id, newName) => set((state) => ({
     files: state.files.map(f => f.id === id ? { ...f, name: newName } : f)
   })),
+
+  moveFile: (fileId, newParentId) => set((state) => {
+    const file = state.files.find(f => f.id === fileId);
+    if (!file) return state;
+    if (file.parentId === newParentId) return state;
+
+    // Prevent moving a folder into itself or its descendants
+    if (file.type === 'folder' && newParentId !== undefined) {
+      const isDescendant = (parentId: string | undefined): boolean => {
+        if (parentId === fileId) return true;
+        const parent = state.files.find(f => f.id === parentId);
+        if (!parent || !parent.parentId) return false;
+        return isDescendant(parent.parentId);
+      };
+      if (isDescendant(newParentId)) return state;
+    }
+
+    // Prevent duplicate names in the target folder
+    const siblings = state.files.filter(f => f.parentId === newParentId && f.id !== fileId);
+    if (siblings.some(s => s.name === file.name && s.type === file.type)) return state;
+
+    return {
+      files: state.files.map(f => f.id === fileId ? { ...f, parentId: newParentId } : f)
+    };
+  }),
 
   saveFile: (id) => set((state) => ({
     files: state.files.map(f => f.id === id ? { ...f, isDirty: false } : f)
@@ -481,10 +513,12 @@ export const useCodeStore = create<CodeState>((set, get) => ({
   })),
 
   setTerminalOpen: (isOpen) => set({ isTerminalOpen: isOpen }),
+  setAISuggestionsEnabled: (enabled) => set({ aiSuggestionsEnabled: enabled }),
   setAIRefineOpen: (isOpen) => set({ isAIRefineOpen: isOpen }),
   setSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),
   setCommandPaletteOpen: (isOpen) => set({ isCommandPaletteOpen: isOpen }),
   setActiveSidebarTab: (activeSidebarTab) => set({ activeSidebarTab }),
+  setActiveRightTab: (activeRightTab) => set({ activeRightTab }),
   setActiveBottomTab: (activeBottomTab) => set({ activeBottomTab }),
   runCommand: (command) => set({ terminalCommand: command, terminalTimestamp: Date.now() }),
   addFile: (name, type, parentId) => set((state) => {
