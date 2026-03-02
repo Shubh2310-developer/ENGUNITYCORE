@@ -62,6 +62,25 @@ export default function ResearchPage() {
     { id: 4, name: 'Finalization' },
   ];
 
+  const handlePhaseClick = (id: number) => {
+    setCurrentPhase(id);
+    
+    // Allow React time to render if changing phase affects visibility
+    setTimeout(() => {
+      let targetId = '';
+      if (id === 1) targetId = 'phase-1-target';
+      else if (id === 2 || id === 4) targetId = 'phase-2-target';
+      else if (id === 3) targetId = 'phase-3-target';
+
+      if (targetId) {
+        const element = document.getElementById(targetId);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+    }, 100);
+  };
+
   const citationStyles = ['APA 7th', 'IEEE', 'MLA', 'BibTeX'];
   const sources = [
     { title: 'Neural Attention Mechanisms', type: 'Paper', author: 'Vaswani et al.', date: '2017', relevance: '98%' },
@@ -410,7 +429,7 @@ export default function ResearchPage() {
       </div>
 
       {/* Header Section */}
-      <header className={styles.headerSection}>
+      <header id="phase-1-target" className={styles.headerSection}>
         <div className={styles.titleGroup}>
           <h1>Research Workspace</h1>
           <p>Deep-web synthesis and academic intelligence gathering.</p>
@@ -420,7 +439,7 @@ export default function ResearchPage() {
               <div
                 key={phase.id}
                 className={`${styles.phaseItem} ${currentPhase === phase.id ? styles.phaseItemActive : ''}`}
-                onClick={() => setCurrentPhase(phase.id)}
+                onClick={() => handlePhaseClick(phase.id)}
               >
                 <span className={styles.phaseNumber}>{phase.id}</span>
                 <span>{phase.name}</span>
@@ -559,7 +578,7 @@ export default function ResearchPage() {
           </div>
 
           {/* Synthesis & Analysis Section (Dynamic based on phase) */}
-          <div className={styles.synthesisGrid}>
+          <div id="phase-2-target" className={styles.synthesisGrid}>
             {(toolsByPhase[currentPhase] || []).map(toolKey => {
               const tool = toolDetails[toolKey];
               if (!tool) return null;
@@ -576,7 +595,7 @@ export default function ResearchPage() {
           </div>
 
           {/* Active Synthesis Workspace */}
-          <div className={styles.draftCard}>
+          <div id="phase-3-target" className={styles.draftCard}>
             <div className={styles.draftBadge}>Synthesis Workspace</div>
 
             <div className={styles.editorLayout}>
