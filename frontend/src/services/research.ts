@@ -11,10 +11,79 @@ export interface ResearchRequest {
 }
 
 export interface ResearchStreamEvent {
-    event_type: 'status' | 'sub_query' | 'source_found' | 'insight' | 'progress' | 'complete' | 'error';
+    event_type: 'status' | 'sub_query' | 'source_found' | 'search_query' | 'evaluation' | 'insight' | 'progress' | 'complete' | 'error';
     data: Record<string, any>;
     timestamp: string;
     progress_percent: number;
+}
+
+export type ToolKey =
+  | 'gap_detector'
+  | 'method_comparator'
+  | 'assumption_extractor'
+  | 'strength_weakness'
+  | 'question_generator'
+  | 'argument_checker'
+  | 'conflict_resolver'
+  | 'trend_forecaster'
+  | 'scenario_planner';
+
+export interface ToolInvokeResult {
+  tool: ToolKey;
+  result: Record<string, any>;
+  generated_at?: string;
+}
+
+export async function fetchSources(token: string): Promise<any[]> {
+  const response = await fetch(`${API_BASE}/api/v1/research/workspace/sources`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch sources: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function fetchClusters(token: string): Promise<any[]> {
+  const response = await fetch(`${API_BASE}/api/v1/research/workspace/clusters`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch clusters: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function fetchGraphNodes(token: string): Promise<any[]> {
+  const response = await fetch(`${API_BASE}/api/v1/research/workspace/graph-nodes`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch graph nodes: ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function invokeTool(
+  tool: ToolKey,
+  context: string,
+  sourceTitles: string[] = [],
+  token: string
+): Promise<ToolInvokeResult> {
+  const response = await fetch(`${API_BASE}/api/v1/research/workspace/tool-invoke`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ tool, context, source_titles: sourceTitles }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to invoke tool: ${response.status}`);
+  }
+
+  return response.json();
 }
 
 export interface SourceEvaluation {

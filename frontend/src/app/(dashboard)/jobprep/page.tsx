@@ -251,15 +251,16 @@ const JobPrepHub = () => {
 
   useEffect(() => {
     if (profile) {
+      const profileExtras = profile as Record<string, any>;
       setProfileForm({
         current_status: profile.current_status || 'preparing',
         target_timeline: profile.target_timeline || '3 months',
         experience_level: profile.experience_level || 'mid',
-        industry_focus: profile.industry_focus || '',
-        salary_expectation_min: profile.salary_expectation_min || 0,
-        salary_expectation_max: profile.salary_expectation_max || 0,
-        timezone: profile.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
-        learning_style: profile.learning_style || 'visual',
+        industry_focus: profileExtras.industry_focus || '',
+        salary_expectation_min: profileExtras.salary_expectation_min || 0,
+        salary_expectation_max: profileExtras.salary_expectation_max || 0,
+        timezone: profileExtras.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+        learning_style: profileExtras.learning_style || 'visual',
         preferred_companies: profile.preferred_companies || [],
         notifications_enabled: profile.notifications_enabled !== undefined ? profile.notifications_enabled : true
       });

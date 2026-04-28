@@ -382,7 +382,7 @@ const DocumentsPage = () => {
                       <div className={styles.docFooter}>
                         <div className={styles.docMeta}>
                           <div className={styles.docMetaItem}>
-                            <User size={12} /> {user?.full_name || user?.username || 'You'}
+                            <User size={12} /> {user?.email || 'You'}
                           </div>
                           <div className={styles.docMetaItem}>
                             <Clock size={12} /> {formatDate(doc.updated_at)}

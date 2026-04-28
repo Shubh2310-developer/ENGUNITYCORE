@@ -721,10 +721,10 @@ export default function DatasetDetailPage() {
                     <div>
                       <p className="text-sm font-medium text-gray-700 mb-2">Test Metrics:</p>
                       <dl className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {Object.entries(analysis.results.test_metrics).map(([key, value]) => (
+                        {Object.entries(analysis.results.test_metrics as Record<string, unknown>).map(([key, value]) => (
                           <div key={key} className="bg-slate-50 p-2 rounded border border-slate-100">
                             <dt className="text-[10px] text-gray-500 font-bold uppercase tracking-tight">{key}</dt>
-                            <dd className="text-lg font-bold text-slate-800">{typeof value === 'number' ? value.toFixed(4) : value}</dd>
+                            <dd className="text-lg font-bold text-slate-800">{typeof value === 'number' ? value.toFixed(4) : String(value)}</dd>
                           </div>
                         ))}
                       </dl>

@@ -7,17 +7,17 @@ export class TerminalWebSocket {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectTimeout: NodeJS.Timeout | null = null;
+  private intentionalClose = false;
 
   constructor(terminal: Terminal, projectId: string) {
     this.term = terminal;
 
     if (typeof window !== 'undefined') {
-        // Determine WebSocket URL based on current window location
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = window.location.hostname;
-        // Assuming backend runs on port 8000
-        const port = '8000';
-        this.url = `${protocol}//${host}:${port}/ws/terminal/${projectId}`;
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+        const parsed = new URL(apiBase);
+        const protocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = parsed.host;
+        this.url = `${protocol}//${host}/ws/terminal/${projectId}`;
     } else {
         this.url = '';
     }
@@ -29,6 +29,7 @@ export class TerminalWebSocket {
     }
 
     try {
+      this.intentionalClose = false;
       this.ws = new WebSocket(this.url);
 
       this.ws.onopen = () => {
@@ -47,7 +48,10 @@ export class TerminalWebSocket {
       };
 
       this.ws.onclose = (event) => {
-        if (!event.wasClean) {
+        if (this.intentionalClose) {
+          return;
+        }
+        if (!event.wasClean || this.reconnectAttempts < this.maxReconnectAttempts) {
           this.term.write('\r\n\x1b[31m[Connection lost. Reconnecting...]\x1b[0m\r\n');
           this.attemptReconnect();
         } else {
@@ -108,6 +112,7 @@ export class TerminalWebSocket {
     }
 
     if (this.ws) {
+      this.intentionalClose = true;
       // Prevent callbacks on intentional close
       this.ws.onclose = null;
       this.ws.onerror = null;

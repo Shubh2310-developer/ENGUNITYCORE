@@ -3,6 +3,19 @@ from typing import List, Optional
 from datetime import datetime
 from app.schemas.image import ImageResponse
 
+
+class TurboQuantMetadata(BaseModel):
+    requested: bool
+    applied: bool
+    provider: Optional[str] = None
+    variant: Optional[str] = None
+    bit_width: Optional[int] = None
+    compression_ratio: Optional[float] = None
+    estimated_memory_saved_mb: Optional[float] = None
+    quality_score: Optional[float] = None
+    first_token_overhead_ms: Optional[float] = None
+    fallback_reason: Optional[str] = None
+
 class ChatMessageBase(BaseModel):
     role: str
     content: str
@@ -28,6 +41,7 @@ class ChatMessage(ChatMessageBase):
     multi_queries: Optional[List[str]] = []
     memory_active: Optional[bool] = False
     memory_summary: Optional[str] = None
+    turbo_quant: Optional[TurboQuantMetadata] = None
 
     class Config:
         from_attributes = True

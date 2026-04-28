@@ -32,7 +32,12 @@ import { useRouter } from 'next/navigation';
 
 import { useAuthStore } from '@/stores/authStore';
 import { chatService, Message } from '@/services/chat';
-import { omniRagService } from '@/services/omniRag';
+import {
+  omniRagService,
+  OmniRAGStreamEvent,
+  TurboQuantRequest,
+  TurboQuantRuntimeMetadata,
+} from '@/services/omniRag';
 import { imageService, ImageResponse } from '@/services/image';
 import { startDeepResearch, ResearchRequest, ResearchStreamEvent, ResearchReport } from '@/services/research';
 import styles from './chat.module.css';
@@ -45,6 +50,51 @@ interface ChatSession {
   messageCount: number;
   isActive: boolean;
 }
+
+const normalizeId = (value: unknown): string => String(value ?? '').trim();
+
+const mapSessionsForSidebar = (
+  sessions: any[],
+  activeSessionId: string | null = null
+): ChatSession[] => {
+  return sessions
+    .map((session: any, index: number) => {
+      const id = normalizeId(session.id);
+      if (!id) return null;
+
+      return {
+        id,
+        title: session.title || `Chat ${index + 1}`,
+        lastMessage: '',
+        timestamp: new Date(session.updated_at || session.created_at || Date.now()),
+        messageCount: session.message_count || 0,
+        isActive: activeSessionId ? id === activeSessionId : index === 0,
+      };
+    })
+    .filter((session): session is ChatSession => session !== null);
+};
+
+const getMessageRenderKey = (msg: Partial<Message>, idx: number): string => {
+  const messageId = normalizeId(msg.id);
+  if (messageId) return messageId;
+
+  const ts = normalizeId(msg.timestamp);
+  if (ts) return `msg-${idx}-${ts}`;
+
+  return `msg-${idx}`;
+};
+
+const isTurboQuantRuntimeEnabled = () => {
+  if (process.env.NEXT_PUBLIC_ENABLE_TURBO_QUANT_CHAT === 'true') {
+    return true;
+  }
+
+  if (typeof window !== 'undefined') {
+    return (window as unknown as { __ENABLE_TURBO_QUANT_CHAT?: boolean }).__ENABLE_TURBO_QUANT_CHAT === true;
+  }
+
+  return false;
+};
 
 // Memoized CodeBlock component to prevent re-renders
 const CodeBlock = React.memo(({ children, lang }: { children: string, lang: string }) => {
@@ -98,6 +148,14 @@ export default function ChatPage() {
   const [communities, setCommunities] = useState<any[]>([]);
   const [isRefreshingGraph, setIsRefreshingGraph] = useState(false);
   const [selectedStrategy, setSelectedStrategy] = useState<'adaptive' | 'vector_rag' | 'graph_rag' | 'recursive_intensive'>('adaptive');
+  const [turboQuantEnabled, setTurboQuantEnabled] = useState(false);
+  const [turboQuantConfig, setTurboQuantConfig] = useState<TurboQuantRequest>({
+    enabled: false,
+    mode: 'auto',
+    target: 'auto',
+    variant: 'prod',
+    bit_width: 4,
+  });
   const [now, setNow] = useState(new Date());
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [stagedImages, setStagedImages] = useState<ImageResponse[]>([]);
@@ -109,6 +167,7 @@ export default function ChatPage() {
   const [researchDepth, setResearchDepth] = useState<'quick' | 'standard' | 'deep' | 'exhaustive'>('standard');
   const [researchEvents, setResearchEvents] = useState<ResearchStreamEvent[]>([]);
   const [activeResearchId, setActiveResearchId] = useState<string | null>(null);
+  const turboQuantFeatureEnabled = isTurboQuantRuntimeEnabled();
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -360,21 +419,17 @@ export default function ChatPage() {
       try {
         const sessions = await chatService.getSessions();
         if (sessions && sessions.length > 0) {
-          // Map sessions to ChatSession format
-          const formattedSessions: ChatSession[] = sessions.map((s: any, index: number) => ({
-            id: s.id,
-            title: s.title || `Chat ${index + 1}`,
-            lastMessage: '',
-            timestamp: new Date(s.updated_at || s.created_at || Date.now()),
-            messageCount: s.message_count || 0,
-            isActive: index === 0
-          }));
+          const formattedSessions = mapSessionsForSidebar(sessions);
           setChatSessions(formattedSessions);
 
-          const latestSession = await chatService.getSession(sessions[0].id);
-          setActiveSessionId(latestSession.id);
-          if (latestSession.messages && latestSession.messages.length > 0) {
-            setMessages(latestSession.messages);
+          if (formattedSessions.length > 0) {
+            const latestSession = await chatService.getSession(formattedSessions[0].id);
+            setActiveSessionId(latestSession.id);
+            if (latestSession.messages && latestSession.messages.length > 0) {
+              setMessages(latestSession.messages);
+            } else {
+              setInitialMessage();
+            }
           } else {
             setInitialMessage();
           }
@@ -527,9 +582,15 @@ export default function ChatPage() {
           session_id: activeSessionId || undefined,
           strategy: selectedStrategy === 'adaptive' ? undefined : selectedStrategy,
           image_urls: currentStagedImages.map(img => img.public_url),
-          image_ids: currentStagedImages.map(img => img.id)
+          image_ids: currentStagedImages.map(img => img.id),
+          turbo_quant: turboQuantEnabled
+            ? {
+                ...turboQuantConfig,
+                enabled: true,
+              }
+            : undefined,
         },
-        (event) => {
+        (event: OmniRAGStreamEvent) => {
           if (event.type === 'metadata') {
             if (event.session_id) {
               currentSessionId = event.session_id;
@@ -537,14 +598,7 @@ export default function ChatPage() {
                 setActiveSessionId(event.session_id);
                 // Refresh sessions list
                 chatService.getSessions().then(sessions => {
-                  const formattedSessions = sessions.map((s: any, index: number) => ({
-                    id: s.id,
-                    title: s.title || `Chat ${index + 1}`,
-                    lastMessage: '',
-                    timestamp: new Date(s.updated_at || s.created_at || Date.now()),
-                    messageCount: s.message_count || 0,
-                    isActive: s.id === event.session_id
-                  }));
+                  const formattedSessions = mapSessionsForSidebar(sessions, normalizeId(event.session_id));
                   setChatSessions(formattedSessions);
                 });
               }
@@ -565,7 +619,8 @@ export default function ChatPage() {
                   context_compressed: event.context_compressed !== undefined ? event.context_compressed : msg.context_compressed,
                   confidence: event.confidence !== undefined ? event.confidence : msg.confidence,
                   critique: event.critique || msg.critique,
-                  steps: event.steps || msg.steps
+                  steps: event.steps || msg.steps,
+                  turbo_quant: mergeTurboQuantMetadata(msg.turbo_quant, event.turbo_quant),
                 }
                 : msg
             ));
@@ -701,6 +756,37 @@ export default function ChatPage() {
   const removeStagedImage = useCallback((id: string) => {
     setStagedImages(prev => prev.filter(img => img.id !== id));
   }, []);
+
+  const toggleTurboQuant = useCallback(() => {
+    setTurboQuantEnabled(prev => {
+      const nextEnabled = !prev;
+      setTurboQuantConfig(config => ({ ...config, enabled: nextEnabled }));
+      return nextEnabled;
+    });
+  }, []);
+
+  const mergeTurboQuantMetadata = useCallback(
+    (
+      current: TurboQuantRuntimeMetadata | undefined,
+      incoming: TurboQuantRuntimeMetadata | undefined
+    ): TurboQuantRuntimeMetadata | undefined => {
+      if (!incoming) {
+        return current;
+      }
+
+      const merged: TurboQuantRuntimeMetadata = { ...(current || {}) };
+      const entries = Object.entries(incoming) as Array<[keyof TurboQuantRuntimeMetadata, TurboQuantRuntimeMetadata[keyof TurboQuantRuntimeMetadata]]>;
+
+      for (const [key, value] of entries) {
+        if (value !== undefined) {
+          (merged as Record<string, unknown>)[key as string] = value;
+        }
+      }
+
+      return merged;
+    },
+    []
+  );
 
   const clearCanvas = async () => {
     setIsLoading(true);
@@ -1115,7 +1201,7 @@ export default function ChatPage() {
           <AnimatePresence initial={false}>
             {messages.map((msg, idx) => (
               <motion.div
-                key={msg.id || idx}
+                key={getMessageRenderKey(msg, idx)}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, ease: "easeOut" }}
@@ -1134,11 +1220,11 @@ export default function ChatPage() {
                     {/* Message Interaction Toolbar */}
                     <div className={styles.messageToolbar}>
                       <button
-                        onClick={() => copyMessage(msg.content || '', msg.id || idx.toString())}
+                        onClick={() => copyMessage(msg.content || '', getMessageRenderKey(msg, idx))}
                         className={styles.toolbarBtn}
                         title="Copy message"
                       >
-                        {copiedId === (msg.id || idx.toString()) ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                        {copiedId === getMessageRenderKey(msg, idx) ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
                       </button>
                       {msg.role === 'assistant' && idx === messages.length - 1 && (
                         <button
@@ -1207,7 +1293,7 @@ export default function ChatPage() {
                         )}
 
                         {/* Omni-RAG Metadata Badges */}
-                        {(msg.strategy || msg.complexity || msg.used_web_search || msg.multi_queries || msg.memory_active) && (
+                        {(msg.strategy || msg.complexity || msg.used_web_search || msg.multi_queries || msg.memory_active || msg.turbo_quant) && (
                           <div className="flex flex-wrap gap-2 mb-3">
                             <AnimatePresence>
                               {msg.strategy && (
@@ -1269,6 +1355,51 @@ export default function ChatPage() {
                                     }`}
                                 >
                                   Confidence: {Math.round(msg.confidence * 100)}%
+                                </motion.span>
+                              )}
+                              {msg.turbo_quant?.requested && (
+                                <motion.span
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  className={styles.turboQuantBadgeRequested}
+                                >
+                                  Turbo Quant Requested
+                                </motion.span>
+                              )}
+                              {msg.turbo_quant?.applied && (
+                                <motion.span
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  className={styles.turboQuantBadgeApplied}
+                                >
+                                  Turbo Quant Applied
+                                </motion.span>
+                              )}
+                              {msg.turbo_quant?.requested && !msg.turbo_quant?.applied && msg.turbo_quant?.fallback_reason && (
+                                <motion.span
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  className={styles.turboQuantBadgeFallback}
+                                >
+                                  Fallback: {msg.turbo_quant.fallback_reason}
+                                </motion.span>
+                              )}
+                              {msg.turbo_quant?.compression_ratio !== undefined && (
+                                <motion.span
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  className={styles.turboQuantBadgeApplied}
+                                >
+                                  x{msg.turbo_quant.compression_ratio}
+                                </motion.span>
+                              )}
+                              {msg.turbo_quant?.estimated_memory_saved_mb !== undefined && (
+                                <motion.span
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  className={styles.turboQuantBadgeApplied}
+                                >
+                                  {Math.round(msg.turbo_quant.estimated_memory_saved_mb)}MB saved
                                 </motion.span>
                               )}
                             </AnimatePresence>
@@ -1665,6 +1796,59 @@ export default function ChatPage() {
                     <option value="graph_rag">Graph RAG</option>
                     <option value="recursive_intensive">Recursive (Long Context)</option>
                   </select>
+
+                  {turboQuantFeatureEnabled && (
+                    <>
+                      <button
+                        onClick={toggleTurboQuant}
+                        disabled={isLoading}
+                        className={`${styles.turboQuantToggle} ${turboQuantEnabled ? styles.turboQuantToggleEnabled : ''}`}
+                        title="Toggle Turbo Quant"
+                        type="button"
+                      >
+                        TQ
+                      </button>
+
+                      <select
+                        value={turboQuantConfig.mode}
+                        onChange={(e) => setTurboQuantConfig(prev => ({ ...prev, mode: e.target.value as TurboQuantRequest['mode'] }))}
+                        className={styles.turboQuantSelect}
+                        title="Turbo Quant Mode"
+                        disabled={!turboQuantEnabled || isLoading}
+                      >
+                        <option value="auto">TQ Auto</option>
+                        <option value="force">TQ Force</option>
+                        <option value="off">TQ Off</option>
+                      </select>
+
+                      <select
+                        value={turboQuantConfig.bit_width}
+                        onChange={(e) => setTurboQuantConfig(prev => ({ ...prev, bit_width: Number(e.target.value) as TurboQuantRequest['bit_width'] }))}
+                        className={styles.turboQuantSelect}
+                        title="Turbo Quant Bit Width"
+                        disabled={!turboQuantEnabled || isLoading}
+                      >
+                        <option value={2}>2-bit</option>
+                        <option value={3}>3-bit</option>
+                        <option value={4}>4-bit</option>
+                        <option value={5}>5-bit</option>
+                        <option value={6}>6-bit</option>
+                        <option value={7}>7-bit</option>
+                        <option value={8}>8-bit</option>
+                      </select>
+
+                      <select
+                        value={turboQuantConfig.variant}
+                        onChange={(e) => setTurboQuantConfig(prev => ({ ...prev, variant: e.target.value as TurboQuantRequest['variant'] }))}
+                        className={styles.turboQuantSelect}
+                        title="Turbo Quant Variant"
+                        disabled={!turboQuantEnabled || isLoading}
+                      >
+                        <option value="prod">TQ Prod</option>
+                        <option value="mse">TQ MSE</option>
+                      </select>
+                    </>
+                  )}
                 </div>
 
                 {/* Text Input */}

@@ -1,5 +1,6 @@
 import { test as base, expect } from '@playwright/test';
 import type { Route } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 type AuthFixtures = {
     authenticatedPage: any;
@@ -8,14 +9,16 @@ type AuthFixtures = {
 
 export const test = base.extend<AuthFixtures>({
     testUser: async ({ }, use) => {
+        // Use environment variable if available, otherwise use placeholder
+        const testPassword = process.env.TEST_USER_PASSWORD || 'TestP@ssw0rd!2026';
         const user = {
             email: `test-${Date.now()}@engunity.test`,
-            password: 'TestP@ssw0rd!2026',
+            password: testPassword,
         };
         await use(user);
     },
 
-    authenticatedPage: async ({ page, testUser }, use) => {
+    authenticatedPage: async ({ page, testUser }: { page: Page; testUser: { email: string; password: string } }, use: (page: Page) => Promise<void>) => {
         const mockUser = {
             id: 1,
             email: testUser.email,
@@ -33,11 +36,12 @@ export const test = base.extend<AuthFixtures>({
         });
 
         await page.route('**/api/v1/auth/login', async (route: Route) => {
+            const mockToken = process.env.TEST_MOCK_JWT || 'mock-jwt-token-test-only';
             await route.fulfill({
                 status: 200,
                 contentType: 'application/json',
                 body: JSON.stringify({
-                    access_token: 'mock-jwt-token-for-testing-12345',
+                    access_token: mockToken,
                     token_type: 'bearer',
                 }),
             });

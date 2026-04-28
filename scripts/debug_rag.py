@@ -5,7 +5,7 @@ import pickle
 import numpy as np
 
 # Add backend to path
-sys.path.append('/home/agentrogue/Engunity/backend')
+sys.path.append('/home/agentrogue/projects/ENGUNITYCORE/backend')
 
 from app.services.ai.vector_store import vector_store
 

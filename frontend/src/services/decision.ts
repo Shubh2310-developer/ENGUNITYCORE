@@ -16,6 +16,7 @@ const FINAL_API_URL = getBaseUrl();
 export type DecisionStatus = 'tentative' | 'confirmed' | 'revisited' | 'deprecated';
 export type DecisionConfidence = 'low' | 'medium' | 'high';
 export type DecisionType = 'Architecture' | 'Research' | 'Code' | 'Product' | 'Career' | 'Compliance';
+export type DecisionPrivacy = 'private' | 'workspace' | 'public';
 
 export interface Option {
   id: string;
@@ -90,7 +91,28 @@ export interface Decision {
   ai_flags?: AIFlag[];
   revisit_rule?: RevisitRule;
   tags: string[];
-  privacy: 'private' | 'team' | 'public';
+  privacy: DecisionPrivacy;
+}
+
+const normalizePrivacy = (privacy: unknown): DecisionPrivacy => {
+  if (privacy === 'workspace' || privacy === 'public' || privacy === 'private') return privacy;
+  if (privacy === 'team') return 'workspace';
+  return 'private';
+};
+
+const normalizeDecision = (decision: any): Decision => ({
+  ...decision,
+  privacy: normalizePrivacy(decision?.privacy),
+});
+
+export class DecisionAIError extends Error {
+  status?: number;
+
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = 'DecisionAIError';
+    this.status = status;
+  }
 }
 
 export const decisionService = {
@@ -105,7 +127,9 @@ export const decisionService = {
       });
 
       if (response.ok) {
-        return response.json();
+        const data = await response.json();
+        if (!Array.isArray(data)) return [];
+        return data.map(normalizeDecision);
       }
       if (response.status === 404) {
         console.warn('Decisions endpoint not found, feature might be in frontend-only mode');
@@ -129,7 +153,8 @@ export const decisionService = {
       });
 
       if (response.ok) {
-        return response.json();
+        const data = await response.json();
+        return normalizeDecision(data);
       }
       return null;
     } catch (error) {
@@ -138,7 +163,7 @@ export const decisionService = {
     }
   },
 
-  async createDecision(decision: Partial<Decision>) {
+  async createDecision(decision: Partial<Decision>, opts?: { idempotencyKey?: string }) {
     const token = useAuthStore.getState().token;
     try {
       const response = await fetch(`${FINAL_API_URL}/decisions/`, {
@@ -146,12 +171,14 @@ export const decisionService = {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
+          ...(opts?.idempotencyKey ? { 'Idempotency-Key': opts.idempotencyKey } : {}),
         },
         body: JSON.stringify(decision),
       });
 
       if (response.ok) {
-        return response.json();
+        const data = await response.json();
+        return normalizeDecision(data);
       }
       throw new Error('Failed to create decision');
     } catch (error) {
@@ -173,7 +200,8 @@ export const decisionService = {
       });
 
       if (response.ok) {
-        return response.json();
+        const data = await response.json();
+        return normalizeDecision(data);
       }
       throw new Error('Failed to update decision');
     } catch (error) {
@@ -197,10 +225,22 @@ export const decisionService = {
       if (response.ok) {
         return response.json();
       }
-      return [];
+
+      let message = 'Decision analysis failed';
+      try {
+        const body = await response.json();
+        message = body?.detail?.message || body?.detail || message;
+      } catch {
+        message = `Decision analysis failed with status ${response.status}`;
+      }
+
+      throw new DecisionAIError(message, response.status);
     } catch (error) {
       console.error('Decision analysis error:', error);
-      return [];
+      if (error instanceof DecisionAIError) {
+        throw error;
+      }
+      throw new DecisionAIError('Decision analysis unavailable. Please retry.', 0);
     }
   }
 };

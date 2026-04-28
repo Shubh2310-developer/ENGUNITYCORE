@@ -1,17 +1,23 @@
 from typing import Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Body, Response
+from fastapi import APIRouter, Depends, HTTPException, Body, Response, Header
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from app.api.v1.auth import get_current_user
 from app.core.database import get_db
 from app.core.mongodb import mongodb
 from app.models.user import User
 from app.models.decision import Decision as DecisionModel
-from app.schemas.decision import Decision, DecisionCreate, DecisionUpdate, DecisionBase
-from app.services.ai.decision_ai import decision_ai_service
+from app.schemas.decision import Decision, DecisionCreate, DecisionUpdate, DecisionBase, AIFlagSchema
+from app.services.ai.decision_ai import decision_ai_service, DecisionAnalysisError
 from app.services.export.decision_export import decision_export_service
 from datetime import datetime
 import uuid
+import json
+import hashlib
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -32,35 +38,73 @@ async def create_decision(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     decision_in: DecisionCreate,
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
 ) -> Any:
     """
     Create a new decision.
     Metadata goes to Postgres, Reasoning traces go to MongoDB.
     """
+    payload_hash = hashlib.sha256(
+        json.dumps(decision_in.model_dump(), sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    ).hexdigest()
+
+    if idempotency_key:
+        existing = db.query(DecisionModel).filter(
+            DecisionModel.user_id == current_user.id,
+            DecisionModel.idempotency_key == idempotency_key,
+        ).first()
+        if existing:
+            if existing.idempotency_payload_hash != payload_hash:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD",
+                        "message": "Idempotency key has already been used with a different payload",
+                    },
+                )
+            return existing
+
     decision_id = str(uuid.uuid4())
     decision = DecisionModel(
         **decision_in.model_dump(),
         id=decision_id,
-        user_id=current_user.id
+        user_id=current_user.id,
+        idempotency_key=idempotency_key,
+        idempotency_payload_hash=payload_hash if idempotency_key else None,
     )
 
-    # Store initial reasoning trace in MongoDB if provided in the request
-    if mongodb.db is not None:
-        trace_data = {
-            "decision_id": decision_id,
-            "user_id": current_user.id,
-            "event": "creation",
-            "timestamp": datetime.now(),
-            "reasoning_trace": "Decision initialized in the vault."
-        }
-        await mongodb.db.decision_traces.insert_one(trace_data)
-
     db.add(decision)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        if idempotency_key:
+            existing = db.query(DecisionModel).filter(
+                DecisionModel.user_id == current_user.id,
+                DecisionModel.idempotency_key == idempotency_key,
+            ).first()
+            if existing and existing.idempotency_payload_hash == payload_hash:
+                return existing
+        raise
     db.refresh(decision)
+
+    # Store initial reasoning trace in MongoDB as best-effort after Postgres commit
+    if mongodb.db is not None:
+        try:
+            trace_data = {
+                "decision_id": decision_id,
+                "user_id": current_user.id,
+                "event": "creation",
+                "timestamp": datetime.now(),
+                "reasoning_trace": "Decision initialized in the vault."
+            }
+            await mongodb.db.decision_traces.insert_one(trace_data)
+        except Exception as exc:
+            logger.warning("Decision trace persistence failed for %s: %s", decision_id, exc)
+
     return decision
 
-@router.post("/analyze", response_model=List[Any])
+@router.post("/analyze", response_model=List[AIFlagSchema])
 async def analyze_decision(
     *,
     decision_in: DecisionBase,
@@ -69,8 +113,18 @@ async def analyze_decision(
     """
     Perform adversarial AI review on a decision draft.
     """
-    flags = await decision_ai_service.analyze_decision(decision_in)
-    return flags
+    try:
+        flags = await decision_ai_service.analyze_decision(decision_in)
+        return flags
+    except DecisionAnalysisError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "code": exc.code,
+                "message": exc.message,
+                "retryable": exc.retryable,
+            },
+        ) from exc
 
 @router.get("/{decision_id}", response_model=Decision)
 async def get_decision(
@@ -90,7 +144,7 @@ async def get_decision(
 
     # Fetch reasoning traces from MongoDB
     if mongodb.db is not None:
-        traces_cursor = mongodb.db.decision_traces.find({"decision_id": decision_id}).sort("timestamp", 1)
+        traces_cursor = mongodb.db.decision_traces.find({"decision_id": decision_id, "user_id": current_user.id}).sort("timestamp", 1)
         traces = await traces_cursor.to_list(length=100)
         # We can attach these to a separate field or return them in a detailed view
         # For now, we'll just ensure they are retrievable

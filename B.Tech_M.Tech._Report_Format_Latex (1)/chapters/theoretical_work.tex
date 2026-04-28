@@ -1,0 +1,369 @@
+\chapter{System Design and Architecture}
+\label{chap:design}
+
+\section{Design Philosophy}
+\label{sec:design-philosophy}
+
+Before getting into the specifics of each subsystem, it is worth saying something
+about what we were trying to avoid. The most common failure mode in student AI
+projects is what might be called ``glue-code'' architecture: take an LLM API,
+wrap a thin web layer around it, and call it a platform. That approach produces
+something that technically works but breaks down immediately under any real-world
+load, is impossible to diagnose when it produces bad outputs, and offers no
+foundation for improvement.
+
+We deliberately went in the other direction. Every layer of EngUnity has a reason
+for being where it is and a defined boundary with its neighbours. When a generated
+answer is poor, we can point to a specific module---query classifier, re-ranker,
+compression step, refiner---and ask what went wrong there. That traceability was
+a deliberate design goal, not an afterthought.
+
+\section{Overall Architecture}
+\label{sec:architecture}
+
+EngUnity is organised into four planes that communicate only through typed API or
+message-queue contracts. Keeping these boundaries strict is what makes individual
+components replaceable---if FAISS becomes a bottleneck, swapping in Qdrant should
+not require changes beyond the vector-store interface.
+
+\begin{table}[ht]
+    \centering
+    \caption{The four architectural planes and their primary responsibilities.}
+    \label{tab:planes}
+    \begin{tabular}{lll}
+        \toprule
+        \textbf{Plane} & \textbf{Technology} & \textbf{Responsibilities} \\
+        \midrule
+        Presentation   & Next.js 16, React 18, Tailwind CSS 3 &
+            Rendering, routing, real-time SSE consumption \\
+        Orchestration  & FastAPI 0.115, Uvicorn, Celery, Redis &
+            Auth, rate-limiting, job dispatch, API contracts \\
+        Inference      & OmniRAG pipeline, AI agents, Groq / Ollama &
+            Retrieval, reasoning, generation, quality evaluation \\
+        Persistence    & PostgreSQL, MongoDB, Redis, FAISS &
+            Relational data, document store, cache, vector index \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+The client (Next.js PWA) communicates exclusively with the Orchestration Plane
+over HTTPS. The Inference and Persistence planes are never directly accessible
+from the browser. Background jobs---file indexing, bulk analysis, knowledge-graph
+community building---go through Celery, backed by Redis, so that long-running
+operations do not block the FastAPI event loop.
+
+\section{The OmniRAG Pipeline}
+\label{sec:omnirag}
+
+\subsection{Why a Single Pipeline for Four Strategies?}
+
+Early in the project we had separate endpoints for simple questions, document
+search, and deep research. This worked, but it pushed a significant cognitive
+burden onto the student: they had to decide what \textit{kind} of question they
+were asking before they could get a useful answer. A casual empirical check
+showed that students routinely underestimated query complexity and ended up on
+the wrong endpoint. The fix was to classify automatically and route internally.
+The pipeline exposes a single \texttt{process\_query} method; the strategy is
+an implementation detail.
+
+\subsection{Complexity Classification and Routing}
+
+The \texttt{QueryComplexityClassifier} analyses each incoming query and assigns
+one of four classes:
+
+\begin{table}[ht]
+    \centering
+    \caption{OmniRAG complexity classes, strategies, and typical query characteristics.}
+    \label{tab:complexity}
+    \begin{tabular}{llp{6cm}}
+        \toprule
+        \textbf{Class} & \textbf{Strategy} & \textbf{Characteristics} \\
+        \midrule
+        \texttt{SIMPLE} & Direct generation &
+            Conversational, definitional, low document-dependency \\
+        \texttt{SINGLE\_HOP} & Vector RAG &
+            Factual with a clear document anchor; single retrieval topic \\
+        \texttt{MULTI\_HOP} & Graph RAG (map-reduce) &
+            Comparative, synthesising, requires multiple source documents \\
+        \texttt{RECURSIVE\_INTENSIVE} & Recursive reasoning &
+            Open-ended analytical, benefits from multi-step hypothesis chains \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsection{The Single-Hop Retrieval Flow}
+
+For the most common class of queries---single-hop---the pipeline executes the
+following steps. We have numbered them to make it easier to cross-reference with
+the source code in \texttt{backend/app/services/rag/pipeline.py}.
+
+\begin{enumerate}
+    \item \textbf{Memory recall.} Up to three relevant memories are fetched from
+    the user's long-term profile via \texttt{memory\_system.recall}. These are
+    injected into the query rewriting step.
+
+    \item \textbf{Image perception (conditional).} If the request includes
+    \texttt{image\_urls} or \texttt{image\_ids}, the pipeline calls the
+    \texttt{MultiModalVisionProcessor} before any text retrieval occurs. The
+    processor returns a structured visual context string that is prepended to
+    the query.
+
+    \item \textbf{Query rewriting.} The \texttt{QueryRewriter} reformulates
+    the raw user query---incorporating the memory context from step 1---to
+    improve retrieval recall. This step is particularly useful for follow-up
+    questions that omit pronouns or assume prior context.
+
+    \item \textbf{Multi-query expansion.} The LLM generates four query
+    variations including a step-back abstraction (a broader, more general form
+    of the original question). Retrieval runs concurrently for each variant
+    using \texttt{asyncio.gather}.
+
+    \item \textbf{HyDE transformation.} \texttt{HyDEEngine} generates a
+    hypothetical answer and embeds it. The resulting embedding is used as the
+    retrieval vector alongside the original query embedding. In our testing on
+    technical engineering questions, HyDE consistently retrieved more relevant
+    passage excerpts than the raw query embedding alone.
+
+    \item \textbf{Hybrid search.} FAISS performs a combined semantic and BM25
+    search with a weighting of $\alpha=0.6$ semantic and $0.4$ keyword. Top-20
+    results are retrieved per query variant and then deduplicated by chunk ID.
+
+    \item \textbf{FlashRank neural re-ranking.} The cross-attention re-ranker
+    in \texttt{FlashRankReranker} scores all deduplicated candidates and
+    retains the top 10. This step is what separates passages that are
+    topically related from those that are genuinely answer-relevant.
+
+    \item \textbf{CRAG evaluation.} \texttt{CRAGPipeline} scores retrieval
+    quality using the \texttt{RetrievalEvaluator}. If the top document scores
+    below the configured threshold, \texttt{WebSearchFallback} queries the
+    Brave Search API and supplements the candidate pool.
+
+    \item \textbf{Contextual compression.} Each of the top-5 re-ranked
+    documents is compressed by an LLM call that extracts only the excerpt
+    most relevant to the query. The five compression calls run in parallel;
+    this step typically eliminates 60--70\% of each document's token count
+    while preserving the answer-bearing sentences.
+
+    \item \textbf{Two-stage generation.} A draft is generated at
+    \texttt{temperature=0.3} using the compressed context. The
+    \texttt{AnswerRefiner} then inspects the draft and removes filler phrases,
+    reduces passive constructions, and trims word count while preserving
+    factual content.
+
+    \item \textbf{Self-critique.} \texttt{SelfCritique} scores the refined
+    answer against the retrieved documents and emits a confidence value.
+    Answers that score poorly here are flagged in the response metadata so
+    that the frontend can surface a visual indicator to the user.
+
+    \item \textbf{Quality metric logging.} Structure, density, naturalness,
+    and confidence scores are computed and appended to
+    \texttt{quality\_metrics.jsonl} for offline analysis.
+\end{enumerate}
+
+\subsection{Multi-Hop (Graph RAG) Flow}
+
+The multi-hop path retrieves knowledge-graph community summaries alongside
+standard vector chunks and synthesises them using a map-reduce pattern.
+
+In the \textit{map} phase, the pipeline generates partial answers independently
+for each community summary and each top-5 document, running all LLM calls in
+parallel via \texttt{asyncio.gather}. In the \textit{reduce} phase, a
+synthesis prompt receives all partial answers and produces a single, coherent
+final response. The map-reduce structure means that the number of parallel LLM
+calls scales with the number of retrieved communities and documents, which is
+configurable at deployment time.
+
+\subsection{Recursive Intensive Flow}
+
+Recursive queries expand the retrieval budget ($k=40$ versus $k=20$ for single-
+hop) and combine the larger document pool with knowledge-graph context. The
+assembled context is handed to \texttt{RecursiveReasoningAgent}, which implements
+a chain-of-thought loop where each step can spawn subsidiary inferences before
+committing to a final answer. Each intermediate step is emitted as a structured
+streaming event, giving the user partial visibility into the reasoning process.
+
+\section{The DeepResearchAgent}
+\label{sec:deepresearch}
+
+\subsection{Design Rationale}
+
+The OmniRAG pipeline, even on its recursive-intensive path, operates within a
+single-call budget. For genuine research tasks---``summarise the state of the art
+in thermophotovoltaic energy conversion'' or ``compare the memory management
+approaches of five major programming languages''---this is not enough. The research
+agent is the answer to that limitation.
+
+The core design principle is simple: a single research iteration is like any other
+single-hop retrieval, but the agent can run multiple iterations, each informed by
+what the previous iterations found (and, more importantly, what they did not find).
+
+\subsection{The Five-Phase Pipeline}
+
+\begin{enumerate}
+    \item \textbf{Decompose.} The main query is broken down by the LLM into
+    up to $N$ typed sub-questions (factual, analytical, comparative, exploratory).
+    The typing matters: factual sub-questions are sent to the vector store first;
+    analytical and comparative ones are weighted toward the knowledge graph.
+
+    \item \textbf{Search.} For each sub-question, three backends are queried
+    concurrently: the OmniRAG vector store, a live web search (Brave Search API),
+    and the knowledge-graph community index. Results from all three are pooled.
+
+    \item \textbf{Evaluate.} A hybrid relevance scorer applies fast keyword-overlap
+    matching as a pre-filter, then invokes an LLM scorer for ambiguous candidates.
+    Snippets below a relevance threshold of 0.4 are discarded. The threshold is
+    conservative because false positives at this stage degrade synthesis quality.
+
+    \item \textbf{Refine.} The agent inspects which sub-questions remain
+    under-sourced (fewer than the configured minimum source count). For each gap,
+    it generates one or more exploratory follow-up queries and re-enters the
+    Search phase. If the iteration budget is exhausted without reaching minimum
+    coverage, the agent continues with whatever sources it has.
+
+    \item \textbf{Synthesize.} All accepted snippets are assembled into a structured
+    report prompt that produces: Executive Summary, Key Findings, Analysis,
+    Caveats, Follow-up Questions, and Related Topics. The Caveats section is
+    produced because early tests found that leaving known limitations implicit
+    generated less trust from students than surfacing them explicitly.
+\end{enumerate}
+
+\begin{table}[ht]
+    \centering
+    \caption{ResearchDepth parameter matrix.}
+    \label{tab:depth}
+    \begin{tabular}{lrrrl}
+        \toprule
+        \textbf{Depth} & \textbf{Max Sub-Q} & \textbf{Max Iter} &
+        \textbf{Min Src} & \textbf{Typical Use} \\
+        \midrule
+        \texttt{QUICK}      & 2  & 1 & 2  & Quick factual look-up \\
+        \texttt{STANDARD}   & 5  & 3 & 4  & Coursework research \\
+        \texttt{DEEP}       & 8  & 5 & 7  & Thesis-level questions \\
+        \texttt{EXHAUSTIVE} & 12 & 8 & 10 & Full domain survey \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\section{Multimodal Visual Perception}
+\label{sec:multimodal}
+
+The \texttt{MultiModalVisionProcessor} wraps three perception components:
+
+\begin{itemize}
+    \item \textbf{CLIP (ViT-B/32)} embeds each image into the same 512-dimensional
+    space used for text embeddings, enabling cross-modal retrieval within the same
+    FAISS index.
+
+    \item \textbf{EasyOCR} extracts printed and handwritten text with layout
+    information preserved. Detected text regions are concatenated with positional
+    markers (top-left, bottom-right coordinates) so that spatial queries remain
+    meaningful.
+
+    \item \textbf{YOLOv8n} detects objects and classifies them using the 80-class
+    COCO taxonomy. Detected labels are included in the visual context string;
+    for engineering images, the most useful classes in practice have been
+    ``keyboard'', ``monitor'', ``book'', ``cell phone'', and various electronic
+    components that fall back to ``remote'' or ``cell phone'' under the COCO
+    taxonomy (a known limitation---see Chapter~\ref{chap:results}).
+\end{itemize}
+
+All three components produce text output that is concatenated into a visual context
+prefix injected into the RAG prompt. This architecture means the same pipeline
+handles text-only and multimodal queries without branching.
+
+\section{Code Laboratory}
+\label{sec:codelab}
+
+The Code Lab is built around Monaco Editor (v0.50) on the frontend and a
+\texttt{SecureSandbox} class on the backend. The sandbox spins up a Docker
+container per execution request, enforces CPU and memory cgroups, and redirects
+stdin and stdout through a controlled channel. There is no network access from
+within the container by default.
+
+On top of the execution layer:
+
+\begin{itemize}
+    \item A WebSocket endpoint at \texttt{/ws/terminal/\{project\_id\}} provides
+    an interactive terminal through XTerm.js. The same container that ran the
+    initial code execution remains active for the terminal session.
+
+    \item AI inline completion streams token-by-token code suggestions from the
+    OmniRAG pipeline and displays them as ghost text in Monaco. The completion
+    prompt includes the current file content, cursor position, and a summary
+    of recently visited files for context.
+
+    \item A Debug Adapter Protocol implementation using Python's \texttt{Bdb}
+    supports breakpoints, step-over, step-into, and variable inspection for
+    Python programs. The DAP protocol messages are transported over the
+    existing WebSocket connection.
+
+    \item Git integration (\texttt{/api/v1/git/}) exposes log, diff, commit,
+    and branch operations backed by GitPython. GitHub synchronisation through
+    PyGithub 2.8 allows students to pull in remote repositories for analysis
+    or push work back to their organisation.
+\end{itemize}
+
+\section{Memory Architecture}
+\label{sec:memory}
+
+Two memory layers operate in parallel:
+
+\textbf{Short-term session summaries.} At natural pause points within a session,
+the LLM generates a hierarchical summary of the conversation history. This
+summary---rather than the raw message log---is passed as \texttt{memory\_summary}
+on subsequent requests, keeping the context window lean while preserving the
+substance of prior exchanges.
+
+\textbf{Long-term user profiles.} After each OmniRAG interaction, the
+\texttt{memory\_system.remember()} call stores a structured record: the original
+query, the generated response, the sources cited, the complexity class and
+strategy used, and the self-critique confidence score. A background aggregation
+process computes per-user patterns from this record store and populates a profile
+that the query rewriter consults on subsequent sessions.
+
+Both layers are scoped to individual users by \texttt{user\_id}. There is no
+cross-user memory sharing.
+
+\section{Analytics Workbench}
+\label{sec:analytics}
+
+The Analytics module accepts CSV and XLSX uploads, infers column types using
+Pandas, and provides a self-service workbench for descriptive statistics,
+K-Means clustering (scikit-learn), and lightweight classification. Recharts
+renders the output charts in the browser. The AI insight generation endpoint
+feeds a dataset summary into the OmniRAG pipeline --- the same pipeline that
+handles all other queries --- and returns a structured analysis covering
+correlations, outliers, and recommended follow-up investigations. Export to
+PDF is handled by jsPDF with jspdf-autotable.
+
+\section{Decision Vault}
+\label{sec:decision}
+
+The Decision Vault stores structured decisions (context, constraints, options,
+rationale, confidence) and submits each to \texttt{DecisionAIService} for
+adversarial review. The AI reviewer attempts to challenge the premises of the
+decision and flag logical inconsistencies or hidden assumptions. Results are
+returned with severity labels (critical, warning, suggestion) and are
+exportable as PDF or JSON.
+
+This subsystem was the least mature of the five at the time of writing. The
+review logic works, but the prompt engineering for adversarial critiquing is an
+area where iteration is clearly warranted.
+
+\section{Authentication and Security}
+\label{sec:security}
+
+Authentication uses two cooperating layers. Supabase handles the primary auth
+flow (email/password and OAuth2 social providers); every request to the FastAPI
+backend carries a Supabase-issued JWT that is validated by
+\texttt{get\_current\_user()}. For relational integrity, each successful Supabase
+authentication also upserts a local user record in PostgreSQL, so that
+foreign-key relationships (sessions, projects, analysis records) do not depend
+on a remote service being available at query time.
+
+Security testing covers input validation (injection attacks on all auth
+endpoints via \texttt{TestInputValidation}), standard header assertions
+(\texttt{TestSecurityHeaders}), JWT-specific tests (\texttt{TestJWTTokens}),
+and password-hash correctness (\texttt{TestPasswordHashing}). Rate limiting
+is enforced globally via SlowAPI backed by Redis, with per-user overrides
+configurable through environment variables.

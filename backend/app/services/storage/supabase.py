@@ -1,8 +1,9 @@
 import redis.asyncio as redis
 from supabase import create_client, Client
 from app.core.config import settings
-import os
-import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 class SupabaseStorage:
     def __init__(self):
@@ -10,7 +11,11 @@ class SupabaseStorage:
         # Use SERVICE_ROLE_KEY if available to bypass RLS in the backend
         key = settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_ANON_KEY
         if settings.SUPABASE_URL and key:
-            self.supabase = create_client(settings.SUPABASE_URL, key)
+            try:
+                self.supabase = create_client(settings.SUPABASE_URL, key)
+            except Exception as e:
+                logger.warning("Supabase client initialization failed; storage features disabled: %s", e)
+                self.supabase = None
 
         # Initialize Redis for URL caching
         try:

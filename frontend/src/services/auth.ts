@@ -45,14 +45,14 @@ export const authService = {
     }
   },
 
-  async register(email: string, password: string, role: string = 'user') {
+  async register(email: string, password: string, role: string = 'user', firstName?: string, lastName?: string) {
     try {
       const response = await fetch(`${FINAL_API_URL}/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password, role }),
+        body: JSON.stringify({ email, password, role, first_name: firstName, last_name: lastName }),
       });
 
       if (!response.ok) {
@@ -88,6 +88,9 @@ export const authService = {
 
       if (!response.ok) {
         const errorText = await response.text();
+        if (response.status === 401 || response.status === 403) {
+          throw new Error('UNAUTHORIZED');
+        }
         if (process.env.NODE_ENV === 'development') {
           console.error('[Auth Service] Error response:', errorText);
         }

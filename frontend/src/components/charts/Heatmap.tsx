@@ -4,7 +4,7 @@ import React from 'react';
 
 interface HeatmapProps {
   data: Array<{ x: string; y: string; value: number }>;
-  height?: number;
+  height?: number | string;
   title?: string;
 }
 
@@ -41,7 +41,7 @@ export const Heatmap: React.FC<HeatmapProps> = ({ data, height, title }) => {
   return (
     <div className="w-full h-full flex flex-col">
       {title && <h3 className="text-lg font-semibold mb-4 text-gray-800">{title}</h3>}
-      <div className="overflow-auto border border-gray-100 rounded-xl bg-gray-50/30 shadow-inner p-2 custom-scrollbar flex-1" style={{ maxHeight: height || '400px' }}>
+      <div className="overflow-auto border border-gray-100 rounded-xl bg-gray-50/30 shadow-inner p-2 custom-scrollbar flex-1" style={{ maxHeight: height ? (typeof height === 'number' ? `${height}px` : height) : '400px' }}>
         <table className="border-separate border-spacing-1">
           <thead>
             <tr>

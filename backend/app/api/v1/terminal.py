@@ -48,11 +48,19 @@ class TerminalSession:
 
             logger.info(f"Started terminal session {self.session_id} with PID {self.process.pid}")
 
-            # Start read/write tasks
-            await asyncio.gather(
-                self._read_output(),
-                self._read_input()
+            output_task = asyncio.create_task(self._read_output())
+            input_task = asyncio.create_task(self._read_input())
+            done, pending = await asyncio.wait(
+                [output_task, input_task],
+                return_when=asyncio.FIRST_COMPLETED,
             )
+            for task in pending:
+                task.cancel()
+            for task in done:
+                try:
+                    await task
+                except Exception:
+                    pass
         except Exception as e:
             logger.error(f"Failed to start terminal process: {e}")
             raise
@@ -125,6 +133,19 @@ class TerminalSession:
         """Cleanup terminal session"""
         logger.info(f"Cleaning up terminal session {self.session_id}")
 
+        if self.master:
+            try:
+                os.close(self.master)
+            except Exception:
+                pass
+            self.master = None
+        if self.slave:
+            try:
+                os.close(self.slave)
+            except Exception:
+                pass
+            self.slave = None
+
         if self.process:
             try:
                 # Kill the process group
@@ -137,17 +158,6 @@ class TerminalSession:
                         os.killpg(os.getpgid(self.process.pid), signal.SIGKILL)
             except Exception as e:
                 logger.error(f"Process cleanup error: {e}")
-
-        if self.master:
-            try:
-                os.close(self.master)
-            except:
-                pass
-        if self.slave:
-            try:
-                os.close(self.slave)
-            except:
-                pass
 
 # Store active sessions
 active_sessions: Dict[str, TerminalSession] = {}

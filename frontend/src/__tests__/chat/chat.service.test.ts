@@ -46,7 +46,11 @@ describe('chatService', () => {
         });
 
         it('should throw on non-ok response', async () => {
-            global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+            global.fetch = vi.fn().mockResolvedValue({
+                ok: false,
+                status: 500,
+                text: () => Promise.resolve('internal error'),
+            });
 
             await expect(chatService.getSessions()).rejects.toThrow('Failed to fetch chat sessions');
         });

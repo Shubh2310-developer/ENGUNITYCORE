@@ -106,6 +106,7 @@ export default function DashboardLayout({
                 src="/Logo1.jpg"
                 alt="Engunity Logo"
                 fill
+                sizes="36px"
                 className="object-cover"
               />
             </div>

@@ -33,6 +33,25 @@ from app.api.v1.testing import router as testing_router
 from app.api.v1.jobprep import router as jobprep_router
 from app.api.v1.agent_tools import router as agent_tools_router
 from app.api.v1.coding_team import router as coding_team_router
+from app.api.v1.wellbeing import router as wellbeing_router
+
+ALLOWED_ORIGINS = {
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+}
+
+
+def _cors_error_headers(request: Request) -> dict:
+    origin = request.headers.get("origin")
+    if origin in ALLOWED_ORIGINS:
+        return {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Vary": "Origin",
+        }
+    return {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -89,6 +108,7 @@ async def starlette_http_exception_handler(request: Request, exc: StarletteHTTPE
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},
+        headers=_cors_error_headers(request),
     )
 
 @app.exception_handler(FastAPIHTTPException)
@@ -97,6 +117,7 @@ async def fastapi_http_exception_handler(request: Request, exc: FastAPIHTTPExcep
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},
+        headers=_cors_error_headers(request),
     )
 
 @app.exception_handler(Exception)
@@ -108,17 +129,9 @@ async def global_exception_handler(request: Request, exc: Exception):
 
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error", "error": str(exc)},
+        content={"detail": "Internal server error"},
+        headers=_cors_error_headers(request),
     )
-
-# Add standard CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # Add GZip Compression Middleware (compress responses > 1KB)
 from fastapi.middleware.gzip import GZipMiddleware
@@ -126,6 +139,16 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Add Response Caching Middleware
 app.add_middleware(ResponseCacheMiddleware, ttl=300)
+
+# Add CORS middleware last so it's outermost and can attach headers
+# to both success and error responses in local development.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=list(ALLOWED_ORIGINS),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 def root():
@@ -154,3 +177,4 @@ app.include_router(testing_router, prefix=f"{settings.API_V1_STR}/testing", tags
 app.include_router(jobprep_router, prefix=f"{settings.API_V1_STR}/jobprep", tags=["jobprep"])
 app.include_router(agent_tools_router, prefix=f"{settings.API_V1_STR}/agent-tools", tags=["agent-tools"])
 app.include_router(coding_team_router, prefix=f"{settings.API_V1_STR}/coding-team", tags=["coding-team"])
+app.include_router(wellbeing_router, prefix=f"{settings.API_V1_STR}/wellbeing", tags=["wellbeing"])

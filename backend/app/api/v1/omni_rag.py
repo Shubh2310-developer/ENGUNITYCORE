@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
-from typing import Optional, List
+from typing import Optional, List, Literal
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.api.v1.auth import get_current_user
@@ -10,6 +10,7 @@ from app.models.user import User
 from app.models.chat import ChatSession
 from app.services.rag.pipeline import OmniRAGPipeline
 from app.services.ai.router import ai_router
+from app.services.ai.turbo_quant_service import turbo_quant_service
 from app.services.ai.dependencies import get_vector_store
 from app.services.ai.groq_client import groq_client
 from app.services.ai.document_processor import document_processor
@@ -34,6 +35,14 @@ def get_omni_rag_pipeline():
         )
     return _omni_rag_pipeline
 
+class TurboQuantRequestSchema(BaseModel):
+    enabled: bool = False
+    mode: Literal["auto", "force", "off"] = "auto"
+    target: Literal["kv_cache", "embeddings", "auto"] = "auto"
+    variant: Literal["mse", "prod"] = "prod"
+    bit_width: Literal[2, 3, 4, 5, 6, 7, 8] = 4
+
+
 class OmniRAGRequest(BaseModel):
     query: str
     session_id: Optional[str] = None
@@ -41,6 +50,7 @@ class OmniRAGRequest(BaseModel):
     include_metadata: bool = True
     image_urls: Optional[List[str]] = []
     image_ids: Optional[List[str]] = []
+    turbo_quant: Optional[TurboQuantRequestSchema] = None
 
 class OmniRAGResponse(BaseModel):
     query: str
@@ -88,7 +98,10 @@ async def process_omni_rag_query(
         "timestamp": datetime.now()
     }
     if mongodb.db is not None:
-        await mongodb.db.chat_messages.insert_one(user_msg_data)
+        try:
+            await mongodb.db.chat_messages.insert_one(user_msg_data)
+        except Exception as e:
+            logger.warning(f"Failed to insert user message into MongoDB: {e}")
 
     # 3. Build optimized context using Hierarchical Memory
     from app.services.chat.context import build_context
@@ -129,7 +142,10 @@ async def process_omni_rag_query(
             **rag_metadata
         }
         if mongodb.db is not None:
-            await mongodb.db.chat_messages.insert_one(assistant_msg_data)
+            try:
+                await mongodb.db.chat_messages.insert_one(assistant_msg_data)
+            except Exception as e:
+                logger.warning(f"Failed to insert assistant message into MongoDB: {e}")
 
         # 6. Update session title if needed
         # Generate a smart title if it's currently a placeholder or generic
@@ -358,14 +374,25 @@ async def stream_omni_rag_query(
     """
     Process query and stream response using Omni-RAG pipeline with persistence
     """
+    turbo_quant_request = request.turbo_quant.model_dump() if request.turbo_quant else None
+
+    config_error = turbo_quant_service.validate_config(turbo_quant_request)
+    if config_error:
+        raise HTTPException(status_code=422, detail=config_error)
+
     # 1. Get or create session
     session_id = request.session_id
     if not session_id:
-        session = ChatSession(user_id=current_user.id, title=request.query[:30] + "...")
-        db.add(session)
-        db.commit()
-        db.refresh(session)
-        session_id = session.id
+        try:
+            session = ChatSession(user_id=current_user.id, title=request.query[:30] + "...")
+            db.add(session)
+            db.commit()
+            db.refresh(session)
+            session_id = session.id
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Failed to create session in omni-rag/stream: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to create session: {type(e).__name__}")
     else:
         session = db.query(ChatSession).filter(
             ChatSession.id == session_id,
@@ -384,8 +411,7 @@ async def stream_omni_rag_query(
         "image_ids": request.image_ids,
         "timestamp": datetime.now()
     }
-    if mongodb.db is not None:
-        await mongodb.db.chat_messages.insert_one(user_msg_data)
+    # We defer MongoDB insertion until inside the event generator so we can gracefully stream errors if needed.
 
     # 3. Build optimized context using Hierarchical Memory
     from app.services.chat.context import build_context
@@ -403,12 +429,29 @@ async def stream_omni_rag_query(
         full_response = ""
         final_metadata = {}
         final_metadata.update(context_meta) # Start with memory metadata
+        runtime_provider = ai_router.get_provider_identity_for_strategy(request.strategy)
+        turbo_quant_metadata = turbo_quant_service.evaluate_request(runtime_provider, turbo_quant_request)
+        if turbo_quant_metadata:
+            final_metadata["turbo_quant"] = turbo_quant_metadata
 
         try:
-            # Yield session ID and memory status for frontend
-            yield f"data: {json.dumps({'type': 'metadata', 'session_id': session_id, **context_meta})}\n\n"
+            if mongodb.db is not None:
+                try:
+                    await mongodb.db.chat_messages.insert_one(user_msg_data)
+                except Exception as e:
+                    logger.warning(f"Failed to insert user message into MongoDB: {e}")
 
-            pipeline = get_omni_rag_pipeline()
+            initial_metadata_payload = {'type': 'metadata', 'session_id': session_id, **context_meta}
+            if turbo_quant_metadata:
+                initial_metadata_payload['turbo_quant'] = turbo_quant_metadata
+
+            # Yield session and runtime metadata before meaningful content
+            yield f"data: {json.dumps(initial_metadata_payload)}\n\n"
+
+            # Load the pipeline in a thread-pool executor to avoid blocking the event loop.
+            # OmniRAGPipeline init loads sentence transformers which can take 30+ seconds.
+            import asyncio as _asyncio
+            pipeline = await _asyncio.to_thread(get_omni_rag_pipeline)
             async for event in pipeline.stream_query(
                 query=request.query,
                 user_id=str(current_user.id),
@@ -423,7 +466,12 @@ async def stream_omni_rag_query(
                 if event['type'] == 'content':
                     full_response += event['content']
                 elif event['type'] == 'metadata':
-                    final_metadata.update(event)
+                    final_metadata.update({k: v for k, v in event.items() if k != 'turbo_quant'})
+                    incoming_turbo = event.get('turbo_quant')
+                    if incoming_turbo is not None:
+                        merged_turbo = dict(final_metadata.get('turbo_quant') or {})
+                        merged_turbo.update({k: v for k, v in incoming_turbo.items() if v is not None})
+                        final_metadata['turbo_quant'] = merged_turbo
                 yield f"data: {json.dumps(event)}\n\n"
 
             # Save assistant message after stream ends
@@ -435,11 +483,16 @@ async def stream_omni_rag_query(
                 "content": full_response,
                 "timestamp": datetime.now(),
                 "retrieved_docs": final_metadata.get('retrieved_docs', []),
+                "turbo_quant": final_metadata.get('turbo_quant'),
                 **final_metadata
             }
             if mongodb.db is not None:
-                res = await mongodb.db.chat_messages.insert_one(assistant_msg_data)
-                msg_id = str(res.inserted_id)
+                try:
+                    res = await mongodb.db.chat_messages.insert_one(assistant_msg_data)
+                    msg_id = str(res.inserted_id)
+                except Exception as e:
+                    logger.warning(f"Failed to insert assistant message: {e}")
+                    msg_id = str(uuid.uuid4())
             else:
                 msg_id = str(uuid.uuid4())
 
@@ -468,9 +521,15 @@ async def stream_omni_rag_query(
 
                 yield f"data: {json.dumps({'type': 'done', 'message_id': msg_id, 'title': generated_title})}\n\n"
 
+        except (BrokenPipeError, IOError, GeneratorExit, ConnectionResetError) as e:
+            # Client disconnected — swallow silently, no need to stream an error back
+            logger.warning(f"Client disconnected during streaming: {type(e).__name__}")
         except Exception as e:
             logger.error(f"Error in Omni-RAG streaming: {str(e)}")
-            yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+            try:
+                yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+            except (BrokenPipeError, IOError):
+                pass  # Client already gone
         finally:
             stream_db.close()
 

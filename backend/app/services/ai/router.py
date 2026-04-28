@@ -5,6 +5,11 @@ from app.services.ai.cache import ai_cache
 from app.services.ai.logger import ai_logger
 
 class AIRouter:
+    def get_provider_identity_for_strategy(self, strategy: Optional[str] = None) -> str:
+        if getattr(groq_client, "clients", None):
+            return "groq"
+        return "ollama"
+
     async def route_request(
         self,
         messages: List[Dict[str, str]],

@@ -8,6 +8,94 @@ export interface OmniRAGRequest {
   include_metadata?: boolean;
   image_urls?: string[];
   image_ids?: string[];
+  turbo_quant?: TurboQuantRequest;
+}
+
+export type TurboQuantMode = 'auto' | 'force' | 'off';
+export type TurboQuantTarget = 'kv_cache' | 'embeddings' | 'auto';
+export type TurboQuantVariant = 'mse' | 'prod';
+export type TurboQuantBitWidth = 2 | 3 | 4 | 5 | 6 | 7 | 8;
+
+export interface TurboQuantRequest {
+  enabled: boolean;
+  mode: TurboQuantMode;
+  target: TurboQuantTarget;
+  variant: TurboQuantVariant;
+  bit_width: TurboQuantBitWidth;
+}
+
+export interface TurboQuantRuntimeMetadata {
+  requested?: boolean;
+  applied?: boolean;
+  provider?: string;
+  variant?: TurboQuantVariant;
+  bit_width?: number;
+  compression_ratio?: number;
+  estimated_memory_saved_mb?: number;
+  quality_score?: number;
+  first_token_overhead_ms?: number;
+  fallback_reason?: string;
+}
+
+export interface OmniRAGMetadataEvent {
+  type: 'metadata';
+  session_id?: string;
+  complexity?: string;
+  strategy?: string;
+  used_web_search?: boolean;
+  retrieved_docs?: string[];
+  hyde_doc?: string;
+  multi_queries?: string[];
+  memory_active?: boolean;
+  memory_summary?: string;
+  context_compressed?: boolean;
+  confidence?: number;
+  critique?: string;
+  steps?: Array<{ thought: string; output: string }>;
+  turbo_quant?: TurboQuantRuntimeMetadata;
+}
+
+export interface OmniRAGContentEvent {
+  type: 'content';
+  content: string;
+}
+
+export interface OmniRAGDoneEvent {
+  type: 'done';
+  message_id?: string;
+  title?: string;
+  strategy?: string;
+}
+
+export interface OmniRAGErrorEvent {
+  type: 'error';
+  content: string;
+}
+
+export type OmniRAGStreamEvent =
+  | OmniRAGMetadataEvent
+  | OmniRAGContentEvent
+  | OmniRAGDoneEvent
+  | OmniRAGErrorEvent;
+
+function parseSseEvent(raw: string): OmniRAGStreamEvent | null {
+  const parsed: unknown = JSON.parse(raw);
+  if (!parsed || typeof parsed !== 'object') {
+    return null;
+  }
+
+  const event = parsed as Record<string, unknown>;
+  const eventType = event.type;
+  if (
+    eventType === 'metadata' ||
+    eventType === 'content' ||
+    eventType === 'done' ||
+    eventType === 'error'
+  ) {
+    return event as unknown as OmniRAGStreamEvent;
+  }
+
+  return null;
 }
 
 export interface OmniRAGResponse {
@@ -133,7 +221,7 @@ class OmniRAGService {
 
   async streamQuery(
     request: OmniRAGRequest,
-    onEvent: (event: any) => void,
+    onEvent: (event: OmniRAGStreamEvent) => void,
     onError?: (error: string) => void
   ): Promise<void> {
     const token = useAuthStore.getState().token;
@@ -169,12 +257,23 @@ class OmniRAGService {
 
         for (const line of lines) {
           if (line.trim().startsWith('data: ')) {
+            let event: OmniRAGStreamEvent | null = null;
             try {
-              const event = JSON.parse(line.trim().slice(6));
-              onEvent(event);
+              event = parseSseEvent(line.trim().slice(6));
             } catch (e) {
-              console.error('Error parsing SSE event:', e);
+              // Only catch JSON parse errors here — let onEvent errors propagate
+              console.error('Error parsing SSE event JSON:', e);
+              continue;
             }
+
+            if (!event) {
+              continue;
+            }
+
+            // Call onEvent OUTSIDE the JSON parse try-catch so that errors thrown
+            // from inside onEvent (e.g. when handling type:'error' events) propagate
+            // to the outer catch block and correctly invoke onError.
+            onEvent(event);
           }
         }
       }

@@ -12,7 +12,8 @@ export const Terminal = () => {
     activeTerminalId,
     addTerminal,
     removeTerminal,
-    setActiveTerminal
+    setActiveTerminal,
+    currentProjectId,
   } = useCodeStore();
 
   useEffect(() => {
@@ -76,7 +77,7 @@ export const Terminal = () => {
         {terminals.map((term) => (
           <TerminalInstance
             key={term.id}
-            projectId="default-project"
+            projectId={currentProjectId || 'default-project'}
             isActive={activeTerminalId === term.id}
           />
         ))}

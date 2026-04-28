@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 
 interface User {
   id: number;
@@ -43,6 +43,30 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'engunity-auth',
+      storage: createJSONStorage(() => {
+        const fallbackStorage = {
+          getItem: (_name: string) => null,
+          setItem: (_name: string, _value: string) => undefined,
+          removeItem: (_name: string) => undefined,
+        };
+
+        if (typeof window !== 'undefined' && window.localStorage) {
+          try {
+            const storage = window.localStorage;
+            if (
+              typeof storage.getItem === 'function' &&
+              typeof storage.setItem === 'function' &&
+              typeof storage.removeItem === 'function'
+            ) {
+              return storage;
+            }
+          } catch {
+            return fallbackStorage;
+          }
+        }
+
+        return fallbackStorage;
+      }),
       partialize: (state) => ({ token: state.token, providerToken: state.providerToken }),
       onRehydrateStorage: (state) => {
         return () => {

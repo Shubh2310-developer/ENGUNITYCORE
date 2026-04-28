@@ -31,6 +31,15 @@ export interface CodeProjectCreate {
   repository_url?: string;
 }
 
+export interface CodeFileCreate {
+  path: string;
+  name: string;
+  type: 'file' | 'folder';
+  content?: string;
+  language?: string;
+  parentId?: string;
+}
+
 export interface CodeProjectUpdate {
   name?: string;
   description?: string;
@@ -160,7 +169,7 @@ export const codeService = {
 
   async getFile(projectId: string, fileId: string): Promise<any> {
     const token = useAuthStore.getState().token;
-    const response = await fetch(`${API_URL}/code/${projectId}/files/${fileId}`, {
+    const response = await fetch(`${FINAL_API_URL}/code/${projectId}/files/${fileId}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -186,7 +195,7 @@ export const codeService = {
 
   async updateFile(projectId: string, fileId: string, data: any): Promise<any> {
     const token = useAuthStore.getState().token;
-    const response = await fetch(`${API_URL}/code/${projectId}/files/${fileId}`, {
+    const response = await fetch(`${FINAL_API_URL}/code/${projectId}/files/${fileId}`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -200,7 +209,7 @@ export const codeService = {
 
   async deleteFile(projectId: string, fileId: string): Promise<void> {
     const token = useAuthStore.getState().token;
-    const response = await fetch(`${API_URL}/code/${projectId}/files/${fileId}`, {
+    const response = await fetch(`${FINAL_API_URL}/code/${projectId}/files/${fileId}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -245,7 +254,7 @@ export const codeService = {
 
   async searchCode(projectId: string, query: string): Promise<any> {
     const token = useAuthStore.getState().token;
-    const response = await fetch(`${API_URL}/code/${projectId}/search?query=${encodeURIComponent(query)}`, {
+    const response = await fetch(`${FINAL_API_URL}/code/${projectId}/search?query=${encodeURIComponent(query)}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -257,7 +266,7 @@ export const codeService = {
 
   async refineCode(data: { file_content: string; language: string; instruction: string; project_id?: string }): Promise<any> {
     const token = useAuthStore.getState().token;
-    const response = await fetch(`${API_URL}/code/refine`, {
+    const response = await fetch(`${FINAL_API_URL}/code/refine`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,

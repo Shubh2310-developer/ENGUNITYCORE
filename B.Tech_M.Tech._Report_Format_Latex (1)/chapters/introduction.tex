@@ -1,0 +1,142 @@
+\chapter{Introduction}
+\label{chap:intro}
+
+\section{Background and Motivation}
+\label{sec:background}
+
+When we first began sketching out what would become EngUnity, we noticed a pattern
+that most engineering students will recognise immediately. You switch between five
+browser tabs just to get through one assignment: a search engine for context, a
+separate IDE for the actual code, a spreadsheet for your data, maybe a chatbot
+window for quick explanations, and yet another tool if you want to dig deeper into
+a topic. None of these things talk to each other. Context is lost every time you
+jump between them.
+
+That fragmentation is not just inconvenient---it actively slows learning. Research
+on cognitive load has long established that switching between disconnected
+environments increases the mental overhead required for even straightforward
+tasks~\citep{sweller1988cognitive}. When students spend energy managing tools rather
+than engaging with the subject matter itself, something is wrong at the tooling level.
+
+At roughly the same time, large language models crossed what felt like a practical
+threshold. Systems capable of multi-step reasoning, document grounding, and
+iterative search---the kind of thing that until recently required dedicated research
+infrastructure---became available through open APIs and open-weight releases.
+Retrieval-augmented generation frameworks matured enough that integrating a
+domain-specific document corpus into a conversational system was, if not trivial,
+at least tractable for a small engineering team~\citep{lewis2020rag}.
+Containerised web sandboxes made safe code execution feasible without a dedicated
+judge cluster. Real-time streaming (Server-Sent Events over HTTP) made it possible
+to deliver token-by-token output to a browser without proprietary client libraries.
+
+The question, then, was whether these pieces could be assembled into a platform that
+genuinely serves engineering students rather than one that merely demonstrates the
+technology. EngUnity is our answer to that question.
+
+\section{Problem Statement}
+\label{sec:problem}
+
+The problems we set out to address can be grouped into five categories, each of
+which shaped a design decision.
+
+\begin{enumerate}
+    \item \textbf{Tool fragmentation.}
+    Students routinely maintain parallel sessions across a web IDE, an AI chat
+    window, a browser search engine, and a data analysis tool. There is no
+    shared context between these environments. A finding from a research session
+    does not automatically appear in the coding assistant; a dataset insight does
+    not inform the decision-support tool. This forces students to act as
+    middleware, manually copying context between systems.
+
+    \item \textbf{Shallow AI depth.}
+    Most accessible AI assistants are excellent at answering well-posed, single-
+    turn factual questions. They are considerably less capable when a task
+    requires gathering information from several sources, reconciling conflicting
+    accounts, or iteratively narrowing a research question. Thesis-level queries
+    and comparative technical investigations routinely fall into this harder
+    category.
+
+    \item \textbf{Code execution safety.}
+    Allowing arbitrary code to run on shared cloud infrastructure without
+    isolation bounds is a real problem. Resource exhaustion, inadvertent data
+    exposure, and denial-of-service through infinite loops are all plausible
+    without proper sandboxing. Existing solutions either accept the risk or
+    offload execution to the student's local machine, which breaks the
+    browser-only workflow.
+
+    \item \textbf{Stateless AI assistance.}
+    Generic LLM deployments treat every session---often every message---as
+    independent. Prior context about a user's course, project, or skill level
+    is discarded between interactions. Over a semester, this amounts to a
+    significant amount of repeated context-setting by the student.
+
+    \item \textbf{Multimodal blind spots.}
+    Engineering coursework is not text-only. Circuit schematics, timing
+    diagrams, signal plots, handwritten lecture notes, and scanned reference
+    sheets are all routine. A system that cannot reason about images forces
+    students back to text-only workflows for a substantial fraction of their
+    actual study materials.
+\end{enumerate}
+
+\section{Objectives of the Study}
+\label{sec:objectives}
+
+This project aimed to design, build, and evaluate a platform that addresses each
+of the problems above. The concrete objectives were:
+
+\begin{enumerate}
+    \item Design a \textbf{query-complexity-aware retrieval-augmented generation pipeline}
+    that automatically selects among direct generation, single-hop retrieval,
+    multi-hop knowledge-graph traversal, and recursive intensive reasoning
+    based on a per-request complexity estimate.
+
+    \item Implement a \textbf{multi-phase autonomous research agent} that decomposes
+    complex queries, fans out searches across a vector store, live web results,
+    and a knowledge-graph community index, evaluates evidence quality, identifies
+    coverage gaps, and synthesises a final report---without requiring the user
+    to manually orchestrate these steps.
+
+    \item Build a \textbf{multimodal visual understanding layer} that accepts
+    image inputs alongside text and generates contextual descriptions through
+    a stack comprising CLIP semantic embeddings, EasyOCR text extraction, and
+    YOLOv8 object detection.
+
+    \item Deliver a \textbf{secure, browser-hosted code laboratory} with a Monaco
+    editor frontend, container-isolated code execution, a live WebSocket
+    terminal, AI-assisted inline completion, a DAP-compliant debugger, and
+    Git and GitHub integration.
+
+    \item Implement a \textbf{two-layer memory system} that accumulates session
+    context and builds a long-term user profile to personalise answers
+    without violating per-user data isolation.
+
+    \item Evaluate the assembled system through \textbf{automated load testing},
+    a \textbf{quality-metric logging pipeline}, and a \textbf{Playwright
+    end-to-end test suite} covering all critical user flows.
+\end{enumerate}
+
+\section{Scope and Boundaries}
+\label{sec:scope}
+
+EngUnity is a web application. The server-side components are deployable on any
+Linux host with Docker; the client runs in any modern browser. The system was
+built and evaluated in a single-server configuration consistent with an academic
+project budget. Horizontal multi-server scaling, while architecturally possible
+(the stateless FastAPI application and Redis-backed Celery queue support it), was
+not the focus of this evaluation.
+
+The platform is \textit{domain-agnostic}---the OmniRAG pipeline can be loaded with
+any document corpus. This report focuses on engineering education as the primary
+use case because that was the context in which the system was developed and tested.
+
+\section{Report Organisation}
+\label{sec:structure}
+
+Chapter~\ref{chap:litrev} reviews the technical literature underpinning each
+major subsystem. Chapter~\ref{chap:design} details the system architecture,
+data models, and the algorithms we implemented or adapted. Chapter~\ref{chap:results}
+presents evaluation results, including load-test latency data, quality metric
+statistics, and functional test outcomes. Chapter~\ref{chap:conclusions} draws
+conclusions, identifies limitations, and proposes directions for future work.
+Appendices cover the full API reference, technology stack tables, and a
+bibliography citation audit.

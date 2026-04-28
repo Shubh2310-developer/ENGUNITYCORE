@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useRef } from 'react';
 import {
   Shield,
   Search,
@@ -35,13 +35,49 @@ import {
   MessageCircle
 } from 'lucide-react';
 import styles from './decisionvault.module.css';
-import { decisionService, Decision, DecisionType, DecisionStatus, DecisionConfidence, Option, Evidence, AIFlag } from '@/services/decision';
+import { decisionService, Decision, DecisionType, DecisionStatus, DecisionConfidence, Option, Evidence, AIFlag, DecisionAIError } from '@/services/decision';
 import { useSearchParams } from 'next/navigation';
 
 type ViewMode = 'active' | 'timeline' | 'analytics';
 
 const DECISION_TYPES: DecisionType[] = ['Architecture', 'Research', 'Code', 'Product', 'Career', 'Compliance'];
 const STATUSES: DecisionStatus[] = ['tentative', 'confirmed', 'revisited', 'deprecated'];
+
+const sanitizePrefill = (value: string | null, maxLen: number): string => {
+  if (!value) return '';
+  return value
+    .replace(/[\u0000-\u001F\u007F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLen);
+};
+
+const sanitizeContextPrefill = (value: string | null): string => {
+  if (!value) return '';
+  return sanitizePrefill(value.replace(/<\/?script[^>]*>/gi, ''), 4000);
+};
+
+const buildInitialDecision = (): Partial<Decision> => ({
+  title: '',
+  type: 'Architecture',
+  problem_statement: '',
+  context: '',
+  status: 'tentative',
+  confidence: 'medium',
+  options: [
+    { id: '1', label: '', description: '', pros: [], cons: [], estimated_effort: 'medium', risk_level: 'low' },
+    { id: '2', label: '', description: '', pros: [], cons: [], estimated_effort: 'medium', risk_level: 'low' }
+  ],
+  constraints: [],
+  tradeoffs: { performance: 3, cost: 3, complexity: 3, risk: 3, scalability: 3, time_to_implement: 3 },
+  evidence: [],
+  ai_flags: [],
+  revisit_rule: { trigger_type: 'time_based', trigger_value: '3 months', notification_enabled: true },
+  tags: [],
+  final_decision: '',
+  rationale: '',
+  privacy: 'private'
+});
 
 function DecisionVaultContent() {
   const searchParams = useSearchParams();
@@ -50,6 +86,9 @@ function DecisionVaultContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [aiReviewError, setAiReviewError] = useState<string | null>(null);
   const [selectedDecision, setSelectedDecision] = useState<Decision | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [isGeneratingFlags, setIsGeneratingFlags] = useState(false);
@@ -137,26 +176,8 @@ function DecisionVaultContent() {
   ];
 
   // Form State
-  const [newDecision, setNewDecision] = useState<Partial<Decision>>({
-    title: '',
-    type: 'Architecture',
-    problem_statement: '',
-    status: 'tentative',
-    confidence: 'medium',
-    options: [
-      { id: '1', label: '', description: '', pros: [], cons: [], estimated_effort: 'medium', risk_level: 'low' },
-      { id: '2', label: '', description: '', pros: [], cons: [], estimated_effort: 'medium', risk_level: 'low' }
-    ],
-    constraints: [],
-    tradeoffs: { performance: 3, cost: 3, complexity: 3, risk: 3, scalability: 3, time_to_implement: 3 },
-    evidence: [],
-    ai_flags: [],
-    revisit_rule: { trigger_type: 'time_based', trigger_value: '3 months', notification_enabled: true },
-    tags: [],
-    final_decision: '',
-    rationale: '',
-    privacy: 'private'
-  });
+  const [newDecision, setNewDecision] = useState<Partial<Decision>>(buildInitialDecision());
+  const createRequestKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     loadDecisions();
@@ -165,26 +186,35 @@ function DecisionVaultContent() {
   // Handle incoming triggers from other modules
   useEffect(() => {
     const source = searchParams.get('source');
-    const title = searchParams.get('title');
-    const problem = searchParams.get('problem');
+    const title = sanitizePrefill(searchParams.get('title'), 200);
+    const problem = sanitizePrefill(searchParams.get('problem'), 1000);
+    const context = sanitizeContextPrefill(searchParams.get('context'));
+    const safeSource = source === 'code' || source === 'research' || source === 'chat' ? source : null;
 
-    if (source || title || problem) {
+    if (safeSource || title || problem || context) {
       setShowCreateModal(true);
+      setSubmitError(null);
+      setAiReviewError(null);
       setNewDecision(prev => ({
         ...prev,
         title: title || prev.title,
+        context: context || prev.context,
         problem_statement: problem || prev.problem_statement,
-        type: source === 'code' ? 'Code' :
-              source === 'research' ? 'Research' :
-              source === 'chat' ? 'Architecture' : prev.type
+        type: safeSource === 'code' ? 'Code' :
+              safeSource === 'research' ? 'Research' :
+              safeSource === 'chat' ? 'Architecture' : prev.type
       }));
 
       // If it's a chat conversion, we might want to skip to context or start fresh
-      if (source === 'chat' && !problem) {
+      if (safeSource === 'chat' && !problem) {
         setNewDecision(prev => ({
           ...prev,
           problem_statement: `Converted from chat session: ${title || 'Untitled'}`
         }));
+      }
+
+      if (typeof window !== 'undefined' && window.location.search) {
+        window.history.replaceState({}, '', window.location.pathname);
       }
     }
   }, [searchParams]);
@@ -202,35 +232,39 @@ function DecisionVaultContent() {
   };
 
   const handleCreateDecision = async () => {
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    if (!createRequestKeyRef.current) {
+      createRequestKeyRef.current = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `dv-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
+
     try {
-      const created = await decisionService.createDecision(newDecision);
-      setDecisions([created, ...decisions]);
+      const created = await decisionService.createDecision(newDecision, {
+        idempotencyKey: createRequestKeyRef.current,
+      });
+      setDecisions(prev => [created, ...prev]);
       setShowCreateModal(false);
       resetForm();
     } catch (error) {
+      setSubmitError('Failed to initialize decision. Please retry.');
       console.error('Failed to process decision creation:', error);
+    } finally {
+      setIsSubmitting(false);
+      createRequestKeyRef.current = null;
     }
   };
 
   const resetForm = () => {
     setCurrentStep(1);
-    setNewDecision({
-      title: '',
-      type: 'Architecture',
-      problem_statement: '',
-      status: 'tentative',
-      confidence: 'medium',
-      options: [
-        { id: '1', label: '', description: '', pros: [], cons: [], estimated_effort: 'medium', risk_level: 'low' },
-        { id: '2', label: '', description: '', pros: [], cons: [], estimated_effort: 'medium', risk_level: 'low' }
-      ],
-      constraints: [],
-      tradeoffs: { performance: 3, cost: 3, complexity: 3, risk: 3, scalability: 3, time_to_implement: 3 },
-      evidence: [],
-      ai_flags: [],
-      revisit_rule: { trigger_type: 'time_based', trigger_value: '3 months', notification_enabled: true },
-      tags: []
-    });
+    setNewDecision(buildInitialDecision());
+    setSubmitError(null);
+    setAiReviewError(null);
+    createRequestKeyRef.current = null;
   };
 
   const filteredDecisions = decisions.filter(d =>
@@ -273,10 +307,16 @@ function DecisionVaultContent() {
 
   const generateAIFlags = async () => {
     setIsGeneratingFlags(true);
+    setAiReviewError(null);
     try {
       const flags = await decisionService.analyzeDecision(newDecision);
       setNewDecision(prev => ({ ...prev, ai_flags: flags }));
     } catch (error) {
+      if (error instanceof DecisionAIError) {
+        setAiReviewError(error.message || 'AI review unavailable. You can continue, but this draft was not adversarially checked.');
+      } else {
+        setAiReviewError('AI review unavailable. You can continue, but this draft was not adversarially checked.');
+      }
       console.error('Failed to generate AI flags:', error);
     } finally {
       setIsGeneratingFlags(false);
@@ -1073,7 +1113,23 @@ ${d.options.map(o => `#### ${o.label}\n${o.description}\n- Pros: ${o.pros.join('
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {newDecision.ai_flags?.length === 0 ? (
+                      {aiReviewError ? (
+                        <div className="p-5 bg-red-50 border border-red-100 rounded-xl">
+                          <div className="flex items-start gap-3">
+                            <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
+                            <div>
+                              <h4 className="font-bold text-red-900 mb-1">AI review unavailable</h4>
+                              <p className="text-sm text-red-700 mb-3">{aiReviewError}</p>
+                              <button
+                                onClick={generateAIFlags}
+                                className="px-3 py-1.5 rounded-lg bg-white border border-red-200 text-red-700 text-xs font-bold hover:bg-red-50 transition-all"
+                              >
+                                Retry AI Review
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : newDecision.ai_flags?.length === 0 ? (
                         <div className="p-6 bg-green-50 border border-green-100 rounded-xl text-center">
                           <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto mb-3" />
                           <h4 className="font-bold text-green-900">No major issues detected</h4>
@@ -1218,9 +1274,18 @@ ${d.options.map(o => `#### ${o.label}\n${o.description}\n- Pros: ${o.pros.join('
               {currentStep < 7 ? (
                 <button onClick={nextStep} className={`${styles.btn} ${styles.btnPrimary}`}>Next Step</button>
               ) : (
-                <button onClick={handleCreateDecision} className={`${styles.btn} ${styles.btnPrimary}`}>Initialize Decision</button>
+                <button
+                  onClick={handleCreateDecision}
+                  disabled={isSubmitting}
+                  className={`${styles.btn} ${styles.btnPrimary} ${isSubmitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+                >
+                  {isSubmitting ? 'Initializing...' : 'Initialize Decision'}
+                </button>
               )}
             </div>
+            {submitError && (
+              <div className="px-6 pb-5 text-xs font-medium text-red-700">{submitError}</div>
+            )}
           </div>
         </div>
       )}

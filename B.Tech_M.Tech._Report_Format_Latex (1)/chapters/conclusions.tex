@@ -1,0 +1,150 @@
+\chapter{Conclusions}
+\label{chap:conclusions}
+
+\section{What We Set Out to Do and What We Built}
+\label{sec:what-we-built}
+
+The starting premise was that engineering students navigate too many disconnected
+tools and receive AI assistance that is either too shallow, too stateless, or too
+text-limited to be genuinely useful for the kind of work they actually do. We
+argued that this fragmentation was addressable with a carefully designed, open-
+source-backed platform rather than a commercial product, and we built EngUnity
+to test that claim.
+
+The five main technical contributions that emerged from the implementation are:
+
+\begin{enumerate}
+    \item \textbf{OmniRAG Pipeline} --- A four-strategy RAG system (direct
+    generation, single-hop vector retrieval, multi-hop Graph RAG, recursive
+    intensive reasoning) that routes queries automatically via a complexity
+    classifier. The single-hop path alone integrates twelve processing stages,
+    each auditable and individually replaceable.
+
+    \item \textbf{DeepResearchAgent} --- A five-phase iterative research system
+    that fans out searches across three backends (vector store, web, knowledge
+    graph), iteratively fills coverage gaps, and synthesises structured reports.
+    The explicit gap-analysis loop was the element that most clearly separated
+    the agent's output from a single-pass RAG response on broad research queries.
+
+    \item \textbf{Multimodal Input Layer} --- A three-component visual
+    perception stack (CLIP, EasyOCR, YOLOv8) that converts image inputs into
+    text-form context compatible with the existing RAG pipeline, requiring no
+    architectural changes to handle multimodal and text-only queries uniformly.
+
+    \item \textbf{Secure Code Laboratory} --- A browser-based IDE combining
+    Monaco Editor, container-isolated code execution, an interactive WebSocket
+    terminal, AI inline completion, a DAP-based debugger, and Git and GitHub
+    integration in a single authenticated environment.
+
+    \item \textbf{Text Quality Upgrade Stack} --- A post-generation pipeline
+    of 10 modules---refiner, density controller, language optimizer---that
+    measurably reduced LLM-typical phrasing and improved answer structure
+    without adding latency beyond the 150\,ms first-token budget.
+\end{enumerate}
+
+\section{What the Evaluation Showed}
+\label{sec:what-eval-showed}
+
+The load testing demonstrated that the application-level code is not the
+bottleneck under modest concurrent load ($\leq 50$ users): all latency budgets
+were met, the stream error rate stayed below 0.3\%, and the server remained
+within its 1\,GB RAM budget. The quality metric logs showed a mean naturalness
+score of 0.82 across 3,421 interactions, with the refinement step successfully
+reducing word count and filler phrases in 68\% of generated responses.
+Functional testing confirmed that all critical paths---auth, code execution,
+streaming, session persistence, analytics---pass their acceptance criteria.
+
+What the evaluation did not show is also worth stating explicitly. We do not
+have a ground-truth answer set against which to measure factual correctness. We
+did not conduct a user study with real students. The load test used a small,
+synthetic prompt pool that overestimates cache hit rates relative to production.
+These gaps are limitations of the project's scope and timeline, not of the
+system's design, and they point directly to the first items on the future-work
+list.
+
+\section{Limitations Worth Highlighting}
+\label{sec:limitations-final}
+
+\begin{itemize}
+    \item The FAISS vector index runs in-process. This works for a single-server
+    deployment but would need to move to an external service for any meaningful
+    horizontal scaling.
+
+    \item The query complexity classifier is heuristic. It performs well on
+    clear cases but has observable edge-case errors near class boundaries.
+    A trained classifier would be the natural improvement.
+
+    \item YOLOv8n's COCO taxonomy is too coarse for engineering hardware images.
+    A domain-adapted detection model, or at minimum fine-tuning on electronics
+    and lab-equipment imagery, is needed for the visual understanding layer to
+    be genuinely reliable.
+
+    \item Knowledge-graph community summaries are not incrementally updated.
+    Documents indexed after the initial community-building pass are not
+    represented in community-level retrieval.
+
+    \item The local Ollama inference path exists but is not the default
+    configuration. The TurboQuant KV-cache compression feature, designed to
+    improve local inference efficiency, falls back to disabled on the primary
+    Groq-hosted path. It remains a planned capability rather than a deployed one.
+\end{itemize}
+
+\section{Future Work}
+\label{sec:future-conclusions}
+
+The following directions are prioritised by their likely impact relative to
+implementation effort:
+
+\begin{enumerate}
+    \item \textbf{External vector store.} Replace in-process FAISS with
+    Qdrant or Weaviate. This is the highest-priority infrastructure change
+    for anyone considering scaling beyond a single server.
+
+    \item \textbf{Trained complexity classifier.} Use the quality metric log
+    (strategy assigned, quality outcome) as a weak supervision signal to train
+    a lightweight binary or multi-class classifier. A few thousand labelled
+    examples should be achievable from the existing logs with minimal annotation
+    effort.
+
+    \item \textbf{Electronics-adapted visual perception.} Fine-tune YOLOv8
+    on a domain-appropriate dataset (or substitute a circuit-diagram-specific
+    component detector) to improve multimodal understanding for the most common
+    engineering image type.
+
+    \item \textbf{Incremental knowledge-graph updates.} Move from batch
+    community building to an event-driven approach: new document indexed $\to$
+    community membership re-evaluated $\to$ affected community summaries
+    regenerated. This is a larger infrastructure change but directly addresses
+    the staleness limitation.
+
+    \item \textbf{Formal user study.} Run a controlled study with two cohorts
+    of students---one using EngUnity, one using a conventional combination of
+    search engine and standalone chatbot---and measure task completion time,
+    answer quality (judged by subject-matter experts), and self-reported
+    cognitive load.
+
+    \item \textbf{Blockchain audit trail.} Extend the existing blockchain
+    provenance layer (currently covering decision vault events) to log all
+    RAG retrievals, so that students can trace the documentary origin of any
+    AI-generated content they incorporate into their work.
+\end{enumerate}
+
+\section{Final Remarks}
+\label{sec:closing}
+
+EngUnity is, at its core, a demonstration that production-quality AI infrastructure
+for education does not require proprietary components. Every major subsystem is
+built from open-source libraries: FastAPI, FAISS, sentence-transformers,
+FlashRank, EasyOCR, Ultralytics YOLOv8, Next.js, Monaco, XTerm.js, and
+GitPython, among others. The Groq inference API is the one component that
+introduces external dependency, and the architecture is designed so that
+switching to a locally-hosted Ollama endpoint would not require structural
+changes to the pipeline.
+
+Whether the system is useful to students is a question we cannot fully answer
+from the available evaluation data. What we can say is that it is coherent---the
+five subsystems share a retrieval backbone, a memory architecture, a quality
+evaluation loop, and an authentication layer---and that it is tractable for a
+team of engineering students to build, understand, and extend. That tractability
+was not accidental; it was the result of setting component-boundary discipline
+as a design constraint from the start.

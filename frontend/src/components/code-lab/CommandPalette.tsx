@@ -16,11 +16,18 @@ export const CommandPalette = () => {
   );
 
   useEffect(() => {
+    let rafId: number | null = null;
     if (isCommandPaletteOpen) {
       setQuery('');
       setSelectedIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 10);
+      rafId = requestAnimationFrame(() => inputRef.current?.focus());
     }
+
+    return () => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+    };
   }, [isCommandPaletteOpen]);
 
   useEffect(() => {
@@ -61,7 +68,7 @@ export const CommandPalette = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] px-4">
+    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] px-4" role="dialog" aria-label="Command Palette" aria-modal="true" data-testid="command-palette">
       <div
         className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] animate-in fade-in duration-300"
         onClick={() => setCommandPaletteOpen(false)}
@@ -76,6 +83,7 @@ export const CommandPalette = () => {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Type a file name to navigate..."
+            aria-label="Search files"
             className="flex-1 bg-transparent border-none px-3 py-4 text-sm text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none font-medium"
           />
           <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-[#F1F5F9] border border-[#E2E8F0] text-[10px] font-bold text-[#64748B] uppercase tracking-wider shadow-sm">

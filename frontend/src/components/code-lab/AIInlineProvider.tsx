@@ -12,8 +12,8 @@ export class AIInlineCompletionProvider implements monaco.languages.InlineComple
   async provideInlineCompletions(
     model: monaco.editor.ITextModel,
     position: monaco.Position,
-    context: monaco.languages.InlineCompletionContext,
-    token: monaco.CancellationToken
+    _context: monaco.languages.InlineCompletionContext,
+    _token: monaco.CancellationToken
   ): Promise<monaco.languages.InlineCompletions | undefined> {
     // Cancel previous request
     if (this.abortController) {
@@ -21,6 +21,7 @@ export class AIInlineCompletionProvider implements monaco.languages.InlineComple
     }
 
     this.abortController = new AbortController();
+    if (!this.monaco?.Range) return undefined;
 
     // Get context
     const textBeforeCursor = model.getValueInRange({
@@ -38,13 +39,13 @@ export class AIInlineCompletionProvider implements monaco.languages.InlineComple
     });
 
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : '';
+      const authToken = typeof window !== 'undefined' ? localStorage.getItem('token') : '';
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/code/ai-inline-complete`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             // Add auth token if available in localStorage/cookies
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
           before: textBeforeCursor,
@@ -66,7 +67,7 @@ export class AIInlineCompletionProvider implements monaco.languages.InlineComple
       return {
         items: data.completions.map((completion: string) => ({
           insertText: completion,
-          range: new monaco.Range(
+          range: new this.monaco.Range(
             position.lineNumber,
             position.column,
             position.lineNumber,
@@ -80,8 +81,9 @@ export class AIInlineCompletionProvider implements monaco.languages.InlineComple
         enableForwardStability: true
       };
 
-    } catch (error: any) {
-      if (error.name !== 'AbortError') {
+    } catch (error: unknown) {
+      const maybeError = error as { name?: string };
+      if (maybeError.name !== 'AbortError') {
         console.error('AI completion error:', error);
       }
       return undefined;

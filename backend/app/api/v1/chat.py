@@ -33,18 +33,28 @@ async def get_chat_sessions(
 
     # Enrich with message count from MongoDB
     enriched_sessions = []
+    from datetime import datetime
     for session in sessions:
         count = 0
         if mongodb.db is not None:
-            count = await mongodb.db.chat_messages.count_documents({"session_id": session.id})
+            try:
+                count = await mongodb.db.chat_messages.count_documents({"session_id": str(session.id)})
+            except Exception as e:
+                print(f"Error fetching message count from MongoDB: {e}")
 
-        enriched_sessions.append({
-            "id": session.id,
-            "title": session.title,
-            "created_at": session.created_at,
-            "updated_at": session.updated_at,
-            "message_count": count
-        })
+        try:
+            enriched_sessions.append(
+                ChatSessionSchema(
+                    id=str(session.id),
+                    title=session.title,
+                    created_at=session.created_at or datetime.now(),
+                    updated_at=session.updated_at or datetime.now(),
+                    message_count=count,
+                    messages=[]
+                )
+            )
+        except Exception as e:
+            print(f"Validation error for session {session.id}: {e}")
 
     return enriched_sessions
 
@@ -58,14 +68,27 @@ def create_chat_session(
     """
     Create a new chat session.
     """
-    session = ChatSession(
-        user_id=current_user.id,
-        title=session_in.title or "New Conversation"
+    try:
+        session = ChatSession(
+            user_id=current_user.id,
+            title=session_in.title or "New Conversation"
+        )
+        db.add(session)
+        db.commit()
+        db.refresh(session)
+    except Exception as e:
+        db.rollback()
+        print(f"create_chat_session DB error (user_id={current_user.id}): {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create session: {type(e).__name__}")
+
+    return ChatSessionSchema(
+        id=str(session.id),
+        title=session.title,
+        created_at=session.created_at or datetime.now(),
+        updated_at=session.updated_at or datetime.now(),
+        message_count=0,
+        messages=[]
     )
-    db.add(session)
-    db.commit()
-    db.refresh(session)
-    return session
 
 @router.get("/history/{session_id}")
 @router.get("/{session_id}", response_model=ChatSessionSchema)
@@ -156,7 +179,8 @@ async def get_chat_session(
                         "critique": msg.get("critique"),
                         "multi_queries": msg.get("multi_queries", []),
                         "memory_active": msg.get("memory_active", False),
-                        "memory_summary": msg.get("memory_summary")
+                        "memory_summary": msg.get("memory_summary"),
+                        "turbo_quant": msg.get("turbo_quant")
                     }
                     messages.append(msg_data)
             except Exception as mongo_error:
@@ -168,7 +192,7 @@ async def get_chat_session(
 
         # Convert session to dict and add messages
         session_data = {
-            "id": session.id,
+            "id": str(session.id),
             "title": session.title,
             "created_at": session.created_at,
             "updated_at": session.updated_at,
@@ -205,7 +229,11 @@ async def delete_chat_session(
 
     # 1. Delete messages from MongoDB
     if mongodb.db is not None:
-        await mongodb.db.chat_messages.delete_many({"session_id": session_id})
+        try:
+            await mongodb.db.chat_messages.delete_many({"session_id": session_id})
+        except Exception as e:
+            # Not blocking the deletion of the session if MongoDB is down, logging the error
+            print(f"Error deleting messages from MongoDB: {e}")
 
     # 2. Delete session from PostgreSQL
     db.delete(session)
@@ -251,7 +279,10 @@ async def send_message(
     }
 
     if mongodb.db is not None:
-        await mongodb.db.chat_messages.insert_one(user_msg_data)
+        try:
+            await mongodb.db.chat_messages.insert_one(user_msg_data)
+        except Exception as e:
+            print(f"MongoDB warning logging user msg: {e}")
 
     # 3. Build context for AI
     context, retrieved_docs, context_meta = await build_context(
@@ -285,8 +316,12 @@ async def send_message(
     }
 
     if mongodb.db is not None:
-        result = await mongodb.db.chat_messages.insert_one(assistant_msg_data)
-        assistant_msg_data["id"] = str(result.inserted_id)
+        try:
+            result = await mongodb.db.chat_messages.insert_one(assistant_msg_data)
+            assistant_msg_data["id"] = str(result.inserted_id)
+        except Exception as e:
+            print(f"MongoDB error logging assistant msg: {e}")
+            assistant_msg_data["id"] = str(uuid.uuid4())
     else:
         assistant_msg_data["id"] = str(uuid.uuid4())
 
@@ -347,8 +382,7 @@ async def stream_message(
         "status": "done"
     }
 
-    if mongodb.db is not None:
-        await mongodb.db.chat_messages.insert_one(user_msg_data)
+    # We'll defer the MongoDB insertion until inside the event generator so we can gracefully stream errors.
 
     # 3. Build context for AI
     context, retrieved_docs, context_meta = await build_context(
@@ -364,6 +398,13 @@ async def stream_message(
 
         full_content = ""
         try:
+            # At start of stream, attempt to persist user message
+            if mongodb.db is not None:
+                try:
+                    await mongodb.db.chat_messages.insert_one(user_msg_data)
+                except Exception as e:
+                    print(f"MongoDB warning inserting user message: {e}")
+
             # Yield initial metadata including retrieved docs and memory status
             yield f"data: {json.dumps({'type': 'metadata', 'session_id': session_id, 'retrieved_docs': retrieved_docs, **context_meta})}\n\n"
 
@@ -391,8 +432,12 @@ async def stream_message(
             }
 
             if mongodb.db is not None:
-                result = await mongodb.db.chat_messages.insert_one(assistant_msg_data)
-                msg_id = str(result.inserted_id)
+                try:
+                    result = await mongodb.db.chat_messages.insert_one(assistant_msg_data)
+                    msg_id = str(result.inserted_id)
+                except Exception as e:
+                    print(f"MongoDB error inserting assistant msg: {e}")
+                    msg_id = str(uuid.uuid4())
             else:
                 msg_id = str(uuid.uuid4())
 

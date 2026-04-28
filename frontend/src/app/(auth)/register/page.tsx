@@ -31,7 +31,7 @@ export default function RegisterPage() {
     setError(null);
 
     try {
-      await authService.register(email, password);
+      await authService.register(email, password, 'user', firstName, lastName);
       setSuccess(true);
       setTimeout(() => {
         router.push('/login');
@@ -40,6 +40,14 @@ export default function RegisterPage() {
       setError(err.message || 'Registration failed. Please try again.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleGithubSignup = async () => {
+    try {
+      await authService.loginWithGithub();
+    } catch (err: any) {
+      setError(err.message || 'GitHub sign-up failed.');
     }
   };
 
@@ -57,6 +65,7 @@ export default function RegisterPage() {
                 src="/Logo1.jpg"
                 alt="Engunity Logo"
                 fill
+                sizes="32px"
                 className="object-cover"
               />
             </div>
@@ -163,7 +172,7 @@ export default function RegisterPage() {
             <span className="relative px-3 bg-void-800 text-mono-label text-starlight-400/40 italic">Rapid_Onboarding</span>
           </div>
 
-          <button className="w-full btn-ghost py-3 flex items-center justify-center gap-2 text-mono-label font-bold tracking-widest">
+          <button onClick={handleGithubSignup} type="button" disabled={isLoading} className="w-full btn-ghost py-3 flex items-center justify-center gap-2 text-mono-label font-bold tracking-widest disabled:opacity-50">
             <Github className="w-4 h-4" />
             GitHub Identity Link
           </button>

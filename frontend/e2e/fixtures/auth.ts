@@ -4,6 +4,7 @@
  */
 
 import { test as base, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 export interface TestUser {
   email: string;
@@ -16,17 +17,22 @@ interface AuthFixtures {
   testUser: TestUser;
 }
 
-// Test user credentials (configure based on your test environment)
-export const TEST_USERS = {
-  regular: {
-    email: 'test@example.com',
-    password: 'TestPassword123!',
-  },
-  premium: {
-    email: 'premium@example.com',
-    password: 'PremiumPass123!',
-  },
+// Test user credentials - should be configured via environment variables, not hardcoded
+// For development/testing only - NEVER use real credentials in code
+const getTestCredentials = () => {
+  return {
+    regular: {
+      email: process.env.TEST_USER_EMAIL || 'test@example.com',
+      password: process.env.TEST_USER_PASSWORD || 'TestPassword123!',
+    },
+    premium: {
+      email: process.env.TEST_PREMIUM_EMAIL || 'premium@example.com',
+      password: process.env.TEST_PREMIUM_PASSWORD || 'PremiumPass123!',
+    },
+  };
 };
+
+export const TEST_USERS = getTestCredentials();
 
 /**
  * Extended test fixture with authentication
@@ -36,7 +42,7 @@ export const test = base.extend<AuthFixtures>({
     await use(TEST_USERS.regular);
   },
 
-  authenticatedPage: async ({ page, testUser }, use) => {
+  authenticatedPage: async ({ page, testUser }: { page: Page; testUser: TestUser }, use: (page: Page) => Promise<void>) => {
     // Navigate to login page
     await page.goto('/login');
 
@@ -71,14 +77,15 @@ export { expect } from '@playwright/test';
  * Mock authentication for tests that don't need real backend
  */
 export async function mockAuth(page: any, mockUser: Partial<TestUser> = {}) {
+  const mockToken = process.env.TEST_MOCK_TOKEN || 'mock-jwt-token-test-only';
   const defaultMockUser = {
     email: 'mock@example.com',
-    token: 'mock_jwt_token_for_testing',
+    token: mockToken,
     ...mockUser,
   };
 
-  await page.addInitScript((user) => {
-    localStorage.setItem('token', user.token);
+  await page.addInitScript((user: { email: string; token?: string }) => {
+    localStorage.setItem('token', user.token || '');
     localStorage.setItem('user', JSON.stringify({
       id: '123',
       email: user.email,

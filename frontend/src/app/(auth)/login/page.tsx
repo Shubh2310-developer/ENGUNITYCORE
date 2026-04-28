@@ -66,6 +66,7 @@ export default function LoginPage() {
               src="/Logo1.jpg"
               alt="Engunity Logo"
               fill
+              sizes="64px"
               className="object-contain"
               priority
             />
@@ -98,6 +99,7 @@ export default function LoginPage() {
                 src="/Logo1.jpg"
                 alt="Engunity Logo"
                 fill
+                sizes="40px"
                 className="object-contain"
               />
             </div>

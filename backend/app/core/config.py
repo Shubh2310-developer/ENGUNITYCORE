@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     # SECRET_KEY is required - will raise error if not set in .env
     SECRET_KEY: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8  # 8 days
+    AUTH_LOGIN_RATE_LIMIT: str = "30/minute"
 
     # Database - required, will raise error if not set in .env
     DATABASE_URL: str
@@ -37,6 +38,7 @@ class Settings(BaseSettings):
 
     # AI Services Control (for dev mode with --reload)
     ENABLE_AI: bool = True  # Set to False to disable AI and speed up dev restart
+    ENABLE_TURBO_QUANT_CHAT: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra='ignore')
 

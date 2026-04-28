@@ -55,6 +55,34 @@ function formatTimestamp(ts: string | undefined, now: Date): string {
     return date.toLocaleDateString();
 }
 
+type TurboQuantRuntimeMetadata = {
+    requested: boolean;
+    applied: boolean;
+    provider?: string;
+    fallback_reason?: string;
+    compression_ratio?: number;
+};
+
+function mergeTurboQuantMetadata(
+    current: TurboQuantRuntimeMetadata | undefined,
+    incoming: TurboQuantRuntimeMetadata | undefined
+): TurboQuantRuntimeMetadata | undefined {
+    if (!incoming) {
+        return current;
+    }
+
+    const merged = { ...(current || {}) } as TurboQuantRuntimeMetadata;
+    const entries = Object.entries(incoming) as Array<[keyof TurboQuantRuntimeMetadata, TurboQuantRuntimeMetadata[keyof TurboQuantRuntimeMetadata]]>;
+
+    for (const [key, value] of entries) {
+        if (value !== undefined) {
+            merged[key] = value as never;
+        }
+    }
+
+    return merged;
+}
+
 // -------------------------------------------------------
 // Tests
 // -------------------------------------------------------
@@ -148,5 +176,35 @@ describe('formatTimestamp', () => {
 
     it('returns empty string for undefined timestamp', () => {
         expect(formatTimestamp(undefined, now)).toBe('');
+    });
+});
+
+describe('mergeTurboQuantMetadata', () => {
+    it('keeps existing state when incoming is undefined', () => {
+        const current = { requested: true, applied: false, provider: 'groq' };
+        expect(mergeTurboQuantMetadata(current, undefined)).toEqual(current);
+    });
+
+    it('updates only defined fields and preserves prior values', () => {
+        const current = {
+            requested: true,
+            applied: false,
+            provider: 'groq',
+            fallback_reason: 'provider_unsupported',
+        };
+
+        const incoming = {
+            requested: true,
+            applied: true,
+            compression_ratio: 4,
+        };
+
+        expect(mergeTurboQuantMetadata(current, incoming)).toEqual({
+            requested: true,
+            applied: true,
+            provider: 'groq',
+            fallback_reason: 'provider_unsupported',
+            compression_ratio: 4,
+        });
     });
 });

@@ -38,11 +38,14 @@ import { NotificationOverlay } from '@/components/code-lab/NotificationOverlay';
 import { CommandPalette } from '@/components/code-lab/CommandPalette';
 import { PreviewPanel } from '@/components/code-lab/PreviewPanel';
 import { useCodeStore } from '@/stores/codeStore';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { codeService } from '@/services/code';
+import { useAuthStore } from '@/stores/authStore';
 import styles from './codelab.module.css';
 
 export default function CodeLabPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const {
     isAIRefineOpen,
     setAIRefineOpen,
@@ -53,64 +56,106 @@ export default function CodeLabPage() {
     setCommandPaletteOpen,
     setTerminalOpen,
     setActiveBottomTab,
-    runCommand,
+    appendTerminalOutput,
     addFile,
     saveFile,
     activeFileId,
     setNotification,
     debugSession,
     activeRightTab,
-    setActiveRightTab
+    setActiveRightTab,
+    setCurrentProjectId,
+    initProject
   } = useCodeStore();
+  const { status: authStatus, _hasHydrated } = useAuthStore();
 
   // State for execution control and stdin input
   const [isExecuting, setIsExecuting] = React.useState(false);
   const [showStdinModal, setShowStdinModal] = React.useState(false);
   const [stdinInput, setStdinInput] = React.useState('');
+  const executionAbortRef = React.useRef<AbortController | null>(null);
+  const executionLockRef = React.useRef(false);
+
+  // Initialize Project on Mount
+  React.useEffect(() => {
+    if (!_hasHydrated || authStatus !== 'authenticated') {
+      return;
+    }
+
+    let isMounted = true;
+    const init = async () => {
+      try {
+        let pid = searchParams.get('projectId');
+        if (!pid) {
+          const projects = await codeService.getProjects();
+          if (projects && projects.length > 0) {
+            pid = projects[0].id;
+          } else {
+            const newProj = await codeService.createProject({ name: 'Default Project', description: 'Auto-created' });
+            pid = newProj.id;
+          }
+        }
+        if (isMounted && pid) {
+          setCurrentProjectId(pid);
+          await initProject();
+        }
+      } catch (err) {
+        console.error('Failed to initialize project on mount:', err);
+        if (isMounted) {
+          setNotification({ message: 'Failed to initialize code workspace', type: 'error' });
+        }
+      }
+    };
+    init();
+    return () => { isMounted = false; };
+  }, [searchParams, setCurrentProjectId, initProject, setNotification, _hasHydrated, authStatus]);
 
   // Global Keyboard Shortcuts
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Cmd+P or Ctrl+P for Command Palette
-      if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
+      const normalizedKey = e.key.toLowerCase();
+      if ((e.metaKey || e.ctrlKey) && normalizedKey === 'p') {
         e.preventDefault();
         setCommandPaletteOpen(true);
       }
       // Cmd+Shift+F or Ctrl+Shift+F for Search
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'f') {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && normalizedKey === 'f') {
         e.preventDefault();
         setSidebarOpen(true);
         setActiveSidebarTab('search');
       }
       // Cmd+Shift+D or Ctrl+Shift+D for Debug
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'd') {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && normalizedKey === 'd') {
         e.preventDefault();
         setSidebarOpen(true);
         setActiveSidebarTab('debug');
       }
       // Cmd+Shift+G or Ctrl+Shift+G for Git
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'g') {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && normalizedKey === 'g') {
         e.preventDefault();
         setSidebarOpen(true);
         setActiveSidebarTab('git');
       }
       // Cmd+Shift+T or Ctrl+Shift+T for Tests
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 't') {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && normalizedKey === 't') {
         e.preventDefault();
         setSidebarOpen(true);
         setActiveSidebarTab('test');
       }
       // Cmd+B or Ctrl+B for Toggle Sidebar
-      if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
+      if ((e.metaKey || e.ctrlKey) && normalizedKey === 'b') {
         e.preventDefault();
-        setSidebarOpen(!isSidebarOpen);
+        setSidebarOpen(!useCodeStore.getState().isSidebarOpen);
       }
       // Cmd+S or Ctrl+S for Save (Global Fallback)
-      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+      if ((e.metaKey || e.ctrlKey) && normalizedKey === 's') {
         e.preventDefault();
         if (activeFileId) {
-          saveFile(activeFileId);
-          setNotification({ message: 'File saved', type: 'success' });
+          void (async () => {
+            const saved = await saveFile(activeFileId);
+            setNotification({ message: saved ? 'File saved' : 'Save failed', type: saved ? 'success' : 'error' });
+          })();
         }
       }
     };
@@ -124,6 +169,11 @@ export default function CodeLabPage() {
 
   const handleRunProject = async (withStdin: boolean = false) => {
     const { files, activeFileId, setNotification, setTerminalOpen, setActiveBottomTab } = useCodeStore.getState();
+
+    if (executionLockRef.current) {
+      setNotification({ message: 'Execution already in progress', type: 'info' });
+      return;
+    }
     
     if (!activeFileId) {
       setNotification({ message: 'No file selected to run', type: 'error' });
@@ -152,6 +202,10 @@ export default function CodeLabPage() {
       return;
     }
     
+    const abortController = new AbortController();
+    executionAbortRef.current = abortController;
+    executionLockRef.current = true;
+
     setTerminalOpen(true);
     setActiveBottomTab('terminal');
     setNotification({ message: `Running ${activeFile.name}...`, type: 'info' });
@@ -164,6 +218,7 @@ export default function CodeLabPage() {
         headers: {
           'Content-Type': 'application/json',
         },
+        signal: abortController.signal,
         body: JSON.stringify({
           code: activeFile.content,
           language: activeFile.language || 'python',
@@ -188,37 +243,47 @@ export default function CodeLabPage() {
       output += '─'.repeat(60) + '\r\n';
       
       if (result.success) {
+        const stdout = String(result.stdout ?? '');
+        const stderr = String(result.stderr ?? '');
         output += `\x1b[32m[Output]\x1b[0m\r\n`;
         // Process stdout to ensure proper line endings
-        const processedStdout = result.stdout.replace(/\n/g, '\r\n');
+        const processedStdout = stdout.replace(/\n/g, '\r\n');
         output += processedStdout;
-        if (result.stderr && result.stderr.trim()) {
-          const processedStderr = result.stderr.replace(/\n/g, '\r\n');
+        if (stderr.trim()) {
+          const processedStderr = stderr.replace(/\n/g, '\r\n');
           output += `\r\n\x1b[33m[Warnings]\x1b[0m\r\n${processedStderr}`;
         }
         output += `\r\n\x1b[32m✓ Execution completed successfully\x1b[0m`;
         setNotification({ message: 'Code executed successfully', type: 'success' });
       } else {
+        const stderr = String(result.stderr ?? '');
+        const fallbackError = String(result.error ?? 'Unknown execution error');
+        const stdout = String(result.stdout ?? '');
         output += `\x1b[31m[Error]\x1b[0m\r\n`;
-        const errorOutput = result.stderr || result.error;
+        const errorOutput = stderr || fallbackError;
         const processedError = errorOutput.replace(/\n/g, '\r\n');
         output += processedError;
-        if (result.stdout && result.stdout.trim()) {
-          const processedStdout = result.stdout.replace(/\n/g, '\r\n');
+        if (stdout.trim()) {
+          const processedStdout = stdout.replace(/\n/g, '\r\n');
           output += `\r\n\x1b[34m[Partial Output]\x1b[0m\r\n${processedStdout}`;
         }
         output += `\r\n\x1b[31m✗ Execution failed\x1b[0m`;
         setNotification({ message: 'Execution failed', type: 'error' });
       }
       
-      // Send output to terminal via runCommand
-      runCommand(output);
+      appendTerminalOutput(output);
       
     } catch (error: any) {
+      if (error?.name === 'AbortError') {
+        appendTerminalOutput('\r\n\x1b[31m[Execution aborted]\x1b[0m\r\n');
+        return;
+      }
       const errorMsg = `Error: ${error.message}\r\n\r\nMake sure the backend is running on http://localhost:8000`;
-      runCommand(`\r\n\x1b[31m${errorMsg}\x1b[0m\r\n`);
+      appendTerminalOutput(`\r\n\x1b[31m${errorMsg}\x1b[0m\r\n`);
       setNotification({ message: 'Failed to execute code', type: 'error' });
     } finally {
+      executionLockRef.current = false;
+      executionAbortRef.current = null;
       setIsExecuting(false);
       setShowStdinModal(false);
       setStdinInput('');
@@ -226,9 +291,12 @@ export default function CodeLabPage() {
   };
 
   const handleStopExecution = () => {
+    executionAbortRef.current?.abort();
+    executionAbortRef.current = null;
+    executionLockRef.current = false;
     setIsExecuting(false);
     setNotification({ message: 'Execution stopped', type: 'info' });
-    runCommand('\r\n\x1b[31m[Stopped by user]\x1b[0m\r\n');
+    appendTerminalOutput('\r\n\x1b[31m[Stopped by user]\x1b[0m\r\n');
   };
 
   const handleSearch = () => {
@@ -291,7 +359,7 @@ export default function CodeLabPage() {
 
             <div className="flex items-center gap-1">
               <button
-                onClick={() => setSidebarOpen(!isSidebarOpen)}
+                onClick={() => setSidebarOpen(!useCodeStore.getState().isSidebarOpen)}
                 className={styles.button}
                 title="Toggle Sidebar"
               >
@@ -387,6 +455,8 @@ export default function CodeLabPage() {
             <button
               onClick={() => setNotification({ message: 'Settings', type: 'info' })}
               className={styles.button}
+              title="Settings"
+              aria-label="Settings"
             >
               <Settings className="w-4 h-4" />
             </button>

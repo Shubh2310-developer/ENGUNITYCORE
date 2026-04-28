@@ -308,8 +308,9 @@ async def test_code_search_flow(client):
     """
     # 1. Register/Login to get auth
     email = f"search_{os.urandom(4).hex()}@test.com"
-    client.post("/api/v1/auth/register", json={"email": email, "password": "Pass", "role": "user"})
-    login_resp = client.post("/api/v1/auth/login", data={"username": email, "password": "Pass"})
+    strong_password = "SecurePassword123!"
+    client.post("/api/v1/auth/register", json={"email": email, "password": strong_password, "role": "user"})
+    login_resp = client.post("/api/v1/auth/login", data={"username": email, "password": strong_password})
     token = login_resp.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
@@ -336,3 +337,148 @@ async def test_code_search_flow(client):
         assert data["query"] == "hello"
         assert len(data["results"]) == 1
         assert data["results"][0]["content"] == "def hello_world(): print('hi')"
+@pytest.mark.asyncio
+async def test_code_dashboard_file_persistence(client):
+    """
+    Test the lifecycle of a code file (create, update, fetch).
+    Ensures that file saving persistence is fully operational on the backend.
+    """
+    # 1. Register and login
+    email = f"persist_{os.urandom(4).hex()}@engunity.com"
+    password = "SecurePassword123!"
+    client.post("/api/v1/auth/register", json={
+        "email": email,
+        "password": password,
+        "role": "user"
+    })
+
+    login_resp = client.post("/api/v1/auth/login", data={
+        "username": email,
+        "password": password
+    })
+    token = login_resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 2. Create a project
+    project_payload = {
+        "name": "Persistence Test Project",
+        "description": "A project for testing file persistence."
+    }
+    project_resp = client.post("/api/v1/code/", json=project_payload, headers=headers)
+    assert project_resp.status_code == 200
+    project_data = project_resp.json()
+    project_id = project_data["id"]
+
+    # 3. Create a file
+    file_payload = {
+        "name": "test_persistence.py",
+        "path": "src/test_persistence.py",
+        "type": "file",
+        "content": "print('initial')",
+        "language": "python"
+    }
+    file_resp = client.post(f"/api/v1/code/{project_id}/files", json=file_payload, headers=headers)
+    assert file_resp.status_code == 200
+    file_data = file_resp.json()
+    file_id = file_data["id"]
+
+    # 4. Update the file (simulate Ctrl+S save)
+    update_payload = {
+        "content": "print('updated and persisted')"
+    }
+    update_resp = client.patch(f"/api/v1/code/{project_id}/files/{file_id}", json=update_payload, headers=headers)
+    assert update_resp.status_code == 200
+
+    # 5. Fetch the file to ensure the data was actually saved to the backend database
+    fetch_resp = client.get(f"/api/v1/code/{project_id}/files/{file_id}", headers=headers)
+    assert fetch_resp.status_code == 200
+    fetch_data = fetch_resp.json()
+
+    assert fetch_data["content"] == "print('updated and persisted')"
+
+
+@pytest.mark.asyncio
+async def test_code_dashboard_file_hierarchy_persistence(client):
+    """
+    Verify folder/file hierarchy persistence via parentId in code_files.
+    """
+    email = f"hier_{os.urandom(4).hex()}@engunity.com"
+    password = "SecurePassword123!"
+    client.post("/api/v1/auth/register", json={
+        "email": email,
+        "password": password,
+        "role": "user"
+    })
+    login_resp = client.post("/api/v1/auth/login", data={
+        "username": email,
+        "password": password
+    })
+    token = login_resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    project_resp = client.post("/api/v1/code/", json={"name": "Hierarchy Project"}, headers=headers)
+    assert project_resp.status_code == 200
+    project_id = project_resp.json()["id"]
+
+    folder_resp = client.post(
+        f"/api/v1/code/{project_id}/files",
+        json={
+            "path": "src",
+            "name": "src",
+            "type": "folder",
+            "content": "",
+            "language": "plaintext"
+        },
+        headers=headers,
+    )
+    assert folder_resp.status_code == 200
+    folder_id = folder_resp.json()["id"]
+
+    child_resp = client.post(
+        f"/api/v1/code/{project_id}/files",
+        json={
+            "path": "src/main.py",
+            "name": "main.py",
+            "type": "file",
+            "content": "print('nested')",
+            "language": "python",
+            "parentId": folder_id,
+        },
+        headers=headers,
+    )
+    assert child_resp.status_code == 200
+    child_id = child_resp.json()["id"]
+
+    files_resp = client.get(f"/api/v1/code/{project_id}/files", headers=headers)
+    assert files_resp.status_code == 200
+    files = files_resp.json()
+    child = next(f for f in files if f["id"] == child_id)
+    assert child["parentId"] == folder_id
+
+
+def test_terminal_websocket_repeated_interactions(client):
+    """
+    Verify websocket stability under repeated command/resize interactions.
+    """
+    project_id = f"test_terminal_repeat_{os.urandom(4).hex()}"
+    with client.websocket_connect(f"/ws/terminal/{project_id}") as websocket:
+        commands = ["echo 'Run-1'\r", "echo 'Run-2'\r", "echo 'Debug-3'\r"]
+        for cmd in commands:
+            websocket.send_text(cmd)
+
+        websocket.send_text("__resize__:30:100")
+        websocket.send_text("__resize__:24:80")
+
+        received = ""
+        for _ in range(40):
+            try:
+                chunk = websocket.receive_text()
+                received += chunk
+                if "Run-1" in received and "Run-2" in received and "Debug-3" in received:
+                    break
+            except Exception:
+                break
+
+        assert "Run-1" in received
+        assert "Run-2" in received
+        assert "Debug-3" in received

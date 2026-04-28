@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 
 import { gitService, GitStatus, GitCommit } from '@/services/git';
+import { codeService } from '@/services/code';
+
+let notificationTimeout: ReturnType<typeof setTimeout> | null = null;
 
 export interface FileItem {
   id: string;
@@ -56,9 +59,14 @@ interface CodeState {
   activeRightTab: 'ai' | 'preview';
   terminalCommand: string | null;
   terminalTimestamp: number;
+  terminalOutput: string | null;
+  terminalOutputTimestamp: number;
   activeBottomTab: 'terminal' | 'console' | 'errors' | 'tasks' | 'debug_console';
   cursorPosition: { ln: number; col: number };
   notification: { message: string; type: 'info' | 'success' | 'error' } | null;
+
+  // Project state
+  currentProjectId: string | null;
 
   // Actions
   setFiles: (files: FileItem[]) => void;
@@ -69,7 +77,7 @@ interface CodeState {
   updateFileContent: (id: string, content: string) => void;
   renameFile: (id: string, newName: string) => void;
   moveFile: (fileId: string, newParentId: string | undefined) => void;
-  saveFile: (id: string) => void;
+  saveFile: (id: string) => Promise<boolean>;
   setCursorPosition: (ln: number, col: number) => void;
 
   // Terminal Actions
@@ -101,9 +109,12 @@ interface CodeState {
   setActiveRightTab: (tab: 'ai' | 'preview') => void;
   setActiveBottomTab: (tab: 'terminal' | 'console' | 'errors' | 'tasks' | 'debug_console') => void;
   runCommand: (command: string) => void;
+  appendTerminalOutput: (output: string) => void;
   addFile: (name: string, type: 'file' | 'folder', parentId?: string) => void;
   deleteFile: (id: string) => void;
   setNotification: (notification: { message: string; type: 'info' | 'success' | 'error' } | null) => void;
+  setCurrentProjectId: (id: string | null) => void;
+  initProject: () => Promise<void>;
 }
 
 export const useCodeStore = create<CodeState>((set, get) => ({
@@ -181,9 +192,12 @@ export const useCodeStore = create<CodeState>((set, get) => ({
   activeRightTab: 'ai',
   terminalCommand: null,
   terminalTimestamp: 0,
+  terminalOutput: null,
+  terminalOutputTimestamp: 0,
   activeBottomTab: 'terminal',
   cursorPosition: { ln: 1, col: 1 },
   notification: null,
+  currentProjectId: null,
 
   setFiles: (files) => set({ files }),
 
@@ -225,38 +239,136 @@ export const useCodeStore = create<CodeState>((set, get) => ({
     files: state.files.map(f => f.id === id ? { ...f, content, isDirty: true } : f)
   })),
 
-  renameFile: (id, newName) => set((state) => ({
-    files: state.files.map(f => f.id === id ? { ...f, name: newName } : f)
-  })),
+  renameFile: (id, newName) => {
+    set((state) => ({
+      files: state.files.map(f => f.id === id ? { ...f, name: newName, isDirty: f.type === 'file' ? true : f.isDirty } : f)
+    }));
 
-  moveFile: (fileId, newParentId) => set((state) => {
-    const file = state.files.find(f => f.id === fileId);
-    if (!file) return state;
-    if (file.parentId === newParentId) return state;
+    const { currentProjectId, files } = get();
+    const file = files.find(f => f.id === id);
+    if (!currentProjectId || !file) return;
 
-    // Prevent moving a folder into itself or its descendants
-    if (file.type === 'folder' && newParentId !== undefined) {
-      const isDescendant = (parentId: string | undefined): boolean => {
-        if (parentId === fileId) return true;
-        const parent = state.files.find(f => f.id === parentId);
-        if (!parent || !parent.parentId) return false;
-        return isDescendant(parent.parentId);
-      };
-      if (isDescendant(newParentId)) return state;
+    const getPath = (target: FileItem, allFiles: FileItem[]) => {
+      const segments: string[] = [target.name];
+      let parentId = target.parentId;
+      while (parentId) {
+        const parent = allFiles.find(f => f.id === parentId);
+        if (!parent) break;
+        segments.unshift(parent.name);
+        parentId = parent.parentId;
+      }
+      return segments.join('/');
+    };
+
+    const optimisticFile: FileItem = { ...file, name: newName };
+    const optimisticFiles = files.map(f => f.id === id ? optimisticFile : f);
+
+    codeService.updateFile(currentProjectId, id, {
+      name: newName,
+      path: getPath(optimisticFile, optimisticFiles),
+    }).catch((err: any) => {
+      console.error('[renameFile] Backend PATCH failed:', err);
+      get().setNotification({ message: 'Rename failed — backend error', type: 'error' });
+    });
+  },
+
+  moveFile: (fileId, newParentId) => {
+    let canPersist = false;
+    let movedFileSnapshot: FileItem | null = null;
+    let filesSnapshot: FileItem[] = [];
+
+    set((state) => {
+      const file = state.files.find(f => f.id === fileId);
+      if (!file) return state;
+      if (file.parentId === newParentId) return state;
+
+      // Prevent moving a folder into itself or its descendants
+      if (file.type === 'folder' && newParentId !== undefined) {
+        const isDescendant = (parentId: string | undefined): boolean => {
+          if (parentId === fileId) return true;
+          const parent = state.files.find(f => f.id === parentId);
+          if (!parent || !parent.parentId) return false;
+          return isDescendant(parent.parentId);
+        };
+        if (isDescendant(newParentId)) return state;
+      }
+
+      // Prevent duplicate names in the target folder
+      const siblings = state.files.filter(f => f.parentId === newParentId && f.id !== fileId);
+      if (siblings.some(s => s.name === file.name && s.type === file.type)) return state;
+
+      const updatedFiles = state.files.map(f => f.id === fileId ? { ...f, parentId: newParentId } : f);
+      movedFileSnapshot = updatedFiles.find(f => f.id === fileId) || null;
+      filesSnapshot = updatedFiles;
+      canPersist = true;
+
+      return { files: updatedFiles };
+    });
+
+    const { currentProjectId } = get();
+    if (!canPersist || !currentProjectId || !movedFileSnapshot) return;
+
+    const getPath = (target: FileItem, allFiles: FileItem[]) => {
+      const segments: string[] = [target.name];
+      let parentId = target.parentId;
+      while (parentId) {
+        const parent = allFiles.find(f => f.id === parentId);
+        if (!parent) break;
+        segments.unshift(parent.name);
+        parentId = parent.parentId;
+      }
+      return segments.join('/');
+    };
+
+    codeService.updateFile(currentProjectId, fileId, {
+      parentId: newParentId,
+      path: getPath(movedFileSnapshot, filesSnapshot),
+    }).catch((err: any) => {
+      console.error('[moveFile] Backend PATCH failed:', err);
+      get().setNotification({ message: 'Move failed — backend error', type: 'error' });
+    });
+  },
+
+  saveFile: async (id) => {
+    const { currentProjectId, files } = get();
+    const file = files.find(f => f.id === id);
+    if (!file || file.type !== 'file') return false;
+
+    if (!currentProjectId) {
+      set({ notification: { message: 'Save failed — project not initialized', type: 'error' } });
+      return false;
     }
 
-    // Prevent duplicate names in the target folder
-    const siblings = state.files.filter(f => f.parentId === newParentId && f.id !== fileId);
-    if (siblings.some(s => s.name === file.name && s.type === file.type)) return state;
-
-    return {
-      files: state.files.map(f => f.id === fileId ? { ...f, parentId: newParentId } : f)
+    const getPath = (target: FileItem, allFiles: FileItem[]) => {
+      const segments: string[] = [target.name];
+      let parentId = target.parentId;
+      while (parentId) {
+        const parent = allFiles.find(f => f.id === parentId);
+        if (!parent) break;
+        segments.unshift(parent.name);
+        parentId = parent.parentId;
+      }
+      return segments.join('/');
     };
-  }),
 
-  saveFile: (id) => set((state) => ({
-    files: state.files.map(f => f.id === id ? { ...f, isDirty: false } : f)
-  })),
+    try {
+      await codeService.updateFile(currentProjectId, id, {
+        name: file.name,
+        path: getPath(file, files),
+        content: file.content ?? '',
+        language: file.language,
+        parentId: file.parentId,
+      });
+      set((state) => ({
+        files: state.files.map(f => f.id === id ? { ...f, isDirty: false } : f)
+      }));
+      return true;
+    } catch (err) {
+      console.error('[saveFile] Backend PATCH failed:', err);
+      set({ notification: { message: 'Save failed — backend unreachable', type: 'error' } });
+      return false;
+    }
+  },
 
   setCursorPosition: (ln, col) => set({ cursorPosition: { ln, col } }),
 
@@ -313,11 +425,14 @@ export const useCodeStore = create<CodeState>((set, get) => ({
 
       if (!response.ok) throw new Error('Failed to start debugger');
 
-      const { session_id } = await response.json();
+      const sessionResponse = await response.json();
+      const sessionId = sessionResponse.session_id || sessionResponse.id;
+
+      if (!sessionId) throw new Error('Debugger session id missing in response');
 
       set({
         debugSession: {
-          id: session_id,
+          id: sessionId,
           status: 'running',
           currentLine: 0,
           currentFileId: fileId,
@@ -331,10 +446,10 @@ export const useCodeStore = create<CodeState>((set, get) => ({
       // Sync breakpoints
       const fileBreakpoints = state.breakpoints[fileId] || [];
       for (const line of fileBreakpoints) {
-        await fetch(`http://localhost:8000/api/v1/debug/${session_id}/breakpoint`, {
+        await fetch(`http://localhost:8000/api/v1/debug/${sessionId}/breakpoint`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ line, active: true })
+          body: JSON.stringify({ file_id: fileId, line })
         });
       }
 
@@ -380,7 +495,7 @@ export const useCodeStore = create<CodeState>((set, get) => ({
       fetch(`http://localhost:8000/api/v1/debug/${state.debugSession.id}/breakpoint`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ line, active: !exists })
+        body: JSON.stringify({ file_id: fileId, line })
       }).catch(console.error);
     }
 
@@ -404,14 +519,16 @@ export const useCodeStore = create<CodeState>((set, get) => ({
       const debugState = await response.json();
 
       // Fetch variables
-      const varResponse = await fetch(`http://localhost:8000/api/v1/debug/${sessionId}/variables`);
+      const varResponse = await fetch(`http://localhost:8000/api/v1/debug/${sessionId}/variables`, {
+        method: 'POST'
+      });
       const { variables } = await varResponse.json();
 
       set({
         debugSession: {
           ...state.debugSession,
           status: debugState.status,
-          currentLine: debugState.current_line,
+          currentLine: debugState.current_frame?.line ?? null,
           variables
         }
       });
@@ -431,14 +548,16 @@ export const useCodeStore = create<CodeState>((set, get) => ({
       });
       const debugState = await response.json();
 
-      const varResponse = await fetch(`http://localhost:8000/api/v1/debug/${sessionId}/variables`);
+      const varResponse = await fetch(`http://localhost:8000/api/v1/debug/${sessionId}/variables`, {
+        method: 'POST'
+      });
       const { variables } = await varResponse.json();
 
       set({
         debugSession: {
           ...state.debugSession,
           status: debugState.status,
-          currentLine: debugState.current_line,
+          currentLine: debugState.current_frame?.line ?? null,
           variables
         }
       });
@@ -521,7 +640,64 @@ export const useCodeStore = create<CodeState>((set, get) => ({
   setActiveRightTab: (activeRightTab) => set({ activeRightTab }),
   setActiveBottomTab: (activeBottomTab) => set({ activeBottomTab }),
   runCommand: (command) => set({ terminalCommand: command, terminalTimestamp: Date.now() }),
-  addFile: (name, type, parentId) => set((state) => {
+  appendTerminalOutput: (output) => set({ terminalOutput: output, terminalOutputTimestamp: Date.now() }),
+  addFile: (name, type, parentId) => {
+    // 1. Build deterministic language map (same as before)
+    const ext = name.split('.').pop()?.toLowerCase();
+    const languageMap: Record<string, string> = {
+      'py': 'python', 'js': 'javascript', 'ts': 'typescript', 'jsx': 'javascript',
+      'tsx': 'typescript', 'c': 'c', 'cpp': 'cpp', 'h': 'c', 'java': 'java',
+      'rb': 'ruby', 'go': 'go', 'rs': 'rust', 'sh': 'bash', 'bash': 'bash',
+      'php': 'php', 'pl': 'perl', 'lua': 'lua', 'r': 'r', 'swift': 'swift',
+      'kt': 'kotlin', 'scala': 'scala', 'jl': 'julia', 'dart': 'dart',
+      'hs': 'haskell', 'ex': 'elixir', 'erl': 'erlang', 'clj': 'clojure',
+      'nim': 'nim', 'zig': 'zig', 'sql': 'sql', 'ps1': 'powershell',
+      'glsl': 'glsl', 'hlsl': 'hlsl', 'svelte': 'svelte', 'elm': 'elm',
+      'coffee': 'coffeescript', 'hx': 'haxe', 'cr': 'crystal', 'nix': 'nix',
+    };
+    const language = ext ? (languageMap[ext] || 'plaintext') : 'plaintext';
+    const tempId = Math.random().toString(36).substring(7);
+    const newFile: FileItem = {
+      id: tempId,
+      name,
+      type,
+      parentId,
+      language,
+      content: '',
+      isDirty: false,
+    };
+
+    // 2. Optimistic local state update
+    set((state) => ({
+      files: [...state.files, newFile],
+      activeFileId: type === 'file' ? tempId : state.activeFileId,
+      openFileIds: type === 'file' ? [...state.openFileIds, tempId] : state.openFileIds,
+    }));
+
+    // 3. Persist to backend, then replace temp ID with backend UUID
+    const { currentProjectId } = get();
+    if (currentProjectId) {
+      codeService.createFile(currentProjectId, {
+        path: parentId ? `${parentId}/${name}` : name,
+        name,
+        type,
+        content: '',
+        language,
+        parentId,
+      }).then((backendFile: any) => {
+        // Swap the temp ID for the real backend UUID everywhere in state
+        set((state) => ({
+          files: state.files.map(f => f.id === tempId ? { ...f, id: backendFile.id } : f),
+          openFileIds: state.openFileIds.map(fid => fid === tempId ? backendFile.id : fid),
+          activeFileId: state.activeFileId === tempId ? backendFile.id : state.activeFileId,
+        }));
+      }).catch((err: any) => {
+        console.error('[addFile] Backend POST failed:', err);
+      });
+    }
+  },  // end addFile
+
+  _legacyAddFile: (name: string, type: 'file' | 'folder', parentId?: string) => set((state) => {
     const id = Math.random().toString(36).substring(7);
     
     // Detect language from extension
@@ -570,7 +746,6 @@ export const useCodeStore = create<CodeState>((set, get) => ({
       'ps': 'postscript',
       'pde': 'processing',
       'scad': 'openscad',
-      'pl': 'prolog',
       'sb3': 'scratch',
       'logo': 'logo',
       'purs': 'purescript',
@@ -626,38 +801,97 @@ export const useCodeStore = create<CodeState>((set, get) => ({
       activeFileId: type === 'file' ? id : state.activeFileId,
       openFileIds: type === 'file' ? [...state.openFileIds, id] : state.openFileIds
     };
-  }),
+  }),  deleteFile: (id) => {
+    // 1. Optimistic local state update
+    set((state) => {
+      const file = state.files.find(f => f.id === id);
+      if (!file) return state;
 
-  deleteFile: (id) => set((state) => {
-    const file = state.files.find(f => f.id === id);
-    if (!file) return state;
+      // Recursive deletion for folders
+      const getIdsToDelete = (fid: string): string[] => {
+        const children = state.files.filter(f => f.parentId === fid);
+        return [fid, ...children.flatMap(c => getIdsToDelete(c.id))];
+      };
 
-    // Recursive deletion for folders
-    const getIdsToDelete = (fid: string): string[] => {
-      const children = state.files.filter(f => f.parentId === fid);
-      return [fid, ...children.flatMap(c => getIdsToDelete(c.id))];
-    };
+      const idsToDelete = getIdsToDelete(id);
+      const newFiles = state.files.filter(f => !idsToDelete.includes(f.id));
+      const newOpenIds = state.openFileIds.filter(fid => !idsToDelete.includes(fid));
 
-    const idsToDelete = getIdsToDelete(id);
-    const newFiles = state.files.filter(f => !idsToDelete.includes(f.id));
-    const newOpenIds = state.openFileIds.filter(fid => !idsToDelete.includes(fid));
+      let newActiveId = state.activeFileId;
+      if (idsToDelete.includes(newActiveId || '')) {
+        newActiveId = newOpenIds.length > 0 ? newOpenIds[newOpenIds.length - 1] : null;
+      }
 
-    let newActiveId = state.activeFileId;
-    if (idsToDelete.includes(newActiveId || '')) {
-      newActiveId = newOpenIds.length > 0 ? newOpenIds[newOpenIds.length - 1] : null;
-    }
+      return {
+        files: newFiles,
+        openFileIds: newOpenIds,
+        activeFileId: newActiveId
+      };
+    });
 
-    return {
-      files: newFiles,
-      openFileIds: newOpenIds,
-      activeFileId: newActiveId
-    };
-  }),
-
-  setNotification: (notification) => {
-    set({ notification });
-    if (notification) {
-      setTimeout(() => set({ notification: null }), 3000);
+    // 2. Persist delete to backend
+    const { currentProjectId } = get();
+    if (currentProjectId) {
+      codeService.deleteFile(currentProjectId, id).catch(err => {
+        console.error('[deleteFile] Backend DELETE failed:', err);
+        // Can't easily undo the UI deletion, just surface the error
+        get().setNotification({ message: 'Delete failed backend error', type: 'error' });
+      });
     }
   },
+
+  setCurrentProjectId: (id) => set({ currentProjectId: id }),
+
+  initProject: async () => {
+    const { currentProjectId, setFiles, activeFileId, openFileIds } = get();
+    if (!currentProjectId) {
+      setFiles([]);
+      return;
+    }
+    try {
+      const resp = await codeService.getProjectFiles(currentProjectId);
+      if (Array.isArray(resp)) {
+        const mappedFiles = resp.map((apiFile: any) => ({
+          id: apiFile.id,
+          name: apiFile.name,
+          type: apiFile.type,
+          language: apiFile.language || 'plaintext',
+          content: apiFile.content || '',
+          parentId: apiFile.parentId ?? apiFile.parent_id ?? undefined,
+          isDirty: false,
+          isOpen: false,
+        }));
+        const mappedIds = new Set(mappedFiles.map((f: FileItem) => f.id));
+        const nextOpenFileIds = openFileIds.filter(fid => mappedIds.has(fid));
+        const nextActiveFileId = activeFileId && mappedIds.has(activeFileId)
+          ? activeFileId
+          : (nextOpenFileIds[0] || mappedFiles.find((f: FileItem) => f.type === 'file')?.id || null);
+
+        set({
+          files: mappedFiles,
+          openFileIds: nextOpenFileIds,
+          activeFileId: nextActiveFileId,
+        });
+      } else {
+        setFiles([]);
+      }
+    } catch (error) {
+      console.error('[initProject] Load failed:', error);
+      get().setNotification({ message: 'Failed to load project files', type: 'error' });
+    }
+  },
+
+  setNotification: (notification) => {
+    if (notificationTimeout) {
+      clearTimeout(notificationTimeout);
+      notificationTimeout = null;
+    }
+    set({ notification });
+    if (notification) {
+      notificationTimeout = setTimeout(() => {
+        set({ notification: null });
+        notificationTimeout = null;
+      }, 3000);
+    }
+  }
 }));

@@ -33,9 +33,12 @@ export const CodeEditor = () => {
     if (activeFile?.isDirty) {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
 
-      autoSaveTimerRef.current = setTimeout(() => {
-        saveFile(activeFile.id);
-        setNotification({ message: `Auto-saved ${activeFile.name}`, type: 'success' });
+      autoSaveTimerRef.current = setTimeout(async () => {
+        const saved = await saveFile(activeFile.id);
+        setNotification({
+          message: saved ? `Auto-saved ${activeFile.name}` : `Auto-save failed for ${activeFile.name}`,
+          type: saved ? 'success' : 'error'
+        });
       }, 5000); // Increased to 5s to be less intrusive
     }
 
@@ -92,7 +95,7 @@ export const CodeEditor = () => {
             smoothScrolling: true,
             contextmenu: true,
             selectionHighlight: true,
-            occurrencesHighlight: true,
+            occurrencesHighlight: 'singleFile',
             links: true,
             colorDecorators: true,
             folding: true,
@@ -176,9 +179,16 @@ export const CodeEditor = () => {
             });
 
             editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-              if (activeFileId) {
-                saveFile(activeFileId);
-                setNotification({ message: `Saved ${activeFile?.name}`, type: 'success' });
+              const { activeFileId: latestActiveFileId, files: latestFiles } = useCodeStore.getState();
+              if (latestActiveFileId) {
+                const latestFile = latestFiles.find(f => f.id === latestActiveFileId);
+                void (async () => {
+                  const saved = await saveFile(latestActiveFileId);
+                  setNotification({
+                    message: saved ? `Saved ${latestFile?.name || 'file'}` : `Save failed for ${latestFile?.name || 'file'}`,
+                    type: saved ? 'success' : 'error'
+                  });
+                })();
               }
             });
 

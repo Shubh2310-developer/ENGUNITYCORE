@@ -167,6 +167,45 @@ describe('omniRagService', () => {
     // streamQuery — SSE parsing
     // -------------------------------------------------------
     describe('streamQuery', () => {
+        it('should serialize turbo_quant in stream request body', async () => {
+            const encoder = new TextEncoder();
+            const stream = new ReadableStream({
+                start(controller) {
+                    controller.enqueue(encoder.encode('data: {"type":"done","message_id":"m1"}\n\n'));
+                    controller.close();
+                },
+            });
+
+            global.fetch = vi.fn().mockResolvedValue({
+                ok: true,
+                body: stream,
+            });
+
+            await omniRagService.streamQuery(
+                {
+                    query: 'Turbo request',
+                    turbo_quant: {
+                        enabled: true,
+                        mode: 'auto',
+                        target: 'auto',
+                        variant: 'prod',
+                        bit_width: 4,
+                    },
+                },
+                () => undefined
+            );
+
+            const callArgs = (global.fetch as any).mock.calls[0];
+            const body = JSON.parse(callArgs[1].body);
+            expect(body.turbo_quant).toEqual({
+                enabled: true,
+                mode: 'auto',
+                target: 'auto',
+                variant: 'prod',
+                bit_width: 4,
+            });
+        });
+
         it('should parse SSE events and call onEvent callback', async () => {
             const events: any[] = [];
             const sseData =
@@ -251,6 +290,36 @@ describe('omniRagService', () => {
 
             expect(events).toHaveLength(1);
             expect(events[0]).toEqual({ type: 'content', content: 'split' });
+        });
+
+        it('should parse turbo_quant metadata payload', async () => {
+            const events: any[] = [];
+            const sseData =
+                'data: {"type":"metadata","session_id":"sess-1","turbo_quant":{"requested":true,"applied":false,"provider":"groq","fallback_reason":"provider_unsupported"}}\n\n' +
+                'data: {"type":"done","message_id":"m1"}\n\n';
+
+            const encoder = new TextEncoder();
+            const stream = new ReadableStream({
+                start(controller) {
+                    controller.enqueue(encoder.encode(sseData));
+                    controller.close();
+                },
+            });
+
+            global.fetch = vi.fn().mockResolvedValue({ ok: true, body: stream });
+
+            await omniRagService.streamQuery(
+                { query: 'test' },
+                (event) => events.push(event)
+            );
+
+            expect(events[0].type).toBe('metadata');
+            expect(events[0].turbo_quant).toEqual({
+                requested: true,
+                applied: false,
+                provider: 'groq',
+                fallback_reason: 'provider_unsupported',
+            });
         });
     });
 });

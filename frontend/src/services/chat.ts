@@ -1,6 +1,7 @@
 import { useAuthStore } from '@/stores/authStore';
 import { ImageResponse } from './image';
 import { ResearchReport, ResearchStreamEvent, SourceEvaluation } from './research';
+import type { TurboQuantRuntimeMetadata } from './omniRag';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -37,6 +38,7 @@ export interface Message {
   context_compressed?: boolean;
   steps?: Array<{ thought: string; output: string }>;
   latency?: number;
+  turbo_quant?: TurboQuantRuntimeMetadata;
 
   // Deep Research extensions
   isResearch?: boolean;
@@ -97,7 +99,9 @@ export const chatService = {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to fetch chat sessions');
+      const errorText = await response.text();
+      console.error('[Chat Service] Failed to fetch sessions:', response.status, errorText);
+      throw new Error(`Failed to fetch chat sessions: ${response.status} ${errorText}`);
     }
 
     return response.json();

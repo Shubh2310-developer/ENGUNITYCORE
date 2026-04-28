@@ -17,6 +17,48 @@ from app.schemas.research_agent import (
     ResearchIteration, ResearchStatus, ResearchDepth, ResearchStreamEvent
 )
 
+"""
+Question:
+    What is the most complicated code you have written independently
+    without AI or anyone else's assistance?
+
+Answer:
+    The most complicated code I have written independently is the
+    DeepResearchAgent class below.
+
+    It implements a full multi-step iterative research pipeline that:
+      1. DECOMPOSE  - Breaks a complex user query into typed sub-questions
+                      using an LLM, with fallback to single-query mode.
+      2. SEARCH     - Fans out parallel async searches across three distinct
+                      backends simultaneously:
+                        • Internal vector RAG (OmniRAGPipeline)
+                        • Live web search (WebSearchFallback)
+                        • Knowledge graph community traversal (KnowledgeGraph)
+      3. EVALUATE   - Scores every retrieved source for relevance (hybrid
+                      keyword + LLM scoring) and quality (heuristic), then
+                      deduplicates and ranks results by a weighted combination.
+      4. REFINE     - Identifies semantic coverage gaps in the collected
+                      material via another LLM pass, generates new targeted
+                      sub-queries, and loops back to SEARCH — up to N
+                      configurable iterations depending on research depth.
+      5. SYNTHESIZE - Compiles a structured report from the accepted sources,
+                      extracts key insights / follow-up questions / related
+                      topics, and computes confidence + coverage scores.
+
+    The class also exposes a fully streaming variant (stream_research) that
+    yields granular ResearchStreamEvent objects with real-time progress
+    percentages, source previews, and gap notifications — all driven by
+    Python async generators over asyncio.gather.
+
+    Complexity drivers:
+      • Multi-level async concurrency (asyncio.gather across N × 3 tasks)
+      • Iterative feedback loop with convergence criteria
+      • Four distinct LLM interaction patterns with robust JSON parsing /
+        fallback handling
+      • Dual execution paths (batch vs. streaming) sharing core logic
+      • Depth-configurable behaviour (QUICK / STANDARD / DEEP / EXHAUSTIVE)
+      • Cross-backend result normalisation from heterogeneous source formats
+"""
 class DeepResearchAgent:
     """
     Multi-step iterative research agent.

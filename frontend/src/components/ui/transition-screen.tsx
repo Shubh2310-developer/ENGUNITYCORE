@@ -56,6 +56,7 @@ export function TransitionScreen({ isVisible, onComplete }: TransitionScreenProp
                 src="/Logo1.jpg"
                 alt="Engunity Brand Mark"
                 fill
+                sizes="64px"
                 className="object-cover rounded-lg"
                 priority
               />

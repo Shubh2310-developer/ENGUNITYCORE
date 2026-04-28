@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Mic2, CheckCircle2, XCircle, Clock, ChevronRight, MessageSquare, Star } from 'lucide-react';
+import { Mic2, CheckCircle2, XCircle, Clock, ChevronRight, MessageSquare, Star, Activity } from 'lucide-react';
 import styles from '@/app/(dashboard)/jobprep/jobprep.module.css';
 
 interface InterviewTimelineProps {

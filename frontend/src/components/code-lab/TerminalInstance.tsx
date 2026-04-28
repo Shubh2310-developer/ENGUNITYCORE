@@ -3,8 +3,11 @@
 import React, { useEffect, useRef } from 'react';
 import { useCodeStore } from '@/stores/codeStore';
 import { TerminalWebSocket } from '@/services/terminal-ws';
+// Static side-effect import for xterm CSS — Turbopack requires this at module level
+// (runtime require() of CSS inside if(typeof window) blocks is not supported)
+import '@xterm/xterm/css/xterm.css';
 
-// Dynamically import XTerm with no SSR
+// Dynamically import XTerm JS with no SSR (window guard)
 let XTerm: any;
 let FitAddon: any;
 let WebLinksAddon: any;
@@ -13,7 +16,6 @@ if (typeof window !== 'undefined') {
   XTerm = require('@xterm/xterm').Terminal;
   FitAddon = require('@xterm/addon-fit').FitAddon;
   WebLinksAddon = require('@xterm/addon-web-links').WebLinksAddon;
-  require('@xterm/xterm/css/xterm.css');
 }
 
 interface TerminalInstanceProps {
@@ -89,7 +91,14 @@ export const TerminalInstance: React.FC<TerminalInstanceProps> = ({ projectId, i
     }
   };
 
-  const { terminalCommand, terminalTimestamp, activeBottomTab, isTerminalOpen } = useCodeStore();
+  const {
+    terminalCommand,
+    terminalTimestamp,
+    terminalOutput,
+    terminalOutputTimestamp,
+    activeBottomTab,
+    isTerminalOpen
+  } = useCodeStore();
 
   // Re-fit when becoming visible via store state (e.g. panel toggle or tab switch)
   useEffect(() => {
@@ -106,6 +115,12 @@ export const TerminalInstance: React.FC<TerminalInstanceProps> = ({ projectId, i
         wsRef.current.send(terminalCommand + '\r');
     }
   }, [terminalCommand, terminalTimestamp, isActive]);
+
+  useEffect(() => {
+    if (isActive && xtermRef.current && terminalOutput) {
+      xtermRef.current.write(terminalOutput);
+    }
+  }, [terminalOutput, terminalOutputTimestamp, isActive]);
 
   // Main terminal initialization
   useEffect(() => {

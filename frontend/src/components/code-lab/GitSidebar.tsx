@@ -5,6 +5,7 @@ import { GitBranch, RefreshCw, Check, Plus, Clock, Minus } from 'lucide-react';
 export const GitSidebar = () => {
   const {
     activeFileId,
+    currentProjectId,
     gitStatus,
     gitHistory,
     refreshGitStatus,
@@ -18,13 +19,12 @@ export const GitSidebar = () => {
   } = useCodeStore();
 
   const [commitMessage, setCommitMessage] = useState('');
-  // In a real app, we would get project ID from the store or route
-  const projectId = 'default-project';
+  const projectId = currentProjectId || 'default-project';
 
   useEffect(() => {
     refreshGitStatus(projectId);
     fetchGitHistory(projectId);
-  }, [projectId]);
+  }, [projectId, refreshGitStatus, fetchGitHistory]);
 
   const handleCommit = async () => {
     if (!commitMessage.trim()) return;

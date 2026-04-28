@@ -25,6 +25,9 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 @pytest.fixture(scope="function", autouse=False)
 def setup_database():
     """Create necessary tables (SQLite-compatible) before each test and drop after."""
+    FileModel.__table__.drop(bind=engine, checkfirst=True)
+    ProjectModel.__table__.drop(bind=engine, checkfirst=True)
+    UserModel.__table__.drop(bind=engine, checkfirst=True)
     UserModel.__table__.create(bind=engine, checkfirst=True)
     ProjectModel.__table__.create(bind=engine, checkfirst=True)
     FileModel.__table__.create(bind=engine, checkfirst=True)

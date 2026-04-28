@@ -1,5 +1,7 @@
 import pytest
 from jose import jwt
+import base64
+import json
 from app.core.config import settings
 from app.core.security import ALGORITHM
 
@@ -7,12 +9,16 @@ from app.core.security import ALGORITHM
 class TestJWTSecurity:
     """Critical JWT attack vector tests"""
 
+    @staticmethod
+    def _b64url(payload: dict) -> str:
+        raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+        return base64.urlsafe_b64encode(raw).decode("utf-8").rstrip("=")
+
     def test_none_algorithm_attack(self, client):
         """CVE-2015-9235 — 'none' algorithm bypass"""
-        malicious_token = jwt.encode(
-            {"sub": "1", "exp": 9999999999},
-            key="", algorithm="none"
-        )
+        header = self._b64url({"alg": "none", "typ": "JWT"})
+        payload = self._b64url({"sub": "1", "exp": 9999999999})
+        malicious_token = f"{header}.{payload}."
         # This crafted token uses 'none' algorithm — MUST be rejected
         resp = client.get("/api/v1/auth/me", headers={
             "Authorization": f"Bearer {malicious_token}"

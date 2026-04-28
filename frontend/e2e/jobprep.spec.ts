@@ -240,7 +240,8 @@ test.describe('JobPrep Feature - Complete E2E Tests', () => {
 
     test('should start a new interview simulation', async ({ page }) => {
       await page.click('button:has-text("Interview"), button:has-text("Simulator")');
-      await page.click('button:has-text("New Simulation")').or(page.locator('button:has-text("Start Interview")'));
+      const newSimulationButton = page.locator('button:has-text("New Simulation")').or(page.locator('button:has-text("Start Interview")')).first();
+      await newSimulationButton.click();
 
       // Select role
       await page.selectOption('select[name="role"]', { index: 0 });

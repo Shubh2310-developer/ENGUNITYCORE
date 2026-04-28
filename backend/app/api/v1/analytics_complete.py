@@ -25,8 +25,13 @@ from app.schemas.analytics import (
     RegressionRequest, ClassificationRequest, ClusteringRequest, PredictionRequest,
     ExportRequest, ExportFormat
 )
+from app.schemas.data_analysis_agent import DataAnalysisRequest, DataAnalysisResponse
 from app.services.analytics.data_processor import data_processor
 from app.services.analytics.ml_service import ml_service
+from app.services.analytics.data_analysis_agent_service import (
+    DataAnalysisError,
+    data_analysis_agent_service,
+)
 from app.services.storage.supabase import storage_service
 import os
 
@@ -703,6 +708,26 @@ async def get_dataset_insights(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating insights: {str(e)}")
+
+
+@router.post("/ask", response_model=DataAnalysisResponse)
+async def ask_data_analysis_agent(
+    request: DataAnalysisRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Ask natural-language questions about a user-owned analytics dataset."""
+    try:
+        return await data_analysis_agent_service.analyze(request=request, user_id=current_user.id, db=db)
+    except DataAnalysisError as exc:
+        raise HTTPException(status_code=exc.status_code, detail={"code": exc.code, "message": exc.safe_message})
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "ANALYSIS_FAILED", "message": "Could not complete analysis"},
+        )
 
 
 @router.get("/datasets/{dataset_id}/export")

@@ -1,13 +1,15 @@
 import pytest
+from uuid import uuid4
 
 
 class TestRegisterEndpoint:
     def test_register_success(self, client):
+        email = f"newuser-{uuid4().hex[:8]}@test.com"
         resp = client.post("/api/v1/auth/register", json={
-            "email": "newuser@test.com", "password": "P@ssw0rd!", "role": "user"
+            "email": email, "password": "P@ssw0rd!", "role": "user"
         })
         assert resp.status_code == 200
-        assert resp.json()["email"] == "newuser@test.com"
+        assert resp.json()["email"] == email
 
     def test_register_duplicate_email(self, client):
         payload = {"email": "dup@test.com", "password": "P@ssw0rd!", "role": "user"}

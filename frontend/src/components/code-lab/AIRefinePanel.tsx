@@ -89,8 +89,9 @@ export const AIRefinePanel = () => {
           content: '💡 I\'ve generated improved code. Would you like me to apply these changes? Type "apply" to confirm.' 
         }]);
       }
-
-      runCommand(`\r\n\x1b[36m[AI ${action}]\x1b[0m ${result.response || 'Complete'}\r\n`);
+      // NOTE: intentionally NOT calling runCommand() here.
+      // AI responses must stay in the AI panel only and must never
+      // be written to the terminal xterm buffer.
       
     } catch (error: any) {
       setMessages(prev => [...prev, { 

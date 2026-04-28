@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
+import { useAuthStore } from '@/stores/authStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   BarChart as RechartsBar,
@@ -26,6 +27,7 @@ import {
 } from 'recharts';
 import {
   analyticsService,
+  AskDataAnalysisResponse,
   Dataset as DatasetType,
   ColumnMetadata,
   DataPreview,
@@ -40,6 +42,8 @@ import {
   PredictionResult
 } from '@/services/analytics';
 import { Histogram, BoxPlot, Heatmap } from '@/components/charts';
+import DataAnalysisChat from '@/components/charts/DataAnalysisChat';
+import WellbeingBanner from '@/components/analytics/WellbeingBanner';
 import styles from './analytics.module.css';
 import {
   Upload,
@@ -264,24 +268,6 @@ class ErrorBoundary extends React.Component<
 
     return this.props.children;
   }
-}
-
-export interface PredictionResult {
-  prediction_type: 'regression' | 'classification';
-  model_performance: {
-    test_samples: number;
-    r2_score?: number;
-    accuracy?: number;
-    mean_squared_error?: number;
-  };
-  feature_importance: {
-    feature: string;
-    importance: number;
-  }[];
-  predictions_sample: {
-    actual: number | string;
-    predicted: number | string;
-  }[];
 }
 
 const AnalyticsPage = () => {
@@ -512,6 +498,7 @@ FROM dataset`;
   const [aiInsights, setAiInsights] = useState<AIInsight[]>([]);
   const [anomalyAlerts, setAnomalyAlerts] = useState<AnomalyAlert[]>([]);
   const [isAITyping] = useState(false);
+  const [askAgentResult, setAskAgentResult] = useState<AskDataAnalysisResponse | null>(null);
 
   // Prediction
   const [predictionTarget, setPredictionTarget] = useState<string>('');
@@ -665,6 +652,9 @@ FROM dataset`;
                   data: insight.data || {}
                 }));
                 setAiInsights(validatedInsights);
+              }
+              if (parsedData.askAgentResult) {
+                setAskAgentResult(parsedData.askAgentResult as AskDataAnalysisResponse);
               }
               if (parsedData.customCharts) {
                 console.log('🎨 Restoring custom charts');
@@ -1017,7 +1007,6 @@ FROM dataset`;
         console.log('✨ Using mock preview for demo dataset:', fileId);
         // Simple mock data for demo
         setDataPreview({
-          data: [],
           pagination: {
             page,
             pageSize,
@@ -1043,7 +1032,6 @@ FROM dataset`;
 
       // Transform API response to match expected frontend structure
       const transformedData: DataPreview = {
-        data: apiData.data || [],
         pagination: {
           page,
           pageSize,
@@ -1098,7 +1086,7 @@ FROM dataset`;
           max: col.max,
           std: col.std,
           median: col.median,
-          mostFrequent: col.top_values && col.top_values[0] ? String(col.top_values[0].value) : null,
+          mostFrequent: col.top_values && col.top_values[0] ? String(col.top_values[0].value) : undefined,
           topValues: col.top_values || []
         }));
         setColumnMetadata(columnsArray);
@@ -1223,7 +1211,7 @@ FROM dataset`;
           columns: ['Column 1', 'Column 2'],
           matrix: [[1, 0.5], [0.5, 1]],
           strongCorrelations: [],
-          correlations: []
+          correlations: {}
         });
         return;
       }
@@ -1241,7 +1229,7 @@ FROM dataset`;
           columns: [],
           matrix: [],
           strongCorrelations: [],
-          correlations: []
+          correlations: {}
         });
       }
     } catch (error) {
@@ -1256,10 +1244,32 @@ FROM dataset`;
       // Handle demo datasets
       if (!/^\d+$/.test(currentFileId)) {
         console.log('✨ Creating mock custom chart for demo dataset:', currentFileId);
+        
+        let mockData: any[] = [];
+        if (config.type === 'heatmap') {
+          const xs = ['A', 'B', 'C', 'D'];
+          const ys = ['1', '2', '3', '4'];
+          xs.forEach(x => ys.forEach(y => {
+            mockData.push({ x, y, value: Math.random() * 100 });
+          }));
+        } else {
+          mockData = Array.from({ length: 10 }).map((_, i) => ({
+            name: `Item ${i + 1}`,
+            x: `Category ${i + 1}`,
+            y: Math.floor(Math.random() * 100) + 10,
+            value: Math.floor(Math.random() * 100) + 10,
+            [config.xAxis || 'x']: `Item ${i + 1}`,
+            [config.yAxis || 'y']: Math.floor(Math.random() * 100) + 10,
+            range: `${i*10}-${(i+1)*10}`,
+            count: Math.floor(Math.random() * 100) + 10,
+            median: Math.floor(Math.random() * 100) + 10
+          }));
+        }
+
         const newChart: ChartConfig = {
           ...config,
           id: `mock_${Date.now()}`,
-          data: [] // Empty data for mock
+          data: mockData
         };
         setCustomCharts(prev => [...prev, newChart]);
         setChartBuilder({ isOpen: false, config: null });
@@ -1594,7 +1604,7 @@ FROM dataset`;
       const response = await fetch(`${API_CONFIG.BASE_URL}/analytics/datasets/${datasetId}/insights`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${useAuthStore.getState().token || localStorage.getItem('token')}`
         }
       });
 
@@ -1626,6 +1636,57 @@ FROM dataset`;
     ));
   };
 
+  const handleAskAgentApply = ({
+    insights,
+    chart,
+    result,
+  }: {
+    insights: AIInsight[];
+    chart?: ChartConfig;
+    result: AskDataAnalysisResponse;
+  }) => {
+    setAskAgentResult(result);
+
+    const askQueryRecord: QueryHistory = {
+      id: `ask-${Date.now()}`,
+      query: result.query,
+      type: 'NLQ',
+      timestamp: new Date().toISOString(),
+      executionTime: `${Math.round(result.processing_time * 1000)}`,
+      favorite: false,
+      results: {
+        columns: [],
+        rows: [],
+        totalRows: result.raw_data?.length || 0,
+        executionTime: `${Math.round(result.processing_time * 1000)}ms`,
+        insight: result.summary,
+      },
+    };
+    setQueryHistory((prev) => [askQueryRecord, ...prev].slice(0, 100));
+
+    if (insights.length > 0) {
+      setAiInsights(prev => {
+        const dedupeKey = new Set(prev.map((item) => `${item.title}-${item.timestamp}`));
+        const merged = [...prev];
+        insights.forEach((insight) => {
+          const key = `${insight.title}-${insight.timestamp}`;
+          if (!dedupeKey.has(key)) {
+            merged.unshift(insight);
+            dedupeKey.add(key);
+          }
+        });
+        return merged.slice(0, 50);
+      });
+    }
+
+    if (chart) {
+      setCustomCharts(prev => {
+        const merged = [chart, ...prev.filter((item) => item.id !== chart.id)];
+        return merged.slice(0, 20);
+      });
+    }
+  };
+
   // Prediction Functions
   const handleGeneratePredictions = async () => {
     if (!currentFileId || !predictionTarget) {
@@ -1639,20 +1700,26 @@ FROM dataset`;
       setIsLoading(prev => ({ ...prev, prediction: true }));
       await new Promise(resolve => setTimeout(resolve, 1200));
 
-      const mockResults = {
-        model_type: predictionType,
-        test_metrics: predictionType === 'regression' ? {
-          r2: 0.88,
-          mse: 0.12,
-          rmse: 0.35,
-          mae: 0.22
-        } : {
-          accuracy: 0.94,
-          precision: 0.92,
-          recall: 0.91,
-          f1_score: 0.91
-        }
-      };
+      const mockResults = predictionType === 'regression'
+        ? {
+            prediction_type: 'regression' as const,
+            model_performance: {
+              test_samples: 100,
+              r2_score: 0.88,
+              mean_squared_error: 0.12,
+            },
+            feature_importance: [],
+            predictions_sample: [],
+          }
+        : {
+            prediction_type: 'classification' as const,
+            model_performance: {
+              test_samples: 100,
+              accuracy: 0.94,
+            },
+            feature_importance: [],
+            predictions_sample: [],
+          };
 
       setPredictionResults(mockResults);
       const predictionInsight: AIInsight = {
@@ -1695,7 +1762,7 @@ FROM dataset`;
       }
 
       if (analysis && analysis.results) {
-        setPredictionResults(analysis.results);
+        setPredictionResults(analysis.results as PredictionResult);
 
         // Add prediction insight to AI insights
         const predictionInsight: AIInsight = {
@@ -1769,12 +1836,36 @@ FROM dataset`;
       // Handle demo datasets
       if (!/^\d+$/.test(fileId)) {
         console.log('✨ Using mock charts for demo dataset:', fileId);
+        const generateMockChartData = () => Array.from({ length: 12 }).map((_, i) => ({
+          name: `Month ${i+1}`,
+          x: `M${i+1}`,
+          y: Math.floor(Math.random() * 1000) + 500,
+          value: Math.floor(Math.random() * 1000) + 500,
+        }));
         setChartsData({
-          revenueTrend: [],
-          salesByMonth: [],
-          departmentDistribution: [],
-          salesVsRevenue: [],
-          customCharts: []
+          revenueTrend: Array.from({ length: 12 }).map((_, i) => ({
+            month: `M${i + 1}`,
+            revenue: Math.floor(Math.random() * 1000) + 500,
+          })),
+          salesByMonth: Array.from({ length: 12 }).map((_, i) => ({
+            month: `M${i + 1}`,
+            sales: Math.floor(Math.random() * 1000) + 500,
+          })),
+          departmentDistribution: Array.from({ length: 5 }).map((_, i) => ({ name: `Dept ${i+1}`, value: Math.floor(Math.random() * 100) + 20 })),
+          salesVsRevenue: Array.from({ length: 12 }).map(() => ({
+            sales: Math.floor(Math.random() * 1000) + 500,
+            revenue: Math.floor(Math.random() * 1000) + 500,
+          })),
+          customCharts: [
+            {
+              id: 'mock_demo_1',
+              type: 'bar',
+              title: 'Demo Mock Chart',
+              xAxis: 'x',
+              yAxis: 'y',
+              data: generateMockChartData()
+            }
+          ]
         });
         return;
       }
@@ -1831,6 +1922,7 @@ FROM dataset`;
       correlationData,
       queryHistory,
       aiInsights,
+      askAgentResult,
       customCharts
     };
 
@@ -1874,11 +1966,13 @@ FROM dataset`;
 
         // Ensure query history has proper format
         if (queryHistory && queryHistory.length > 0) {
-          updateData.query_history = queryHistory.map(q => ({
+          updateData.query_history = queryHistory.map((q, index) => ({
+            id: q.id || `history-${index}`,
             query: q.query,
             type: q.type,
             timestamp: q.timestamp,
             executionTime: q.executionTime,
+            favorite: Boolean(q.favorite),
             results: q.results
           }));
         }
@@ -1968,6 +2062,7 @@ FROM dataset`;
           chartsData,
           correlationData,
           aiInsights,
+          askAgentResult,
           customCharts: chartsToUse
         };
         localStorage.setItem('analysisData', JSON.stringify(analysisData));
@@ -2125,7 +2220,7 @@ FROM dataset`;
         const session = result.session;
 
         // Restore all the analysis state with proper type conversion
-        setCurrentFileId(session.dataset_id);
+        setCurrentFileId(session.dataset_id !== undefined ? String(session.dataset_id) : null);
         setDataSummary(session.data_summary as DataSummary | null);
         setColumnMetadata((session.column_metadata || []) as ColumnMetadata[]);
 
@@ -2196,10 +2291,10 @@ FROM dataset`;
         setCustomCharts(customCharts);
 
         // Add restored file to uploaded files if not already present
-        if (session.file_info && !uploadedFiles.find(f => f.fileId === session.dataset_id)) {
+        if (session.file_info && session.dataset_id !== undefined && !uploadedFiles.find(f => f.fileId === String(session.dataset_id))) {
           const restoredFile: UploadedFile = {
-            fileId: session.dataset_id,
-            name: session.file_info.name,
+            fileId: String(session.dataset_id),
+            name: session.file_info.name || 'Recovered dataset',
             size: String(session.file_info.size),
             rows: session.file_info.rows || 0,
             columns: session.file_info.columns || 0,
@@ -2265,7 +2360,7 @@ FROM dataset`;
 
     if (sessionId) {
       // Navigate with session ID - let export preview load the session data
-      const url = `/dashboard/analysis/export-preview?sessionId=${sessionId}`;
+      const url = `/analytics/export-preview?sessionId=${sessionId}`;
       console.log('Navigation URL (with session ID):', url);
       router.push(url);
       return;
@@ -2296,13 +2391,13 @@ FROM dataset`;
     try {
       const dataString = JSON.stringify(analysisData);
       const encodedData = btoa(dataString); // Base64 encoding
-      const url = `/dashboard/analysis/export-preview?data=${encodedData}`;
+      const url = `/analytics/export-preview?data=${encodedData}`;
       console.log('Navigation URL (with data):', url.substring(0, 100) + '...');
       router.push(url);
     } catch (error) {
       console.error('Error encoding data for navigation:', error);
       // Fallback to just localStorage
-      router.push('/dashboard/analysis/export-preview');
+      router.push('/analytics/export-preview');
     }
   };
 
@@ -2327,7 +2422,7 @@ FROM dataset`;
       const response = await fetchWithRetry(`${API_CONFIG.BASE_URL}/analytics/datasets/${datasetId}/export?format=${format}`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${useAuthStore.getState().token || localStorage.getItem('token')}`
         }
       });
 
@@ -3031,23 +3126,23 @@ FROM dataset`;
         const professionalColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#06b6d4', '#84cc16', '#f97316'];
         return (
           <ResponsiveContainer {...commonProps}>
-            <RechartsPie>
+            <RechartsPie margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
               <Pie
                 data={chartData}
                 cx="50%"
                 cy="50%"
-                outerRadius={60}
+                outerRadius="75%"
                 dataKey="value"
-                label={({ name, percent = 0 }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                labelLine={false}
-                fontSize={10}
+                label={({ name, percent = 0 }) => percent > 0.05 ? `${name}: ${(percent * 100).toFixed(0)}%` : ''}
+                labelLine={true}
+                fontSize={12}
                 stroke="#ffffff"
                 strokeWidth={2}
               >
                 {chartData?.map((entry, index) => (
                   <Cell
                     key={`cell-${index}`}
-                    fill={entry.fill || professionalColors[index % professionalColors.length]}
+                    fill={typeof entry.fill === 'string' ? entry.fill : professionalColors[index % professionalColors.length]}
                   />
                 ))}
               </Pie>
@@ -3141,24 +3236,24 @@ FROM dataset`;
         const donutColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#06b6d4'];
         return (
           <ResponsiveContainer {...commonProps}>
-            <RechartsPie>
+            <RechartsPie margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
               <Pie
                 data={chartData}
                 cx="50%"
                 cy="50%"
-                innerRadius={25}
-                outerRadius={60}
+                innerRadius="50%"
+                outerRadius="75%"
                 dataKey="value"
-                label={({ name, percent = 0 }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                labelLine={false}
-                fontSize={9}
+                label={({ name, percent = 0 }) => percent > 0.05 ? `${name}: ${(percent * 100).toFixed(0)}%` : ''}
+                labelLine={true}
+                fontSize={12}
                 stroke="#ffffff"
                 strokeWidth={2}
               >
                 {chartData?.map((entry, index) => (
                   <Cell
                     key={`cell-${index}`}
-                    fill={entry.fill || donutColors[index % donutColors.length]}
+                    fill={typeof entry.fill === 'string' ? entry.fill : donutColors[index % donutColors.length]}
                   />
                 ))}
               </Pie>
@@ -3178,8 +3273,15 @@ FROM dataset`;
 
       case 'heatmap':
         return (
-          <div className="w-full h-full overflow-auto">
-            <Heatmap data={chart.data} height={undefined} />
+          <div className="w-full h-full overflow-auto" style={{ minHeight: '400px' }}>
+            <Heatmap
+              data={(chart.data || []).map((row) => ({
+                x: String(row.x ?? chart.xAxis ?? ''),
+                y: String(row.y ?? chart.yAxis ?? ''),
+                value: typeof row.value === 'number' ? row.value : Number(row.value ?? 0),
+              }))}
+              height="100%"
+            />
           </div>
         );
 
@@ -4025,12 +4127,12 @@ FROM dataset`;
                       <tr key={rowIndex} className="hover:bg-slate-50">
                         {queryResults.columns.map((column, colIndex) => (
                           <td key={colIndex} className="px-4 py-3 text-sm text-slate-600">
-                            {row[column] === null || row[column] === undefined ? (
+                            {row[colIndex] === null || row[colIndex] === undefined ? (
                               <span className="text-slate-400 italic">null</span>
                             ) : (
-                              String(row[column]).length > 50 ?
-                                String(row[column]).substring(0, 50) + '...' :
-                                String(row[column])
+                              String(row[colIndex]).length > 50 ?
+                                String(row[colIndex]).substring(0, 50) + '...' :
+                                String(row[colIndex])
                             )}
                           </td>
                         ))}
@@ -4205,6 +4307,23 @@ FROM dataset`;
   const renderAIInsightsPanel = () => (
     <ErrorBoundary>
       <div className="space-y-6">
+        <DataAnalysisChat
+          datasetId={currentFileId && /^\d+$/.test(currentFileId) ? parseInt(currentFileId, 10) : null}
+          onApplyResult={handleAskAgentApply}
+        />
+
+        {askAgentResult && (
+          <div className="bg-white rounded-xl border border-slate-200 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="font-semibold text-slate-800">Latest Ask Result</h3>
+              <span className="text-xs text-slate-500">
+                {askAgentResult.analysis_type.toUpperCase()} • {(askAgentResult.processing_time * 1000).toFixed(0)}ms
+              </span>
+            </div>
+            <p className="text-sm text-slate-600 mt-2">{askAgentResult.query}</p>
+          </div>
+        )}
+
         {/* Anomaly Alerts */}
         {anomalyAlerts.filter(alert => !alert.dismissed).length > 0 && (
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
@@ -4376,8 +4495,8 @@ FROM dataset`;
                     </span>
                     <span className="ml-2 font-bold text-blue-700">
                       {predictionResults.prediction_type === 'regression'
-                        ? `${(predictionResults.model_performance.r2_score * 100).toFixed(1)}%`
-                        : `${(predictionResults.model_performance.accuracy * 100).toFixed(1)}%`
+                        ? `${((predictionResults.model_performance.r2_score ?? 0) * 100).toFixed(1)}%`
+                        : `${((predictionResults.model_performance.accuracy ?? 0) * 100).toFixed(1)}%`
                       }
                     </span>
                   </div>
@@ -4705,6 +4824,8 @@ FROM dataset`;
           </div>
         </div>
       </header>
+
+      <WellbeingBanner activeTab={activeTab} datasetId={currentFileId} isDark={theme.isDark} />
 
       {/* Main Content */}
       <main className="flex h-[calc(100vh-69px)] max-w-screen-2xl mx-auto">
@@ -5149,17 +5270,12 @@ FROM dataset`;
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <h3 className="font-semibold text-slate-900 mb-1">{session.title}</h3>
-                          <p className="text-slate-600 text-sm mb-2">Dataset: {session.dataset_name}</p>
+                          <p className="text-slate-600 text-sm mb-2">Dataset: {session.file_info?.name || `Dataset ${session.dataset_id ?? 'N/A'}`}</p>
                           <div className="flex items-center gap-4 text-xs text-slate-500">
                             <span>Created: {new Date(session.created_at).toLocaleDateString()}</span>
                             <span>Modified: {new Date(session.updated_at).toLocaleDateString()}</span>
-                            <span className={`px-2 py-1 rounded-full ${session.status === 'saved'
-                              ? 'bg-green-100 text-green-800'
-                              : session.status === 'active'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-gray-100 text-gray-800'
-                              }`}>
-                              {session.status}
+                            <span className="px-2 py-1 rounded-full bg-green-100 text-green-800">
+                              saved
                             </span>
                           </div>
                           {session.tags && session.tags.length > 0 && (
@@ -5177,7 +5293,7 @@ FROM dataset`;
                         </div>
                         <div className="flex items-center gap-2 ml-4">
                           <button
-                            onClick={() => session.id && navigateToPreview(session.id)}
+                            onClick={() => session.id && navigateToPreview(String(session.id))}
                             disabled={!session.id}
                             className="flex items-center gap-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Export this session to PDF"
@@ -5188,7 +5304,7 @@ FROM dataset`;
                             PDF
                           </button>
                           <button
-                            onClick={() => session.id && restoreAnalysisSession(session.id)}
+                            onClick={() => session.id && restoreAnalysisSession(String(session.id))}
                             disabled={isLoading.analysis || !session.id}
                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >

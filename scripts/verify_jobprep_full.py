@@ -1,11 +1,21 @@
 import requests
 import json
 import time
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 BASE_URL = "http://localhost:8000/api/v1"
-# In a real environment, we'd get a fresh token.
-# For this script, we assume the user might need to provide one or we use a test one if available.
-TOKEN = "YOUR_TEST_TOKEN"
+# Get token from environment variable - NEVER hardcode tokens
+TOKEN = os.getenv("TEST_AUTH_TOKEN", "")
+
+if not TOKEN:
+    print("ERROR: TEST_AUTH_TOKEN environment variable not set.")
+    print("Please set your test auth token in the environment:")
+    print("  export TEST_AUTH_TOKEN='your_token_here'")
+    print("Or configure it in your .env file")
+    exit(1)
 
 def test_jobprep_e2e():
     headers = {"Authorization": f"Bearer {TOKEN}"}

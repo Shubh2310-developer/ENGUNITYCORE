@@ -10,6 +10,7 @@ import {
   RefreshCcw,
   CheckCircle,
   AlertTriangle,
+  ShieldAlert,
   X,
   ChevronRight,
   Sparkles,
@@ -106,7 +107,9 @@ export const InterviewSimulator: React.FC<InterviewSimulatorProps> = ({ roleId, 
 
   const fetchQuestion = async (id: string, roundType?: string) => {
     // In a real implementation, the backend would use roundType to tailor the question
-    return await jobPrepService.getSimulationQuestion(roleId, difficulty, id);
+    void id;
+    void roundType;
+    return await jobPrepService.getSimulationQuestion(roleId, difficulty);
   };
 
   const handleSubmitResponse = async () => {

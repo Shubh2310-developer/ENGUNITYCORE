@@ -256,10 +256,15 @@ export class CreativeTemplate {
   private pageHeight: number;
   private margin = 20;
   private yPosition = 20;
-  private colors = {
-    primary: [124, 58, 237], // Purple
-    secondary: [236, 72, 153], // Pink
-    accent: [34, 211, 238], // Cyan
+  private colors: {
+    primary: [number, number, number];
+    secondary: [number, number, number];
+    accent: [number, number, number];
+    text: [number, number, number];
+  } = {
+    primary: [124, 58, 237],
+    secondary: [236, 72, 153],
+    accent: [34, 211, 238],
     text: [30, 41, 59]
   };
 

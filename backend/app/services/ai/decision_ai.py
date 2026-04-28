@@ -1,7 +1,18 @@
 from typing import List, Dict, Any
 import json
+import logging
 from app.services.ai.groq_client import groq_client
-from app.schemas.decision import DecisionBase
+from app.schemas.decision import DecisionBase, AIFlagSchema
+
+logger = logging.getLogger(__name__)
+
+
+class DecisionAnalysisError(Exception):
+    def __init__(self, code: str, message: str, retryable: bool = True):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.retryable = retryable
 
 class DecisionAIService:
     """
@@ -61,23 +72,35 @@ class DecisionAIService:
                 {"role": "system", "content": self.system_prompt},
                 {"role": "user", "content": prompt}
             ])
-            
-            # Extract JSON list from response
+        except Exception as exc:
+            logger.exception("Decision AI provider call failed")
+            raise DecisionAnalysisError("AI_PROVIDER_ERROR", f"Decision analysis service failed: {exc}", retryable=True) from exc
+
+        start_idx = response.find('[')
+        end_idx = response.rfind(']') + 1
+        if start_idx == -1 or end_idx <= 0:
+            logger.warning("Decision AI response missing JSON array")
+            raise DecisionAnalysisError("AI_RESPONSE_INVALID_JSON", "Decision analysis returned a non-JSON response", retryable=True)
+
+        flags_json = response[start_idx:end_idx]
+        try:
+            parsed = json.loads(flags_json)
+        except (ValueError, json.JSONDecodeError) as exc:
+            logger.warning("Decision AI JSON parse failed")
+            raise DecisionAnalysisError("AI_RESPONSE_INVALID_JSON", "Decision analysis returned invalid JSON", retryable=True) from exc
+
+        if not isinstance(parsed, list):
+            raise DecisionAnalysisError("AI_RESPONSE_SCHEMA_INVALID", "Decision analysis response must be a list of flags", retryable=False)
+
+        validated: List[Dict[str, Any]] = []
+        for item in parsed:
             try:
-                # Find start and end of JSON list
-                start_idx = response.find('[')
-                end_idx = response.rfind(']') + 1
-                if start_idx != -1 and end_idx != -1:
-                    flags_json = response[start_idx:end_idx]
-                    flags = json.loads(flags_json)
-                    return flags
-            except (ValueError, json.JSONDecodeError):
-                print(f"Failed to parse AI response: {response}")
-                return []
-                
-            return []
-        except Exception as e:
-            print(f"Decision AI Analysis error: {e}")
-            return []
+                flag = AIFlagSchema.model_validate(item)
+                validated.append(flag.model_dump())
+            except Exception as exc:
+                logger.warning("Decision AI schema validation failed for flag: %s", item)
+                raise DecisionAnalysisError("AI_RESPONSE_SCHEMA_INVALID", f"Decision analysis returned malformed flag: {exc}", retryable=False) from exc
+
+        return validated
 
 decision_ai_service = DecisionAIService()

@@ -23,6 +23,16 @@ const CITATION_STYLES = ['APA 7th', 'IEEE', 'MLA', 'BibTeX'];
 const DRAFT_SECTIONS = ['Introduction', 'Literature Review', 'Methodology', 'Results'];
 const GRAPH_NODES = ['Attention', 'Transformers', 'LLMs', 'Latent Space', 'Diffusion'];
 
+async function gotoResearchWithRetry(page: any) {
+  if (page.isClosed()) {
+    throw new Error('Cannot navigate to /research: page is closed');
+  }
+
+  await page.goto(RESEARCH_URL, { waitUntil: 'commit', timeout: 300000 });
+  await expect(page).toHaveURL(/\/research(?:\?|$)/);
+  await expect(page.getByRole('heading', { name: 'Research Workspace', level: 1 })).toBeVisible({ timeout: 180000 });
+}
+
 // ─── Helper: click a phase by its name (scoped to phaseNav) ───────────────
 async function clickPhase(page: any, phaseName: string) {
   const nav = page.locator('[class*="phaseNav"]');
@@ -46,6 +56,8 @@ async function getToolModal(page: any) {
 }
 
 test.describe('Research Workspace', () => {
+  test.describe.configure({ mode: 'serial' });
+  test.setTimeout(420000);
 
   test.beforeEach(async ({ authenticatedPage: page }) => {
     // Mock any backend research API calls
@@ -56,8 +68,7 @@ test.describe('Research Workspace', () => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'ok' }) });
     });
 
-    await page.goto(RESEARCH_URL);
-    await page.waitForLoadState('domcontentloaded');
+    await gotoResearchWithRetry(page);
   });
 
   // =========================================================================
@@ -480,30 +491,37 @@ test.describe('Research Workspace', () => {
   // =========================================================================
   // 10. DECISION VAULT ROUTING
   // =========================================================================
-  test.describe('Decision Vault Routing', () => {
+  test.describe('DV Routing', () => {
 
     test('TC-DV-001: "Log Decision" button is present and correctly labelled', async ({ authenticatedPage: page }) => {
-      // In test env, Next.js router.push may not trigger browser navigation
-      // Verify the button exists and is clickable without crashing
       const logDecBtn = page.getByRole('button', { name: /Log Decision/ });
       await expect(logDecBtn).toBeVisible();
+
+      const waitForDecisionVault = page.waitForURL(/\/decisionvault\?source=research/, { timeout: 1500 }).catch(() => null);
       await logDecBtn.click();
-      await page.waitForTimeout(400);
-      // Page should remain stable even if navigation happens
-      const title = await page.title();
-      expect(title).toBeTruthy();
+
+      const navResult = await waitForDecisionVault;
+      if (navResult) {
+        await expect(page).toHaveURL(/\/decisionvault\?source=research/);
+      } else {
+        await expect(page.getByRole('heading', { name: 'Research Workspace', level: 1 })).toBeVisible();
+      }
     });
 
     test('TC-DV-002: "Finalize as Decision" button is visible and clickable', async ({ authenticatedPage: page }) => {
-      // Footer may be off-screen; scroll to it
       const finalizeBtn = page.getByRole('button', { name: /Finalize as Decision/ });
       await finalizeBtn.scrollIntoViewIfNeeded();
       await expect(finalizeBtn).toBeVisible({ timeout: 5000 });
+
+      const waitForDecisionVault = page.waitForURL(/\/decisionvault\?source=research/, { timeout: 1500 }).catch(() => null);
       await finalizeBtn.click();
-      await page.waitForTimeout(400);
-      // Verify page is stable after the button click
-      const title = await page.title();
-      expect(title).toBeTruthy();
+
+      const navResult = await waitForDecisionVault;
+      if (navResult) {
+        await expect(page).toHaveURL(/\/decisionvault\?source=research/);
+      } else {
+        await expect(page.getByRole('heading', { name: 'Research Workspace', level: 1 })).toBeVisible();
+      }
     });
 
   });

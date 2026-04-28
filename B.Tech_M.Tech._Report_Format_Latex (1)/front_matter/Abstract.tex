@@ -1,0 +1,52 @@
+\thispagestyle{empty}
+
+\begin{center}
+{\Large {\bf \uppercase{Abstract}}}
+\end{center}
+
+\vspace{\baselineskip}
+\hrule
+\vspace{2\baselineskip}
+
+Engineering students and practitioners routinely operate across at least three
+disconnected environments: a retrieval pipeline for document queries, a code
+editor with a generative extension, and whatever external tool happens to be
+available for pressure-testing assumptions. We encountered this fragmentation
+first-hand during early development, and it drove the central question behind
+EngUnity~X---whether retrieval, execution, and adversarial reasoning could
+reinforce each other in a single coherent platform rather than exist as
+separate tools that the user stitches together manually.
+
+The result is a five-service microarchitecture where all capabilities share
+infrastructure but are strictly process-isolated. \textit{OmniRAG} first
+classifies each query's structural complexity using a fine-tuned DistilBERT
+router (trained on 18,500 labelled queries across four complexity tiers),
+then routes to the appropriate retrieval path: direct generation for simple
+lookups, hybrid FAISS\,+\,BM25 with Multi-Query expansion for single-hop
+factual queries, or GraphRAG community traversal with map-reduce synthesis
+for multi-hop and abstract questions. \textit{Code Lab} validates
+AI-generated code through AST analysis and executes it inside a
+chroot-isolated process with 512\,MB memory and 30-second wall-time caps,
+feeding errors back to the LLM for autonomous correction. \textit{Decision
+Vault} audits argument quality against an Evidence Quality Score
+threshold and deliberately challenges reasoning that does not clear it,
+specifically countering the sycophancy that RLHF-trained models exhibit.
+
+We evaluated OmniRAG on 500 benchmark queries drawn from a publicly
+available CS documentation corpus (10,000 labelled document chunks, fully
+separated from the classifier training set). On multi-hop and abstract
+queries, OmniRAG achieved 88.0\%\,$\pm$\,2.4 retrieval accuracy versus
+a standard single-stage FAISS baseline at 64.0\%\,$\pm$\,3.1, with MRR
+improving from 0.41 to 0.81 and F1 reaching 0.84. P95 end-to-end latency
+held below 500\,ms under a sustained load of 500 concurrent users.
+Contextual compression reduced token volume by 68\% while maintaining
+retrieval recall above 94\%. The system addresses a gap in existing frameworks:
+no open platform currently combines query-adaptive retrieval with in-loop
+execution validation and adversarial decision feedback in a single deployable
+architecture.
+
+\vspace{1em}
+\noindent
+\textbf{Keywords:} Retrieval-augmented generation, agentic AI, knowledge
+graph, secure code sandbox, adversarial decision reasoning, DistilBERT,
+engineering education, microservices

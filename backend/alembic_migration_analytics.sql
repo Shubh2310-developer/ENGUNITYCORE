@@ -83,3 +83,28 @@ CREATE TABLE IF NOT EXISTS analytics_dashboard_widgets (
 
 CREATE INDEX IF NOT EXISTS idx_analytics_dashboard_widgets_dashboard_id ON analytics_dashboard_widgets(dashboard_id);
 CREATE INDEX IF NOT EXISTS idx_analytics_dashboard_widgets_chart_id ON analytics_dashboard_widgets(chart_id);
+
+-- Create analytics_sessions table
+CREATE TABLE IF NOT EXISTS analytics_sessions (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    dataset_id INTEGER REFERENCES analytics_datasets(id) ON DELETE SET NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    data_summary JSON,
+    column_metadata JSON,
+    data_preview JSON,
+    charts_data JSON,
+    correlation_data JSON,
+    query_history JSON,
+    ai_insights JSON,
+    custom_charts JSON,
+    file_info JSON,
+    tags JSON,
+    is_public INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_analytics_sessions_user_id ON analytics_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_analytics_sessions_dataset_id ON analytics_sessions(dataset_id);

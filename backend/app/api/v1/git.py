@@ -28,13 +28,7 @@ async def get_status(project_id: str):
         repo = git_service.get_repo(project_id, "default_user")
         return repo.get_status()
     except Exception as e:
-        # Return empty status on error to avoid breaking UI
-        return GitStatus(
-            active_branch="none",
-            is_dirty=False,
-            changed_files=[],
-            untracked_files=[]
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/{project_id}/commit")
 async def commit_changes(project_id: str, request: CommitRequest):
@@ -54,4 +48,4 @@ async def get_log(project_id: str):
         repo = git_service.get_repo(project_id, "default_user")
         return repo.get_log()
     except Exception as e:
-        return []
+        raise HTTPException(status_code=500, detail=str(e))

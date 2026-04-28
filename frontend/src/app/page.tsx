@@ -49,6 +49,7 @@ export default function LandingPage() {
                 src="/Logo1.jpg"
                 alt="Engunity Logo"
                 fill
+                sizes="40px"
                 className="object-cover"
               />
             </div>
@@ -115,6 +116,8 @@ export default function LandingPage() {
                     src="/Hero1.jpeg"
                     alt="Engunity Dashboard Overview"
                     fill
+                    priority
+                    sizes="(max-width: 1024px) 100vw, 50vw"
                     className="object-cover"
                   />
                 </div>
@@ -259,6 +262,7 @@ export default function LandingPage() {
                          src={module.image}
                          alt={module.title}
                          fill
+                         sizes="(min-width: 1024px) 50vw, 100vw"
                          className="object-cover opacity-80 hover:scale-105 transition-transform duration-700"
                        />
                     </div>
@@ -405,6 +409,7 @@ export default function LandingPage() {
                     src="/Logo1.jpg"
                     alt="Engunity Logo"
                     fill
+                    sizes="40px"
                     className="object-cover"
                   />
                 </div>

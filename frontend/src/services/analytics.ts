@@ -276,6 +276,44 @@ export interface InsightsResponse {
   anomalies: Anomaly[];
 }
 
+export type AskAnalysisType = 'trend' | 'comparison' | 'distribution' | 'anomaly' | 'prediction' | 'summary';
+export type AskChartType = 'line' | 'bar' | 'pie' | 'scatter' | 'heatmap' | 'area' | 'histogram' | 'box';
+
+export interface AskDataAnalysisRequest {
+  query: string;
+  dataset_id: number;
+  time_range?: string;
+  data_source?: string;
+}
+
+export interface AskDataInsight {
+  insight_type: string;
+  title: string;
+  description: string;
+  confidence: number;
+  data_points?: Record<string, any>[];
+}
+
+export interface AskChartConfig {
+  chart_type: AskChartType;
+  title: string;
+  x_label: string;
+  y_label: string;
+  data: Record<string, any>[];
+  colors?: string[];
+}
+
+export interface AskDataAnalysisResponse {
+  query: string;
+  analysis_type: AskAnalysisType;
+  summary: string;
+  insights: AskDataInsight[];
+  chart?: AskChartConfig;
+  raw_data?: Record<string, any>[];
+  suggested_queries: string[];
+  processing_time: number;
+}
+
 class AnalyticsService {
   private getAuthHeaders() {
     const token = useAuthStore.getState().token;
@@ -480,6 +518,21 @@ class AnalyticsService {
       headers: this.getAuthHeaders(),
       params: { format },
     });
+    return response.data;
+  }
+
+  async askData(
+    request: AskDataAnalysisRequest,
+    options?: { signal?: AbortSignal }
+  ): Promise<AskDataAnalysisResponse> {
+    const response = await axios.post(
+      `${FINAL_API_URL}/analytics/ask`,
+      request,
+      {
+        headers: this.getAuthHeaders(),
+        signal: options?.signal,
+      }
+    );
     return response.data;
   }
 }
