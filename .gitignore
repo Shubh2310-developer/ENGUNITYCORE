@@ -23,6 +23,9 @@ credentials/
 # Python Backend
 # ==========================================
 
+# Local performance binaries
+backend/k6
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
