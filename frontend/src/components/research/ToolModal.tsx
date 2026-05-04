@@ -46,7 +46,7 @@ function RenderGap({ result }: { result: ToolInvokeResult['result'] }) {
   return (
     <div className="space-y-3">
       {gaps.map((g, i) => (
-        <div key={i} className="p-4 bg-white border border-sky-100 rounded-xl flex justify-between items-start shadow-sm gap-4">
+        <div key={`gap-${g.label}-${i}`} className="p-4 bg-white border border-sky-100 rounded-xl flex justify-between items-start shadow-sm gap-4">
           <div>
             <h5 className="font-bold text-slate-800 text-sm">{g.label}</h5>
             {g.reason && <p className="text-xs text-slate-500 mt-1">{g.reason}</p>}
@@ -127,7 +127,7 @@ function RenderAssumption({ result }: { result: ToolInvokeResult['result'] }) {
   return (
     <div className="space-y-4">
       {assumptions.map((a, i) => (
-        <div key={i} className={styles.assumptionCard}>
+        <div key={`assumption-${a.source}-${a.type}-${i}`} className={styles.assumptionCard}>
           <div className={styles.assumptionHeader}>
             <span className="font-bold text-slate-700 text-sm">{a.source}</span>
             <span className={styles.assumptionType} style={typeStyles[a.type]}>{a.type}</span>
@@ -144,7 +144,7 @@ function RenderStrength({ result }: { result: ToolInvokeResult['result'] }) {
   return (
     <div className="space-y-6">
       {items.map((item, i) => (
-        <div key={i}>
+        <div key={`strength-item-${item.source}-${i}`}>
           <h5 className="font-bold text-slate-800 text-sm mb-3">{item.source}</h5>
           <div className="flex flex-wrap gap-2 mb-2">
             {item.strengths.map((s) => (
@@ -168,7 +168,7 @@ function RenderQuestion({ result }: { result: ToolInvokeResult['result'] }) {
   return (
     <div className="space-y-4">
       {questions.map((q, i) => (
-        <div key={i} className={styles.questionCard}>
+        <div key={`question-${q}-${i}`} className={styles.questionCard}>
           <p className={styles.questionText}>
             <span className="font-black text-blue-600 mr-2">{i + 1}.</span>
             {q}
@@ -191,7 +191,7 @@ function RenderArgument({ result }: { result: ToolInvokeResult['result'] }) {
       {args.map((a, i) => {
         const style = supportColor[a.support] ?? supportColor.Unsupported;
         return (
-          <div key={i} className={styles.argumentCard} style={{ borderLeftColor: style.border }}>
+          <div key={`argument-${a.claim}-${i}`} className={styles.argumentCard} style={{ borderLeftColor: style.border }}>
             <p className={styles.argumentClaim}>Claim: &ldquo;{a.claim}&rdquo;</p>
             <div className={styles.argumentStatus}>
               <span className={`${style.text} font-bold`}>{a.support}</span>
@@ -315,7 +315,7 @@ function RenderChallenger({ result }: { result: ToolInvokeResult['result'] }) {
       {stress_test_details.length > 0 && (
         <div className="space-y-2">
           {stress_test_details.map((d: { aspect: string; verdict: string; reason: string }, i: number) => (
-            <div key={i} className="flex items-start gap-3 p-3 bg-white border border-slate-100 rounded-xl">
+            <div key={`stress-test-${d.aspect}-${i}`} className="flex items-start gap-3 p-3 bg-white border border-slate-100 rounded-xl">
               <span className={`font-bold text-xs flex-shrink-0 mt-0.5 ${verdictColor[d.verdict] ?? 'text-slate-500'}`}>
                 {d.verdict}
               </span>
@@ -420,7 +420,7 @@ const TOOL_CONTENT: Record<string, React.ReactNode> = {
         { label: 'Cross-modal Bias in Latent Diffusion', confidence: 'Medium' },
         { label: 'Real-time Vector Quantization Efficiency', confidence: 'High' },
       ].map((gap, i) => (
-        <div key={i} className="p-4 bg-white border border-sky-100 rounded-xl flex justify-between items-center shadow-sm">
+        <div key={`demo-gap-${gap.label}-${i}`} className="p-4 bg-white border border-sky-100 rounded-xl flex justify-between items-center shadow-sm">
           <div>
             <h5 className="font-bold text-slate-800 text-sm">{gap.label}</h5>
             <p className="text-xs text-slate-500">Identified from 4 conflicting conclusions</p>

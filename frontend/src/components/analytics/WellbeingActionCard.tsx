@@ -30,8 +30,8 @@ function WellbeingActionCard({ check, isDark = false, onStartBreak, onDismiss }:
       </div>
 
       <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-        {check.tips.slice(0, 5).map((tip) => (
-          <li key={tip} className={`flex gap-2 rounded-xl px-3 py-2 text-sm ${isDark ? 'bg-slate-700/60 text-slate-200' : 'bg-slate-50 text-slate-700'}`}>
+        {check.tips.slice(0, 5).map((tip, i) => (
+          <li key={`tip-${tip}-${i}`} className={`flex gap-2 rounded-xl px-3 py-2 text-sm ${isDark ? 'bg-slate-700/60 text-slate-200' : 'bg-slate-50 text-slate-700'}`}>
             <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
             <span>{tip}</span>
           </li>
