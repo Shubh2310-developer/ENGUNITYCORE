@@ -38,7 +38,7 @@ from app.services.jobprep.jobprep_service import JobPrepService
 router = APIRouter()
 
 # --- Profile ---
-@router.get("/profile", response_model=ProfileSchema)
+@router.get("/profile", response_model=Optional[ProfileSchema])
 def get_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -46,7 +46,7 @@ def get_profile(
     service = JobPrepService(db)
     profile = service.get_profile(current_user.id)
     if not profile:
-        raise HTTPException(status_code=404, detail="JobPrep profile not found")
+        return None
     return profile
 
 @router.post("/profile", response_model=ProfileSchema)
@@ -388,7 +388,7 @@ async def get_skill_gaps(
     service = JobPrepService(db)
     profile = service.get_profile(current_user.id)
     if not profile:
-        raise HTTPException(status_code=404, detail="Profile not found")
+        return []
     return await service.analyze_skill_gaps(profile.id)
 
 @router.get("/analysis/readiness-history")
@@ -409,7 +409,7 @@ def get_readiness_forecast(
     service = JobPrepService(db)
     profile = service.get_profile(current_user.id)
     if not profile:
-        raise HTTPException(status_code=404, detail="Profile not found")
+        return None
     return service.get_readiness_forecast(profile.id)
 
 @router.get("/roles/{role_id}/curriculum")

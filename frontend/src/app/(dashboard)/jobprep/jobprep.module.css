@@ -600,3 +600,13 @@
   background-color: #fef3c7;
   color: #92400e;
 }
+
+/* Custom Text Selection */
+.jobprep-theme ::selection {
+  background-color: rgba(37, 99, 235, 0.3); /* Soft blue */
+  color: inherit;
+}
+.jobprep-theme ::-moz-selection {
+  background-color: rgba(37, 99, 235, 0.3);
+  color: inherit;
+}

@@ -282,22 +282,42 @@ async def get_current_user(
     db: Session = Depends(get_db),
 ) -> AuthenticatedUser:
     try:
-        status_code, payload = await _supabase_request_json(
-            "GET",
-            "/auth/v1/user",
-            token=token,
+        # Validate Supabase JWT Locally without hitting the network
+        payload = jwt.decode(
+            token,
+            settings.SUPABASE_JWT_SECRET,
+            algorithms=["HS256"],
+            audience="authenticated"
         )
-    except SupabaseAuthUnavailable:
-        return _local_user_from_token(db, token)
-
-    if status_code != 200:
+        # Adapt payload to match _build_authenticated_user expectations
+        if "sub" in payload and "id" not in payload:
+            payload["id"] = payload["sub"]
+    except JWTError as exc:
+        logger.error(f"Supabase local JWT decode failed: {exc}")
+        
+        # Fallback to network validation if local decode fails (e.g., due to RS256 alg or rotated keys)
         try:
-            return _local_user_from_token(db, token)
-        except HTTPException:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Could not validate credentials",
-            )
+            status_code, user_payload = await _supabase_request_json("GET", "/auth/v1/user", token=token)
+            if status_code in (200, 201) and user_payload and "id" in user_payload:
+                payload = user_payload
+            else:
+                raise ValueError(f"Network validation returned status {status_code}")
+        except Exception as net_exc:
+            logger.error(f"Supabase network validation failed: {net_exc}")
+            try:
+                return _local_user_from_token(db, token)
+            except HTTPException as e:
+                logger.error(f"Local user from token failed: {e.detail}")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Could not validate credentials",
+                )
+    except Exception as exc:
+        logger.error(f"Unexpected error in get_current_user decoding: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Could not validate credentials",
+        )
 
     current_user = _build_authenticated_user(payload)
 

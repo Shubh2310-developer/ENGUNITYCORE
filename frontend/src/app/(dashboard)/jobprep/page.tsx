@@ -440,7 +440,7 @@ const JobPrepHub = () => {
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">Current Status</label>
                   <select
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-900"
                     value={profileForm.current_status}
                     onChange={e => setProfileForm({...profileForm, current_status: e.target.value})}
                   >
@@ -453,7 +453,7 @@ const JobPrepHub = () => {
                   <label className="block text-sm font-bold text-slate-700 mb-1">Target Timeline</label>
                   <input
                     type="text"
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-900"
                     placeholder="e.g. 3 months"
                     value={profileForm.target_timeline}
                     onChange={e => setProfileForm({...profileForm, target_timeline: e.target.value})}
@@ -463,7 +463,7 @@ const JobPrepHub = () => {
                   <label className="block text-sm font-bold text-slate-700 mb-1">Industry Focus</label>
                   <input
                     type="text"
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-900"
                     placeholder="e.g. Fintech, AI, Healthcare"
                     value={profileForm.industry_focus}
                     onChange={e => setProfileForm({...profileForm, industry_focus: e.target.value})}
@@ -475,7 +475,7 @@ const JobPrepHub = () => {
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">Experience Level</label>
                   <select
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-900"
                     value={profileForm.experience_level}
                     onChange={e => setProfileForm({...profileForm, experience_level: e.target.value})}
                   >
@@ -488,7 +488,7 @@ const JobPrepHub = () => {
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">Learning Style</label>
                   <select
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-900"
                     value={profileForm.learning_style}
                     onChange={e => setProfileForm({...profileForm, learning_style: e.target.value})}
                   >
@@ -501,7 +501,7 @@ const JobPrepHub = () => {
                   <label className="block text-sm font-bold text-slate-700 mb-1">Salary Expectations (Min)</label>
                   <input
                     type="number"
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-900"
                     value={profileForm.salary_expectation_min}
                     onChange={e => setProfileForm({...profileForm, salary_expectation_min: parseInt(e.target.value) || 0})}
                   />

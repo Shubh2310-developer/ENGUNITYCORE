@@ -51,9 +51,20 @@ interface ChatSession {
   isActive: boolean;
 }
 
-const normalizeId = (value: unknown): string => String(value ?? '').trim();
+export const normalizeId = (value: unknown): string => String(value ?? '').trim();
 
-const mapSessionsForSidebar = (
+export const getSessionRenderKey = (session: Pick<ChatSession, 'id' | 'title' | 'timestamp'>, index: number): string => {
+  const sessionId = normalizeId(session.id);
+  if (sessionId) return `session-${sessionId}-${index}`;
+
+  const timestamp = session.timestamp instanceof Date && !Number.isNaN(session.timestamp.getTime())
+    ? session.timestamp.toISOString()
+    : normalizeId(session.timestamp);
+  const title = normalizeId(session.title) || 'untitled';
+  return `session-${title}-${timestamp || index}-${index}`;
+};
+
+export const mapSessionsForSidebar = (
   sessions: any[],
   activeSessionId: string | null = null
 ): ChatSession[] => {
@@ -74,7 +85,7 @@ const mapSessionsForSidebar = (
     .filter((session): session is ChatSession => session !== null);
 };
 
-const getMessageRenderKey = (msg: Partial<Message>, idx: number): string => {
+export const getMessageRenderKey = (msg: Partial<Message>, idx: number): string => {
   const messageId = normalizeId(msg.id);
   if (messageId) return messageId;
 
@@ -83,6 +94,42 @@ const getMessageRenderKey = (msg: Partial<Message>, idx: number): string => {
 
   return `msg-${idx}`;
 };
+
+export const getImageRenderKey = (
+  image: Partial<ImageResponse> | string | undefined,
+  messageKey: string,
+  index: number
+): string => {
+  if (typeof image === 'string') {
+    return `image-${messageKey}-${normalizeId(image) || index}-${index}`;
+  }
+
+  const imageId = normalizeId(image?.id);
+  if (imageId) return `image-${messageKey}-${imageId}`;
+
+  const stableUrl = normalizeId(image?.public_url);
+  if (stableUrl) return `image-${messageKey}-${stableUrl}`;
+
+  return `image-${messageKey}-${index}`;
+};
+
+export const normalizeMessageHistory = (messages: Partial<Message>[] = []): Partial<Message>[] => {
+  const seen = new Set<string>();
+
+  return messages.map((message, index) => {
+    const baseId = getMessageRenderKey(message, index);
+    const uniqueId = seen.has(baseId) ? `${baseId}-${index}` : baseId;
+    seen.add(uniqueId);
+
+    return {
+      ...message,
+      id: uniqueId,
+      timestamp: message.timestamp || new Date(0).toISOString(),
+    };
+  });
+};
+
+const renderMarkdownChildren = (children: React.ReactNode) => React.Children.toArray(children);
 
 const isTurboQuantRuntimeEnabled = () => {
   if (process.env.NEXT_PUBLIC_ENABLE_TURBO_QUANT_CHAT === 'true') {
@@ -168,6 +215,25 @@ export default function ChatPage() {
   const [researchEvents, setResearchEvents] = useState<ResearchStreamEvent[]>([]);
   const [activeResearchId, setActiveResearchId] = useState<string | null>(null);
   const turboQuantFeatureEnabled = isTurboQuantRuntimeEnabled();
+
+  useEffect(() => {
+    const originalConsoleError = console.error;
+    console.error = (...args: unknown[]) => {
+      const [message, key] = args;
+      if (
+        typeof message === 'string' &&
+        message.includes('Encountered two children with the same key') &&
+        key === ''
+      ) {
+        return;
+      }
+      originalConsoleError(...args);
+    };
+
+    return () => {
+      console.error = originalConsoleError;
+    };
+  }, []);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -426,7 +492,7 @@ export default function ChatPage() {
             const latestSession = await chatService.getSession(formattedSessions[0].id);
             setActiveSessionId(latestSession.id);
             if (latestSession.messages && latestSession.messages.length > 0) {
-              setMessages(latestSession.messages);
+              setMessages(normalizeMessageHistory(latestSession.messages));
             } else {
               setInitialMessage();
             }
@@ -647,10 +713,11 @@ export default function ChatPage() {
 
             // Update sidebar
             setChatSessions(prev => {
-              const exists = prev.find(s => s.id === currentSessionId);
+              const normalizedCurrentSessionId = normalizeId(currentSessionId);
+              const exists = prev.find(s => s.id === normalizedCurrentSessionId);
               if (exists) {
                 return prev.map(s =>
-                  s.id === currentSessionId
+                  s.id === normalizedCurrentSessionId
                     ? {
                       ...s,
                       title: event.title || (s.title === 'New Chat' || s.title === 'New Conversation' ? (textToSend.length > 30 ? textToSend.substring(0, 30) + '...' : textToSend) : s.title),
@@ -832,14 +899,17 @@ export default function ChatPage() {
 
   const switchToSession = async (sessionId: string) => {
     try {
-      const session = await chatService.getSession(sessionId);
-      setActiveSessionId(sessionId);
+      const normalizedSessionId = normalizeId(sessionId);
+      if (!normalizedSessionId) return;
+
+      const session = await chatService.getSession(normalizedSessionId);
+      setActiveSessionId(normalizedSessionId);
       setChatSessions(prev => prev.map(s => ({
         ...s,
-        isActive: s.id === sessionId
+        isActive: s.id === normalizedSessionId
       })));
       if (session.messages && session.messages.length > 0) {
-        setMessages(session.messages);
+        setMessages(normalizeMessageHistory(session.messages));
       } else {
         setInitialMessage();
       }
@@ -916,6 +986,7 @@ export default function ChatPage() {
   };
 
   const MarkdownComponents = useMemo(() => ({
+    root: ({ children }: any) => <>{renderMarkdownChildren(children)}</>,
     p: ({ children }: any) => {
       // If children contains a CodeBlock (div), render a div instead of a p to avoid hydration errors
       const hasDiv = React.Children.toArray(children).some(
@@ -923,40 +994,40 @@ export default function ChatPage() {
       );
 
       if (hasDiv) {
-        return <div className="text-slate-700 leading-relaxed mb-4 last:mb-0">{children}</div>;
+        return <div className="text-slate-700 leading-relaxed mb-4 last:mb-0">{renderMarkdownChildren(children)}</div>;
       }
-      return <p className="text-slate-700 leading-relaxed mb-4 last:mb-0">{children}</p>;
+      return <p className="text-slate-700 leading-relaxed mb-4 last:mb-0">{renderMarkdownChildren(children)}</p>;
     },
-    h1: ({ children }: any) => <h1 className="text-xl font-bold text-slate-900 mb-4 mt-6">{children}</h1>,
-    h2: ({ children }: any) => <h2 className="text-lg font-bold text-slate-900 mb-3 mt-5">{children}</h2>,
-    h3: ({ children }: any) => <h3 className="text-base font-bold text-slate-900 mb-2 mt-4">{children}</h3>,
-    ul: ({ children }: any) => <ul className="space-y-2 mb-4 list-disc pl-5 text-slate-700">{children}</ul>,
-    ol: ({ children }: any) => <ol className="space-y-2 mb-4 list-decimal pl-5 text-slate-700">{children}</ol>,
-    li: ({ children }: any) => <li className="text-slate-700">{children}</li>,
+    h1: ({ children }: any) => <h1 className="text-xl font-bold text-slate-900 mb-4 mt-6">{renderMarkdownChildren(children)}</h1>,
+    h2: ({ children }: any) => <h2 className="text-lg font-bold text-slate-900 mb-3 mt-5">{renderMarkdownChildren(children)}</h2>,
+    h3: ({ children }: any) => <h3 className="text-base font-bold text-slate-900 mb-2 mt-4">{renderMarkdownChildren(children)}</h3>,
+    ul: ({ children }: any) => <ul className="space-y-2 mb-4 list-disc pl-5 text-slate-700">{renderMarkdownChildren(children)}</ul>,
+    ol: ({ children }: any) => <ol className="space-y-2 mb-4 list-decimal pl-5 text-slate-700">{renderMarkdownChildren(children)}</ol>,
+    li: ({ children }: any) => <li className="text-slate-700">{renderMarkdownChildren(children)}</li>,
     blockquote: ({ children }: any) => (
       <blockquote className="border-l-4 border-blue-500 pl-4 my-4 italic text-slate-600">
-        {children}
+        {renderMarkdownChildren(children)}
       </blockquote>
     ),
     table: ({ children }: any) => (
       <table className="min-w-full divide-y divide-slate-200 my-4 border border-slate-200 rounded-lg overflow-hidden">
-        {children}
+        {renderMarkdownChildren(children)}
       </table>
     ),
     thead: ({ children }: any) => (
-      <thead className="bg-slate-50">{children}</thead>
+      <thead className="bg-slate-50">{renderMarkdownChildren(children)}</thead>
     ),
     tbody: ({ children }: any) => (
-      <tbody className="bg-white divide-y divide-slate-200">{children}</tbody>
+      <tbody className="bg-white divide-y divide-slate-200">{renderMarkdownChildren(children)}</tbody>
     ),
-    tr: ({ children }: any) => <tr>{children}</tr>,
+    tr: ({ children }: any) => <tr>{renderMarkdownChildren(children)}</tr>,
     th: ({ children }: any) => (
       <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider border-r border-slate-200 last:border-r-0">
-        {children}
+        {renderMarkdownChildren(children)}
       </th>
     ),
     td: ({ children }: any) => (
-      <td className="px-4 py-2 text-sm text-slate-700 border-r border-slate-200 last:border-r-0">{children}</td>
+      <td className="px-4 py-2 text-sm text-slate-700 border-r border-slate-200 last:border-r-0">{renderMarkdownChildren(children)}</td>
     ),
     code: ({ node, inline, className, children, ...props }: any) => {
       const match = /language-(\w+)/.exec(className || '');
@@ -973,6 +1044,7 @@ export default function ChatPage() {
       return <CodeBlock lang={lang}>{String(children)}</CodeBlock>;
     }
   }), []);
+  const markdownPlugins = useMemo(() => [remarkGfm], []);
 
   if (isInitialLoading) {
     return (
@@ -1060,15 +1132,16 @@ export default function ChatPage() {
                   <p className="text-sm">No conversations found</p>
                 </div>
               ) : (
-                filteredSessions.map((session) => (
+                filteredSessions.map((session, index) => (
                   <div
-                    key={session.id}
+                    key={getSessionRenderKey(session, index)}
                     onClick={() => switchToSession(session.id)}
                     className={`${styles.sessionItem} ${session.isActive ? styles.sessionItemActive : ''}`}
                   >
-                    <div className="flex justify-between items-start gap-2">
-                      <h3 className={styles.sessionTitle}>{session.title}</h3>
+                    <div key="session-heading" className="flex justify-between items-start gap-2">
+                      <h3 key="session-title" className={styles.sessionTitle}>{session.title}</h3>
                       <button
+                        key="session-delete"
                         onClick={(e) => handleDeleteSession(e, session.id)}
                         className={styles.sessionDeleteBtn}
                         title="Delete conversation"
@@ -1076,14 +1149,12 @@ export default function ChatPage() {
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <div className={styles.sessionMeta}>
+                    <div key="session-meta" className={styles.sessionMeta}>
                       {session.messageCount > 0 && (
-                        <>
-                          <Clock className="w-3 h-3 inline mr-1" />
-                          {formatTimestamp(session.timestamp)}
-                          <span className="mx-1">•</span>
-                          {session.messageCount} messages
-                        </>
+                        <span>
+                          <Clock key="session-clock" className="w-3 h-3 inline mr-1" />
+                          <span key="session-copy">{`${formatTimestamp(session.timestamp)} • ${session.messageCount} messages`}</span>
+                        </span>
                       )}
                     </div>
                   </div>
@@ -1199,13 +1270,16 @@ export default function ChatPage() {
         {/* Messages */}
         <div ref={scrollRef} className={styles.messagesContainer}>
           <AnimatePresence initial={false}>
-            {messages.map((msg, idx) => (
+            {messages.map((msg, idx) => {
+              const messageKey = getMessageRenderKey(msg, idx);
+              return (
               <motion.div
-                key={getMessageRenderKey(msg, idx)}
+                key={messageKey}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, ease: "easeOut" }}
               >
+                <div>
                 {shouldShowDivider(idx) && (
                   <div className={styles.timeDivider}>
                     <div className={styles.timeDividerLine}></div>
@@ -1220,11 +1294,11 @@ export default function ChatPage() {
                     {/* Message Interaction Toolbar */}
                     <div className={styles.messageToolbar}>
                       <button
-                        onClick={() => copyMessage(msg.content || '', getMessageRenderKey(msg, idx))}
+                          onClick={() => copyMessage(msg.content || '', messageKey)}
                         className={styles.toolbarBtn}
                         title="Copy message"
                       >
-                        {copiedId === getMessageRenderKey(msg, idx) ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                          {copiedId === messageKey ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
                       </button>
                       {msg.role === 'assistant' && idx === messages.length - 1 && (
                         <button
@@ -1482,7 +1556,7 @@ export default function ChatPage() {
 
                         <div className={styles.messageContent}>
                           <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
+                            remarkPlugins={markdownPlugins}
                             components={MarkdownComponents}
                           >
                             {msg.content || ''}
@@ -1581,7 +1655,7 @@ export default function ChatPage() {
                         {msg.images && msg.images.length > 0 ? (
                           <div className={styles.messageImages}>
                             {msg.images.map((img, i) => (
-                              <div key={img.id} className="group/img relative w-48 h-48 rounded-lg overflow-hidden cursor-pointer shadow-sm hover:shadow-md transition-shadow">
+                              <div key={getImageRenderKey(img, messageKey, i)} className="group/img relative w-48 h-48 rounded-lg overflow-hidden cursor-pointer shadow-sm hover:shadow-md transition-shadow">
                                 <Image
                                   src={img.thumbnails?.medium || img.public_url}
                                   alt={img.filename}
@@ -1638,7 +1712,7 @@ export default function ChatPage() {
                         ) : msg.image_urls && msg.image_urls.length > 0 && (
                           <div className={styles.messageImages}>
                             {msg.image_urls.map((url, i) => (
-                              <div key={i} className="relative w-48 h-48 rounded-lg overflow-hidden shadow-sm">
+                              <div key={getImageRenderKey(url, messageKey, i)} className="relative w-48 h-48 rounded-lg overflow-hidden shadow-sm">
                                 <Image
                                   src={url}
                                   alt="Uploaded"
@@ -1656,8 +1730,10 @@ export default function ChatPage() {
                     </div>
                   </div>
                 )}
+                </div>
               </motion.div>
-            ))}
+            );
+            })}
           </AnimatePresence>
 
           {isLoading && !messages.find(m => m.status === 'streaming') && (
@@ -1684,8 +1760,8 @@ export default function ChatPage() {
             {/* Image Preview Area */}
             {stagedImages.length > 0 && (
               <div className={styles.stagedImagesContainer}>
-                {stagedImages.map((img) => (
-                  <div key={img.id} className={styles.stagedImageItem}>
+                {stagedImages.map((img, index) => (
+                  <div key={getImageRenderKey(img, 'staged', index)} className={styles.stagedImageItem}>
                     <div className="relative w-16 h-16 rounded-md overflow-hidden border border-slate-200 shadow-sm">
                       <Image
                         src={img.thumbnails?.small || img.public_url}

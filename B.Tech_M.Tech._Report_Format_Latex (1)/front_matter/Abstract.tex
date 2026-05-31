@@ -8,42 +8,35 @@
 \hrule
 \vspace{2\baselineskip}
 
-Engineering students and practitioners routinely operate across at least three
-disconnected environments: a retrieval pipeline for document queries, a code
-editor with a generative extension, and whatever external tool happens to be
-available for pressure-testing assumptions. We encountered this fragmentation
-first-hand during early development, and it drove the central question behind
-EngUnity~X---whether retrieval, execution, and adversarial reasoning could
-reinforce each other in a single coherent platform rather than exist as
-separate tools that the user stitches together manually.
+Anyone who has spent a semester on a final-year engineering project knows
+the drill: one browser tab for searching papers, another for a chatbot, a
+local IDE open on the side, and a Jupyter notebook running somewhere in the
+background. Switching between these tools burns time and focus, and the
+context accumulated in one environment never travels cleanly to the next.
+That friction was the starting point for \textbf{Engunity~X}.
 
-The result is a five-service microarchitecture where all capabilities share
-infrastructure but are strictly process-isolated. \textit{OmniRAG} first
-classifies each query's structural complexity using a fine-tuned DistilBERT
-router (trained on 18,500 labelled queries across four complexity tiers),
-then routes to the appropriate retrieval path: direct generation for simple
-lookups, hybrid FAISS\,+\,BM25 with Multi-Query expansion for single-hop
-factual queries, or GraphRAG community traversal with map-reduce synthesis
-for multi-hop and abstract questions. \textit{Code Lab} validates
-AI-generated code through AST analysis and executes it inside a
-chroot-isolated process with 512\,MB memory and 30-second wall-time caps,
-feeding errors back to the LLM for autonomous correction. \textit{Decision
-Vault} audits argument quality against an Evidence Quality Score
-threshold and deliberately challenges reasoning that does not clear it,
-specifically countering the sycophancy that RLHF-trained models exhibit.
+Rather than bolt another chat interface onto an existing model, we designed
+a five-service platform in which retrieval, code execution, and adversarial
+reasoning share the same authentication layer, the same memory system, and
+the same streaming API. The centrepiece is \textit{OmniRAG}, a
+complexity-adaptive retrieval pipeline built around a DistilBERT classifier
+trained on 18{,}500 human-labelled queries. Depending on what the classifier
+decides---simple, single-hop, multi-hop, or recursively complex---the
+pipeline routes the query to direct generation, hybrid FAISS\,+\,BM25
+retrieval, GraphRAG community-summary synthesis, or a recursive
+chain-of-thought agent. The user never has to choose; the system infers
+the right strategy automatically.
 
-We evaluated OmniRAG on 500 benchmark queries drawn from a publicly
-available CS documentation corpus (10,000 labelled document chunks, fully
-separated from the classifier training set). On multi-hop and abstract
-queries, OmniRAG achieved 88.0\%\,$\pm$\,2.4 retrieval accuracy versus
-a standard single-stage FAISS baseline at 64.0\%\,$\pm$\,3.1, with MRR
-improving from 0.41 to 0.81 and F1 reaching 0.84. P95 end-to-end latency
-held below 500\,ms under a sustained load of 500 concurrent users.
-Contextual compression reduced token volume by 68\% while maintaining
-retrieval recall above 94\%. The system addresses a gap in existing frameworks:
-no open platform currently combines query-adaptive retrieval with in-loop
-execution validation and adversarial decision feedback in a single deployable
-architecture.
+Against a 500-query benchmark built from publicly available CS documentation,
+OmniRAG reached 88.0\,\%\,$\pm$\,2.4 retrieval accuracy on multi-hop
+questions compared with 64.0\,\%\,$\pm$\,3.1 for a standard single-strategy
+baseline---a 24-point gain. MRR improved from 0.41 to 0.81. At the same time,
+extractive context compression trimmed token volume by 68\,\% while holding
+retrieval recall above 94\,\%. A sandboxed \textit{Code Lab} corrected
+70.7\,\% of seeded program errors in a single AI iteration, and the
+\textit{Decision Vault} flagged 78\,\% of logically weak arguments against
+a human-rated evaluation set. The full platform maintained P95 latency below
+500\,ms under 500 concurrent simulated users on commodity hardware.
 
 \vspace{1em}
 \noindent

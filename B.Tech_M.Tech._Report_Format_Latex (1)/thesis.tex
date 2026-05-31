@@ -21,7 +21,7 @@
 \usepackage[left=3.5cm,right=2.5cm,top=2.5cm,bottom=2.5cm]{geometry}
 \usepackage{lineno}
 \usepackage{comment}
-\usepackage{natbib}
+\usepackage[numbers,sort&compress]{natbib}
 \usepackage{multicol}
 \usepackage{xcolor}
 \usepackage{amsfonts}
@@ -33,7 +33,15 @@
 \usepackage{anyfontsize}
 \usepackage{caption}
 \usepackage{longtable}
-%-----------------------------------------------------------------------
+\usepackage{pdfpages}
+\usepackage{pdflscape}
+
+% --- Layout & Formatting Optimization ---
+\widowpenalty=10000
+\clubpenalty=10000
+\flushbottom
+\interfootnotelinepenalty=10000
+% ---------------------------------------
 
 
 
@@ -65,9 +73,8 @@
 \def\branch{ARTIFICIAL INTELLIGENCE AND DATA SCIENCE}
 \def\mysupervisor{Dr. Rahul Pachade}
 \def\myrollno{   }
-\def\mydep{Department of Artificial Intelligence And Data Science}
-\def\mydegreedate{MAY 2026}
-\def\mycollege{Shah and Anchor Kutchhi Engineering College, Mumbai}
+\def\mydep{Department of Artificial Intelligence and Data Science}
+\def\mydegreedate{16/05/2026}
 
 \setlength{\parskip}{0.5em} % Adjust the value as needed its the spacing between paragraphs
 
@@ -91,8 +98,9 @@
 \include{./front_matter/candidate's_declaration}
 \addcontentsline{toc}{section}{Certificate of Plagiarism Check}
 \include{./front_matter/Certificate_of_Plag_Check}
-\addcontentsline{toc}{section}{Dedication} % DEDICATION
-\include{./front_matter/dedication}
+% Dedication page removed per request
+% \addcontentsline{toc}{section}{Dedication}
+% \include{./front_matter/dedication}
 \addcontentsline{toc}{section}{Acknowledgements} %ACKNOWLEDGEMENTS
 \include{./front_matter/acknowledgements}
 \addcontentsline{toc}{section}{Abstract} % ABSTRACT
@@ -118,6 +126,7 @@
 \include{./chapters/introduction}
 \include{./chapters/literature_review}
 \include{./chapters/theoretical_work}
+\include{./chapters/implementation}
 \include{./chapters/results_and_discussions}
 \include{./chapters/conclusions}
 
@@ -125,7 +134,7 @@
 \fontsize{12}{14.4}\selectfont
 
 % Bibliography
-\bibliographystyle{abbrvnat}
+\bibliographystyle{ieeetr}
 
 \bibliography{references}
 \addcontentsline{toc}{chapter}{Bibliography}
@@ -134,4 +143,27 @@
 \appendix
 % \chapter{Appendix}
 \include{./chapters/appendix}
+\include{./chapters/appendix_certificates}
+
+% ======================================================================
+% LOGBOOKS
+% ======================================================================
+\clearpage
+\phantomsection
+\addcontentsline{toc}{chapter}{Logbook (Semester 7)}
+\includepdf[pages=-,fitpaper=false,pagecommand={\thispagestyle{plain}}]{./Logbook_sem7.docx.pdf}
+
+\clearpage
+\phantomsection
+\addcontentsline{toc}{chapter}{Logbook (Semester 8)}
+\includepdf[pages=-,fitpaper=false,pagecommand={\thispagestyle{plain}}]{./Logbook_sem8.docx.pdf}
+
+% ======================================================================
+% EXTERNAL REPORT — appended verbatim at end of document
+% ======================================================================
+\clearpage
+\phantomsection
+\addcontentsline{toc}{chapter}{External Report Reference}
+\includepdf[pages=-,fitpaper=false,pagecommand={\thispagestyle{plain}}]{./B_Tech_M_Tech__Report_Format_Latex__1__3_(no rfe) onlyrpeort(1).pdf}
+
 \end{document}

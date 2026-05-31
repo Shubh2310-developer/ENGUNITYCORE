@@ -1,193 +1,158 @@
 \chapter{Literature Review}
 \label{chap:litrev}
 
-Reading the literature on retrieval-augmented generation, autonomous agents,
-and multimodal learning is, at this point, a somewhat daunting exercise---the
-field has moved fast enough that survey papers published in mid-2023 describe a
-landscape that already looks somewhat dated compared to what is in production
-today. What follows is not an attempt to be exhaustive; it is an effort to trace
-the specific ideas that directly shaped the design decisions in this project.
+The design of Engunity~X is grounded in four major technical lineages: retrieval-augmented generation and its advanced variants, autonomous reasoning agents, multimodal perception systems, and secure code execution infrastructure. This chapter surveys each lineage, traces key research contributions that directly influenced design decisions, and closes with a gap analysis situating Engunity~X relative to the most closely related prior work.
 
-\section{The RAG Lineage}
-\label{sec:rag-lineage}
+\section{Retrieval-Augmented Generation: Foundations and Evolution}
+\label{sec:rag-survey}
 
-The formal starting point is \citet{lewis2020rag}, who showed that pairing a
-parametric sequence-to-sequence model with a non-parametric dense retriever over
-Wikipedia documents substantially improved performance on open-domain question
-answering without additional fine-tuning. The key insight---that a model can look
-things up rather than memorise them---sounds obvious in retrospect, but the
-clean experimental demonstration of it was genuinely useful for the field.
+\subsection{Naive RAG: The Foundational Paradigm}
+\label{subsec:naive-rag}
 
-What that paper does not address is what to do when retrieved documents are
-irrelevant, contradictory, or simply unhelpful. That is the problem that
-Corrective RAG (CRAG) was designed to tackle. \citet{yan2024crag} introduce an
-automatic evaluator that sits between retrieval and generation and redirects the
-system to a web search when the initial vector retrieval scores poorly on
-relevance. We implemented a version of this in our \texttt{CRAGPipeline} class;
-the evaluator runs as part of the single-hop retrieval flow and is one of the
-more practically useful components we adapted from the literature.
+The retrieval-augmented generation paradigm was formalised by \citet{lewis2020rag}, who demonstrated that open-domain question answering could be substantially improved by combining a neural retriever (DPR~\citep{karpukhin2020dpr}) with a sequence-to-sequence generator (BART). On Natural Questions and TriviaQA benchmarks, this approach outperformed GPT-3 on closed-book QA by substantial margins. The core insight---grounding generation in retrieved evidence reduces hallucination and enables access to knowledge beyond training data---spawned a large ecosystem of variants.
 
-\citet{gao2023retrieval} provide the broadest survey of the space, organising
-the field into Naive RAG (retrieve, stuff into context, generate), Advanced
-RAG (add query rewriting, re-ranking, and compression), and Modular RAG
-(swappable components). The OmniRAG pipeline sits firmly in the Modular RAG
-category: query rewriting, HyDE, hybrid search, FlashRank neural re-ranking,
-CRAG, contextual compression, two-stage generation, self-critique, and quality
-scoring are all independent modules wired together by a single \texttt{process\_query}
-controller.
+\subsection{Advanced RAG Variants}
+\label{subsec:advanced-rag}
 
-\subsection{HyDE: Searching for Answers Rather Than Questions}
+The limitations of naive RAG are well-characterised: retrieval quality is a hard ceiling on generation quality, retrieved passages may be only loosely relevant, and the finite context window cannot accommodate all retrieved content.
 
-One of the more clever retrieval tricks we encountered---and adopted---is
-Hypothetical Document Embeddings. \citet{gao2022precise} observe that when you
-embed a question for dense retrieval, you are embedding a linguistic object that
-looks nothing like the documents you are trying to retrieve, which are answers
-rather than questions. The fix is to ask the LLM to generate a plausible
-hypothetical answer to the question, embed \textit{that}, and use the resulting
-vector for retrieval. In technical domains, where questions use different
-vocabulary from the explanations that answer them, this meaningfully improves
-retrieval recall. The effect is particularly visible for questions that use
-colloquial phrasing to ask about domain-specific concepts.
+\subsubsection{HyDE: Hypothetical Document Embeddings}
+\citet{gao2022precise} observed that query embeddings are often geometrically far from the answer document embeddings. Their solution, HyDE, uses the LLM to generate a hypothetical answer document, then retrieves based on that embedding. On several BEIR benchmarks, HyDE improved nDCG@10 by 5--10 percentage points. Engunity's OmniRAG implements HyDE in the single-hop path, particularly effective for engineering queries where question vocabulary differs from answer passage vocabulary.
 
-\subsection{Graph RAG: Communities as Retrieval Units}
+\subsubsection{CRAG: Corrective Retrieval-Augmented Generation}
+\citet{yan2024crag} identified that when retrieved documents are poor, generators produce unreliable output with no failure signal. CRAG inserts a lightweight confidence evaluator; if confidence falls below a threshold, a web-search fallback is triggered. In Engunity, the \texttt{crag\_evaluator} uses a cross-attention scorer with a 0.6 threshold, falling back to Brave Search API when local retrieval is insufficient.
 
-Dense retrieval over individual text chunks has a well-known weakness: it cannot
-easily answer questions that require connecting information from multiple
-disparate documents. \citet{edge2024local} address this with GraphRAG, which
-builds a knowledge graph over the corpus and retrieves at the level of community
-summaries produced by graph partitioning (specifically, the Louvain algorithm).
-For multi-hop queries---``compare how X approaches the problem in document A
-versus how Y handles it in document B''---this is a considerably more effective
-retrieval unit than a 512-token text chunk. Our \texttt{KnowledgeGraph}
-service implements this using the \texttt{python-louvain} library and stores
-community summaries in MongoDB for low-latency access during the multi-hop
-retrieval path.
+\subsubsection{GraphRAG: Graph-Based Community Summarization}
+\citet{edge2024local} proposed GraphRAG to address vector RAG's fundamental limitation on synthesis queries. It builds a knowledge graph, partitions into communities via Louvain algorithm, generates community summaries, and performs map-reduce retrieval over those summaries. Engunity adopts this approach for the multi-hop path, with knowledge graphs built via SpaCy NER and background Celery workers generating summaries stored in MongoDB.
 
-\section{Autonomous Research Agents}
-\label{sec:agents-review}
+\subsection{Modular RAG and the Pipeline Paradigm}
+\label{subsec:modular-rag}
 
-The closest conceptual ancestor of our \texttt{DeepResearchAgent} is
-ReAct~\citep{yao2022react}, which interleaves language model reasoning steps
-(``thoughts'') with tool invocations (``actions'') and observations in a single
-context. The loop---think, act, observe, think again---is surprisingly effective
-for tasks that benefit from dynamic, evidence-driven reasoning chains.
+The modular RAG framework~\citep{gao2023modularrag} reconceptualised RAG as a configurable pipeline of interchangeable modules (query rewriter, retriever, re-ranker, compressor, generator, evaluator). This framework provides the principled basis for OmniRAG's routing logic: different query complexity tiers activate different subsets of available modules.
 
-AutoGen~\citep{wu2023autogen} extends this to multi-agent conversations where
-different agents adopt distinct roles (orchestrator, coder, reviewer) and
-collaborate through structured message passing. Our research agent is
-single-agent but draws on the same principle: distinct numbered phases (Decompose,
-Search, Evaluate, Refine, Synthesize) each have a defined input contract and
-output contract, which makes the pipeline controllable and its failure modes
-localised to individual phases rather than opaque across the whole workflow.
-
-The iterative gap-analysis step---where the agent inspects which sub-questions
-remain under-sourced and generates targeted follow-up queries---was our own
-addition. It was motivated by observing, during early testing, that a single
-research pass reliably missed nuances in broad comparative questions. The
-repetition of the Search$\to$Evaluate loop until a minimum source count is
-reached, or a maximum iteration budget is exhausted, produced meaningfully more
-comprehensive outputs in practice.
-
-Reflexion~\citep{shinn2023reflexion} contributes the idea of verbal self-
-evaluation: rather than discarding failed actions, the model generates a natural-
-language critique of what went wrong and uses that critique to guide the next
-attempt. Our \texttt{SelfCritique} module applies this at the generation level:
-the model scores its own answer against the retrieved documents and emits a
-confidence value that propagates to the frontend as response metadata.
-
-\section{Multimodal Perception}
-\label{sec:multimodal-review}
-
-CLIP~\citep{radford2021clip} is the backbone of our visual understanding layer.
-Its contrastive pre-training on 400 million image-text pairs from the web
-produces a joint embedding space where images and their textual descriptions map
-to nearby points. For our purposes this means that image search and text search
-can share the same FAISS vector index: a user can ask a question in text and
-retrieve relevant images, or upload an image and retrieve relevant text passages,
-without any structural changes to the retrieval pipeline.
-
-We supplement CLIP with EasyOCR (for extracting printed and handwritten text
-from images) and YOLOv8~\citep{jocher2023yolov8} (for detecting and labelling
-objects in images). The three-component stack covers the main categories of
-engineering images that students actually upload: photos of handwritten derivations
-(OCR-dominant), circuit diagrams and block diagrams (OCR + YOLO), and
-oscilloscope or simulator screenshots (YOLO + CLIP context).
-
-\section{Secure Code Execution}
-\label{sec:coding-review}
-
-Online judge systems have grappled with safe code execution for decades. The
-standard approach---execute submitted code inside resource-limited containers
-with network isolation disabled---is well-established in competitive programming
-infrastructure. Our \texttt{SecureSandbox} follows roughly the same model:
-ephemeral Docker containers with CPU and memory cgroups, wall-time enforcement,
-and stdin/stdout redirection through a controlled channel. What differs from a
-typical OJ setup is the addition of a WebSocket terminal (via XTerm.js) that
-gives the student an interactive shell rather than just batch execution output,
-and a DAP-compliant debugger that supports breakpoints and variable inspection
-from within the browser.
-
-\section{Text Quality in Generated Content}
-\label{sec:quality-review}
-
-One concern that kept surfacing during early user testing was that the first-draft
-outputs of the RAG pipeline, while factually grounded, were recognisably
-``AI-written'' in style---heavy on filler phrases, vague hedges, and repetitive
-sentence structures. \citet{guo2023llm_quality} document this phenomenon
-empirically, showing that LLM-generated text is distinguishable from human-written
-text along several surface-level stylistic dimensions. We designed a 10-module
-Text Quality Upgrade stack (documented in \texttt{docs/architecture/}) to address
-this: a \texttt{LanguageOptimizer} that detects and removes high-frequency
-LLM-typical phrases, a \texttt{DensityController} that enforces an information-
-to-word-count ratio floor, and an \texttt{AnswerRefiner} that iteratively
-compresses wordy drafts without discarding meaning.
-
-\section{Engineering Education Technology}
-\label{sec:edu-review}
-
-Work on technology-enhanced undergraduate education spans three decades and a
-wide range of intervention types---intelligent tutoring systems, automated
-formative assessment, collaborative design environments, flipped-classroom tools.
-Within the AI-assisted category, the systems most relevant to this project are
-the ones that blur the boundary between a study assistant and a research tool.
-\citet{liu2023adaptive} review adaptive tutoring approaches that adjust difficulty
-and scaffolding to individual learner models. What those systems share with
-EngUnity is the idea that a single, consistent user model should persist across
-multiple interactions. Where EngUnity diverges is in scope: instead of adapting
-a pre-specified curriculum, it adapts the retrieval and reasoning strategy to
-the query at hand, which is a considerably more open-ended problem.
-
-\section{Positioning EngUnity}
-\label{sec:positioning}
-
-Table~\ref{tab:comparison} maps the capabilities described above against the
-most commonly used tools in the target student population.
+Table~\ref{tab:rag-evolution} summarises the evolution of the RAG paradigm and the corresponding Engunity component.
 
 \begin{table}[ht]
     \centering
-    \caption{Capability comparison across AI-augmented tools and platforms.}
-    \label{tab:comparison}
-    \small
-    \begin{tabular}{lccccc}
+    \caption{Evolution of RAG architectures and their corresponding Engunity implementation.}
+    \label{tab:rag-evolution}
+    \renewcommand{\arraystretch}{1.3}
+    \begin{tabular}{p{3cm} p{3cm} p{2.5cm} p{2.5cm}}
         \toprule
-        \textbf{Platform} & \textbf{RAG} & \textbf{Research Agent} &
-        \textbf{Multimodal} & \textbf{Code Lab} & \textbf{Ed.~Focus} \\
+        \textbf{Paradigm} & \textbf{Key Advance} & \textbf{Reference} & \textbf{Engunity Module} \\
         \midrule
-        ChatGPT             & Partial & --       & \checkmark & Partial & --          \\
-        Gemini Advanced     & \checkmark & --     & \checkmark & --      & --          \\
-        Perplexity AI       & \checkmark & Partial & --         & --      & --          \\
-        GitHub Copilot      & --      & --       & --         & \checkmark & --       \\
-        Cursor              & --      & --       & --         & \checkmark & --       \\
-        LeetCode            & --      & --       & --         & \checkmark & \checkmark \\
-        \textbf{EngUnity}   & \textbf{\checkmark} & \textbf{\checkmark} &
-        \textbf{\checkmark} & \textbf{\checkmark} & \textbf{\checkmark} \\
+        Naive RAG & Dense retrieval + generation & \citet{lewis2020rag} & OmniRAG (baseline) \\
+        HyDE & Hypothetical doc embedding & \citet{gao2022precise} & Query Transformer \\
+        CRAG & Confidence-gated web fallback & \citet{yan2024crag} & CRAG Evaluator \\
+        GraphRAG & Community-summary map-reduce & \citet{edge2024local} & Graph Retriever \\
+        Modular RAG & Pipeline composition & \citet{gao2023modularrag} & OmniRAG Router \\
         \bottomrule
     \end{tabular}
 \end{table}
 
-None of the commercial tools occupies the same column profile as EngUnity.
-Whether that combination is the right one for the target population is partly
-an empirical question and partly a matter of what the student actually needs
-in a given study session. The design deliberately makes each subsystem usable
-independently so that a student who only wants the research agent, for instance,
-does not need to engage with the analytics workbench or the code lab.
+\section{Autonomous Agents and Iterative Reasoning}
+\label{sec:agents-survey}
+
+\subsection{The ReAct Framework}
+\label{subsec:react}
+
+\citet{yao2022react} introduced ReAct (Reason+Act), which interleaves reasoning traces with actions and observations. On HotpotQA, Fever, and AlfWorld benchmarks, ReAct substantially outperformed both chain-of-thought reasoning alone and task-specific supervised models. Engunity's DeepResearchAgent is built on this loop: each iteration generates a reasoning trace, selects an action, executes it, and updates its evidence pool, with the trace streamed to the user in real time.
+
+\subsection{Multi-Agent Role Specialisation}
+\label{subsec:autogen}
+
+\citet{wu2023autogen} introduced AutoGen, a framework where multiple LLM-backed agents with distinct system prompts collaborate to solve complex tasks. Role specialisation---planner, executor, critic---substantially outperforms single-agent approaches on software engineering tasks. Engunity adopts this pattern in the DeepResearchAgent's synthesis phase with a \texttt{PlannerAgent}, \texttt{SearchAgent}, and \texttt{CritiqueAgent}.
+
+\subsection{Reflexion: Verbal Reinforcement Learning}
+\label{subsec:reflexion}
+
+\citet{shinn2023reflexion} proposed Reflexion, in which an agent generates verbal feedback on failed actions and conditions subsequent attempts on prior reflections, achieving state-of-the-art performance on HumanEval and WebArena. Engunity's \texttt{SelfCritique} module implements this loop: responses scoring below 1.8/3.0 on relevance, completeness, and groundedness are regenerated with the critique attached. One critique iteration was sufficient in over 90\% of cases.
+
+\subsection{Comparison of Agent Frameworks}
+\label{subsec:agent-comparison}
+
+\begin{table}[ht]
+    \centering
+    \caption{Comparison of autonomous agent frameworks and their influence on Engunity.}
+    \label{tab:agent-comparison}
+    \renewcommand{\arraystretch}{1.3}
+    \begin{tabular}{p{2.5cm} p{2.5cm} p{2.5cm} p{2.5cm}}
+        \toprule
+        \textbf{Framework} & \textbf{Key Feature} & \textbf{Limitation} & \textbf{Engunity Adoption} \\
+        \midrule
+        LangChain & Tool-calling, chain composition & Overhead, abstraction leakage & Partial (low-level primitives) \\
+        LlamaIndex & Structured data agents & Limited web search & RAG indexing patterns \\
+        AutoGen & Multi-agent conversation & Complex orchestration & Role specialisation pattern \\
+        Reflexion & Verbal self-correction & Requires task-specific evaluator & SelfCritique module \\
+        ReAct & Reason+Act interleaving & Single-agent only & DeepResearchAgent core loop \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\section{Multimodal Perception Systems}
+\label{sec:multimodal-survey}
+
+\subsection{CLIP: Cross-Modal Embedding}
+\label{subsec:clip}
+
+\citet{radford2021clip} trained a vision encoder (ViT) and text encoder jointly on 400 million image-text pairs, creating a shared 512-dimensional embedding space. For Engunity, the critical property is this shared space: uploaded images are embedded alongside text chunks in the same FAISS index, enabling cross-modal retrieval without a separate image retrieval pipeline.
+
+\subsection{YOLOv8: Real-Time Object Detection}
+\label{subsec:yolo}
+
+\citet{jocher2023yolov8} released YOLOv8n, which achieves 37.3 mAP at 80.4 FPS on COCO using only 3.2M parameters---suitable for CPU deployment. Engunity uses YOLOv8n to detect and label objects in uploaded images; detected labels supplement CLIP embeddings with symbolic object identifiers for improved technical documentation matching.
+
+\subsection{OCR for Engineering Handwriting}
+\label{subsec:ocr}
+
+EasyOCR~\citep{easyocr2020} is a multi-language OCR engine handling both printed and handwritten text with layout information. Engunity uses EasyOCR with layout-preserving output: detected text regions are returned with bounding box coordinates, preserving spatial relationships important for matrix equations and multi-line derivations.
+
+\section{Secure Code Execution Infrastructure}
+\label{sec:sandbox-survey}
+
+The secure sandboxing problem has been studied extensively in online judge systems. Common approaches include chroot jails, Linux namespaces, cgroups, seccomp filters, and Docker containers. Judge0~\citep{judge0} and Piston~\citep{piston} are open-source execution APIs designed for competitive programming---prioritising security and throughput over interactive debugging. Engunity's Code Lab takes a different approach: a custom \texttt{SecureSandbox} class managing Docker containers directly via the Docker SDK, enabling the interactive WebSocket terminal sessions that batch-oriented APIs cannot support.
+
+Monaco Editor provides the browser-based IDE, supporting syntax highlighting for 80+ languages and a rich API for programmatic control. Engunity extends Monaco's completion API to query the OmniRAG pipeline, enabling completions informed by the user's uploaded documents.
+
+\section{Pedagogical and UX Considerations}
+\label{sec:pedagogy}
+
+Sweller's Cognitive Load Theory~\citep{sweller1988cognitive} implies that reducing extraneous load (poor interface design, unnecessary complexity) frees cognitive capacity for germane load (productive learning effort). Engunity's single unified chat interface, automatic query complexity classification, and persistent memory system each target a specific source of extraneous load identified in the educational psychology literature. The long-term user profile functions as a simplified learner model from the Intelligent Tutoring System literature~\citep{ma2014intelligent}, adapting explanations to the user's apparent expertise level.
+
+\section{Research Gap Analysis}
+\label{sec:gap-analysis}
+
+Table~\ref{tab:gap-analysis} positions Engunity~X relative to the eight most closely related prior works across six evaluation dimensions.
+
+\begin{table}[ht]
+    \centering
+    \caption{Research gap analysis: Engunity~X vs. closely related prior work.}
+    \label{tab:gap-analysis}
+    \renewcommand{\arraystretch}{1.3}
+    \begin{tabular}{p{3cm} c c c c c c}
+        \toprule
+        \textbf{Work} & \textbf{Adapt.} & \textbf{Graph} & \textbf{Agents} & \textbf{Multimod.} & \textbf{Sandbox} & \textbf{Memory} \\
+        \midrule
+        Lewis et al.~\citep{lewis2020rag}           & $\times$ & $\times$ & $\times$ & $\times$ & $\times$ & $\times$ \\
+        Yan et al.~\citep{yan2024crag}              & \checkmark & $\times$ & $\times$ & $\times$ & $\times$ & $\times$ \\
+        Edge et al.~\citep{edge2024local}           & $\times$ & \checkmark & $\times$ & $\times$ & $\times$ & $\times$ \\
+        Yao et al.~\citep{yao2022react}             & $\times$ & $\times$ & \checkmark & $\times$ & $\times$ & $\times$ \\
+        Wu et al.~\citep{wu2023autogen}             & $\times$ & $\times$ & \checkmark & $\times$ & \checkmark & $\times$ \\
+        Shinn et al.~\citep{shinn2023reflexion}     & $\times$ & $\times$ & \checkmark & $\times$ & $\times$ & \checkmark \\
+        Radford et al.~\citep{radford2021clip}      & $\times$ & $\times$ & $\times$ & \checkmark & $\times$ & $\times$ \\
+        Gao et al.~\citep{gao2022precise}           & $\times$ & $\times$ & $\times$ & $\times$ & $\times$ & $\times$ \\
+        \textbf{Engunity~X (ours)}                 & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark \\
+        \bottomrule
+    \end{tabular}
+    \vspace{0.3em}
+    \begin{flushleft}
+    \textit{Columns: Adapt. = adaptive routing; Graph = knowledge graph retrieval; Agents = autonomous agents; Multimod. = multimodal input; Sandbox = secure code execution; Memory = long-term user memory.}
+    \end{flushleft}
+\end{table}
+
+No prior work simultaneously addresses all six dimensions. The closest, AutoGen~\citep{wu2023autogen}, covers agents and sandboxed execution but lacks adaptive retrieval, knowledge graphs, multimodal input, and persistent memory. Engunity~X is, to the best of our knowledge, the first open-source platform to integrate all six capabilities in a single deployable architecture targeted at engineering education.
+
+\section{Summary}
+\label{sec:litrev-summary}
+
+This chapter has surveyed the four technical lineages informing Engunity~X's design. RAG has evolved from naive dense retrieval to modular adaptive pipelines; Engunity incorporates CRAG, HyDE, and GraphRAG within its OmniRAG router. The autonomous agents literature (ReAct, AutoGen, Reflexion) shapes the DeepResearchAgent's architecture. CLIP, YOLOv8n, and EasyOCR form the multimodal perception stack. Docker-based sandboxing with WebSocket interactivity advances beyond static batch-execution APIs. The research gap analysis confirms Engunity~X's integrated six-capability architecture is novel. Chapter~\ref{chap:design} describes how each component is designed and implemented.

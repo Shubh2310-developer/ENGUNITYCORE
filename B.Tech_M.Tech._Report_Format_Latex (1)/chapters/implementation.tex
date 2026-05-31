@@ -1,0 +1,179 @@
+\chapter{Implementation Details}
+\label{chap:implementation}
+
+\section{Backend Implementation}
+\label{sec:backend-impl}
+
+\subsection{FastAPI Application Structure}
+\label{subsec:fastapi-structure}
+
+The backend is organised as a Python package rooted at \texttt{backend/app/}. The package hierarchy is:
+
+\begin{itemize}
+    \item \texttt{app/api/v1/} --- Router modules for each feature area
+    \item \texttt{app/agents/} --- DeepResearchAgent and sub-agent classes
+    \item \texttt{app/core/} --- Configuration, logging, middleware, security
+    \item \texttt{app/models/} --- SQLAlchemy ORM model definitions
+    \item \texttt{app/schemas/} --- Pydantic request/response schemas
+    \item \texttt{app/services/} --- Business logic and external service clients
+    \item \texttt{app/workers/} --- Celery task definitions
+    \item \texttt{app/utils/} --- Shared utility functions
+\end{itemize}
+
+The \texttt{app/main.py} entry point creates the FastAPI application, registers all routers with their prefixes, configures CORS middleware, attaches the JWT authentication middleware, and starts the Celery worker process.
+
+\subsection{OmniRAG Pipeline Modules}
+\label{subsec:omnirag-impl}
+
+The OmniRAG pipeline is implemented in \texttt{app/services/omni\_rag/pipeline.py}. The core class is \texttt{OmniRAGPipeline}, instantiated as a singleton at application startup to avoid repeated model loading.
+
+\begin{table}[ht]
+    \centering
+    \caption{OmniRAG pipeline modules and their implementations.}
+    \label{tab:omnirag-modules}
+    \renewcommand{\arraystretch}{1.3}
+    \begin{tabular}{l p{4.5cm} p{5.5cm}}
+        \toprule
+        \textbf{Module} & \textbf{File} & \textbf{Key Classes} \\
+        \midrule
+        Complexity Classifier & \texttt{classifier.py} & \texttt{QueryComplexityClassifier} \\
+        Query Transformer & \texttt{transformer.py} & \texttt{QueryTransformer}, \texttt{HyDEGenerator} \\
+        Vector Retriever & \texttt{vector\_retriever.py} & \texttt{FAISSRetriever} \\
+        BM25 Retriever & \texttt{bm25\_retriever.py} & \texttt{BM25Retriever} \\
+        Graph Retriever & \texttt{graph\_retriever.py} & \texttt{GraphRAGRetriever} \\
+        CRAG Evaluator & \texttt{crag\_evaluator.py} & \texttt{CRAGEvaluator} \\
+        Context Compressor & \texttt{compressor.py} & \texttt{ContextualCompressor} \\
+        Response Generator & \texttt{generator.py} & \texttt{StreamingGenerator} \\
+        Self-Critique & \texttt{critique.py} & \texttt{SelfCritique} \\
+        Memory System & \texttt{memory.py} & \texttt{DualLayerMemory} \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsection{DistilBERT Complexity Classifier Training}
+\label{subsec:classifier-training}
+
+The complexity classifier was trained using the HuggingFace \texttt{transformers} library:
+
+\begin{enumerate}
+    \item \textbf{Dataset}: 18,500 queries from Natural Questions, HotpotQA, and a custom engineering annotation set. Labels: \texttt{SIMPLE}=0, \texttt{SINGLE\_HOP}=1, \texttt{MULTI\_HOP}=2, \texttt{RECURSIVE}=3.
+    \item \textbf{Model}: \texttt{DistilBertForSequenceClassification} with 4 output labels, pretrained from \texttt{distilbert-base-uncased}.
+    \item \textbf{Training}: AdamW optimiser, learning rate $2 \times 10^{-5}$, batch size 32, 5 epochs, linear warmup (10\% of steps), weight decay 0.01.
+    \item \textbf{Result}: Macro-averaged F1 = 0.913 on a held-out 2,000-query test set.
+\end{enumerate}
+
+\subsection{FAISS Index and Knowledge Graph Construction}
+\label{subsec:faiss-impl}
+
+Documents are indexed when users upload them via \texttt{POST /api/v1/documents/upload}:
+
+\begin{enumerate}
+    \item The file (PDF/DOCX/TXT) is parsed using \texttt{pdfplumber} or \texttt{python-docx}.
+    \item Text is split into 512-token chunks with 50-token overlap.
+    \item Each chunk is embedded with \texttt{sentence-transformers/all-mpnet-base-v2} (768-dim).
+    \item Embeddings are added to a \texttt{IndexFlatIP} FAISS index; chunk metadata is stored in MongoDB.
+    \item A background Celery task runs entity extraction (SpaCy), co-occurrence graph building, Louvain community detection, and LLM community summarisation on the new document.
+\end{enumerate}
+
+\section{Frontend Implementation}
+\label{sec:frontend-impl}
+
+\subsection{Next.js App Router and State Management}
+\label{subsec:nextjs-structure}
+
+The frontend uses Next.js 16's App Router. Global state is managed by Zustand stores scoped by feature:
+
+\begin{itemize}
+    \item \texttt{useAuthStore} --- Authentication state (user, token, login/logout)
+    \item \texttt{useChatStore} --- OmniRAG session, messages, streaming state
+    \item \texttt{useResearchStore} --- DeepResearchAgent query, depth, progress, report
+    \item \texttt{useCodeStore} --- Active file, language, execution output, terminal state
+    \item \texttt{useAnalyticsStore} --- Uploaded dataset, statistics, cluster results
+\end{itemize}
+
+HTTP calls use Axios with a request interceptor that attaches the JWT token and a response interceptor that handles 401 token-refresh flows automatically.
+
+\subsection{SSE Stream Consumption}
+\label{subsec:sse-impl}
+
+Server-Sent Events are consumed via a custom React hook \texttt{useSSEStream} that uses the Fetch Streams API (since the native \texttt{EventSource} does not support POST requests). The hook decodes UTF-8 chunks, parses SSE line protocol (\texttt{data: <json>}), dispatches events to Zustand, and handles reconnection with exponential backoff on network errors.
+
+\subsection{Monaco Editor and Terminal Integration}
+\label{subsec:monaco-impl}
+
+The Code Lab uses Monaco Editor v0.50 with a custom AI completion provider that queries the OmniRAG pipeline at the \texttt{/api/v1/code/complete} endpoint. Execution errors are decorated as inline red underlines and AI-corrected diffs are displayed using Monaco's \texttt{DiffEditor} component. The interactive terminal uses XTerm.js v5.3 connected to the WebSocket endpoint \texttt{/ws/terminal/\{project\_id\}}, with the FitAddon for responsive resizing.
+
+\section{Celery Background Workers}
+\label{sec:celery-impl}
+
+\begin{table}[ht]
+    \centering
+    \caption{Celery background tasks and their trigger conditions.}
+    \label{tab:celery-tasks}
+    \renewcommand{\arraystretch}{1.3}
+    \begin{tabular}{l p{3.5cm} p{7cm}}
+        \toprule
+        \textbf{Task} & \textbf{Trigger} & \textbf{Description} \\
+        \midrule
+        \texttt{index\_document} & Document upload & Chunk, embed, index to FAISS and BM25 \\
+        \texttt{build\_knowledge\_graph} & Post-index or schedule & Entity extraction, graph construction, community summaries \\
+        \texttt{update\_user\_profile} & Every 6 hours & Aggregate interaction logs into long-term profile \\
+        \texttt{compress\_session} & 90s inactivity or 20 turns & Hierarchical session summary compression \\
+        \texttt{cleanup\_containers} & Every 10 minutes & Remove expired Docker containers \\
+        \texttt{export\_analytics\_pdf} & Analytics export request & Generate PDF report from analytics results \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\section{Testing Infrastructure}
+\label{sec:testing-impl}
+
+\subsection{Backend Testing}
+\label{subsec:backend-tests}
+
+The backend test suite uses pytest organised into \texttt{tests/unit/}, \texttt{tests/integration/}, and \texttt{tests/e2e/} directories. Key fixtures include a SQLite in-memory database, a mock Groq client with deterministic responses, and a pre-loaded test FAISS index. Overall backend line coverage is 78\%, with the lowest coverage in multimodal processing modules (58\%) due to the difficulty of mocking CLIP and YOLOv8 inference in CI.
+
+\subsection{Frontend Testing}
+\label{subsec:frontend-tests}
+
+\begin{table}[ht]
+    \centering
+    \caption{Frontend test coverage by component category.}
+    \label{tab:frontend-coverage}
+    \renewcommand{\arraystretch}{1.3}
+    \begin{tabular}{lrr}
+        \toprule
+        \textbf{Category} & \textbf{Tests} & \textbf{Coverage} \\
+        \midrule
+        Auth components     & 12 & 92\% \\
+        Chat interface      & 18 & 85\% \\
+        Code Lab            & 14 & 76\% \\
+        Analytics           & 10 & 81\% \\
+        Research Agent UI   & 8  & 79\% \\
+        Decision Vault UI   & 6  & 83\% \\
+        Zustand stores      & 24 & 94\% \\
+        \midrule
+        \textbf{Total}      & \textbf{92} & \textbf{84\%} \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+The Playwright E2E suite covers six critical flows: authentication, document upload and query, code execution with AI error correction, research agent with progress tracking, analytics with CSV upload, and Decision Vault challenge. All E2E tests run against a dedicated docker-compose test stack.
+
+\section{Deployment and Security}
+\label{sec:devops}
+
+\subsection{Docker Compose Configuration}
+\label{subsec:docker-compose}
+
+The production deployment is specified in \texttt{docker-compose.yml} with service-level health checks. Environment variables are injected at runtime via \texttt{env\_file}; no sensitive values are baked into images. Persistent volumes are mounted for PostgreSQL data, FAISS index files, uploaded documents, and Redis AOF data.
+
+\subsection{Authentication and Rate Limiting}
+\label{subsec:auth-impl}
+
+Authentication uses a dual-token pattern: Supabase issues short-lived access tokens (1 hour) and long-lived refresh tokens (7 days, stored in an \texttt{httpOnly} cookie). FastAPI middleware validates every request against the Supabase JWKS public key. Rate limiting uses sliding-window Redis counters; limits range from 5 requests/minute (authentication) to 60 requests/minute (OmniRAG stream). All database queries use SQLAlchemy parameterised ORM methods; code execution uses Docker SDK API calls rather than shell subprocesses, eliminating shell injection vectors.
+
+\subsection{Performance Optimisations}
+\label{subsec:perf}
+
+The backend is async-first: all route handlers and service methods are \texttt{async} coroutines. Synchronous operations (FAISS search, YOLOv8 inference, EasyOCR) are offloaded via \texttt{asyncio.get\_event\_loop().run\_in\_executor()} to avoid blocking the event loop. Database connections use SQLAlchemy's \texttt{AsyncEngine} (pool size 20), PyMongo's \texttt{AsyncIOMotorClient} (max pool 50), and an async Redis connection pool (max 100). Frequently requested data (community summaries, user profiles, document metadata) is cached in Redis with TTLs matched to their update schedules.

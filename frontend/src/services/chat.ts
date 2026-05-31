@@ -109,7 +109,7 @@ export const chatService = {
 
   async getSession(sessionId: string): Promise<ChatSession> {
     const token = useAuthStore.getState().token;
-    const response = await fetch(`${FINAL_API_URL}/chat/${sessionId}`, {
+    const response = await fetch(`${FINAL_API_URL}/chat/history/${sessionId}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,

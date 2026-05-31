@@ -6,9 +6,10 @@
 
 \begin{table}[ht]
     \centering
-    \caption{Backend technology stack.}
+    \caption{Complete backend technology stack with versions and purposes.}
     \label{tab:backend-stack}
-    \begin{tabular}{llll}
+    \renewcommand{\arraystretch}{1.3}
+    \begin{tabular}{lll}
         \toprule
         \textbf{Component} & \textbf{Library / Version} & \textbf{Purpose} \\
         \midrule
@@ -17,21 +18,28 @@
         Data validation     & Pydantic 2.9.2        & Request/response schemas \\
         ORM                 & SQLAlchemy 2.0        & PostgreSQL ORM \\
         Migrations          & Alembic 1.13.3        & Database schema management \\
-        Auth                & python-jose + passlib & JWT, bcrypt \\
-        Task queue          & Celery 5.4.0          & Background jobs \\
+        Auth                & python-jose + passlib & JWT, bcrypt hashing \\
+        Task queue          & Celery 5.4.0          & Background job processing \\
         Cache / broker      & Redis 5.0.8           & Caching, Celery broker \\
         LLM client          & Groq 0.11.0           & Cloud LLM inference \\
         Vector store        & FAISS-cpu 1.8.0       & Dense retrieval index \\
         Embeddings          & sentence-transformers 3.1.1 & Text embeddings \\
         Hybrid search       & rank-bm25 0.2.2       & BM25 keyword search \\
+        Reranker            & FlashRank 0.2.9       & Neural cross-attention reranking \\
         OCR                 & EasyOCR 1.7.1         & Image text extraction \\
         Object detection    & Ultralytics 8.4.5     & YOLOv8 inference \\
-        Data analysis       & Pandas 2.1.4, scikit-learn 1.3.2 & Analytics workbench \\
-        GitHub API          & PyGithub 2.8.1        & Repository sync \\
+        Vision encoder      & openai-clip 1.0       & CLIP image embeddings \\
+        Data analysis       & Pandas 2.1.4          & DataFrame processing \\
+        ML clustering       & scikit-learn 1.3.2    & k-means, preprocessing \\
+        GitHub API          & PyGithub 2.8.1        & Repository synchronisation \\
         WebSocket           & python-socketio 5.16  & Terminal streaming \\
-        Graph algorithms    & networkx, python-louvain & Community detection \\
-        PDF export          & pdfplumber 0.11.4     & PDF parsing \\
-        Cloud auth          & supabase 2.10.0       & Supabase integration \\
+        Graph algorithms    & networkx 3.2          & Graph construction \\
+        Community detect    & python-louvain 0.16   & Louvain partitioning \\
+        PDF parsing         & pdfplumber 0.11.4     & PDF text extraction \\
+        Cloud auth          & supabase 2.10.0       & Supabase JWT integration \\
+        MongoDB driver      & pymongo 4.6.1         & MongoDB document store \\
+        Web search          & brave-search-python   & CRAG web fallback \\
+        NLP                 & spacy 3.7.4           & NER for graph building \\
         Testing             & pytest 9.0.2          & Backend test runner \\
         \bottomrule
     \end{tabular}
@@ -39,34 +47,39 @@
 
 \begin{table}[ht]
     \centering
-    \caption{Frontend technology stack.}
+    \caption{Complete frontend technology stack with versions and purposes.}
     \label{tab:frontend-stack}
+    \renewcommand{\arraystretch}{1.3}
     \begin{tabular}{lll}
         \toprule
         \textbf{Component} & \textbf{Library / Version} & \textbf{Purpose} \\
         \midrule
         Framework           & Next.js 16.2.2        & React SSR/SSG framework \\
-        UI library          & React 18              & Component model \\
-        Styling             & Tailwind CSS 3.4.1    & Utility CSS \\
-        Animation           & Framer Motion 12      & UI micro-animations \\
+        UI library          & React 18.3.1          & Component model \\
+        Styling             & Tailwind CSS 3.4.1    & Utility CSS framework \\
+        Animation           & Framer Motion 12.0    & UI micro-animations \\
         State management    & Zustand 5.0.9         & Client state stores \\
         HTTP client         & Axios 1.14.0          & REST API calls \\
         Code editor         & Monaco Editor 0.50.0  & In-browser IDE \\
-        Terminal emulator   & XTerm.js 5.3          & WebSocket terminal \\
-        Charts              & Recharts 3.6.0        & Analytics charts \\
+        Terminal emulator   & XTerm.js 5.3.0        & WebSocket terminal \\
+        Charts              & Recharts 3.6.0        & Analytics visualisations \\
         Markdown render     & react-markdown 10.1.0 & Chat message rendering \\
-        Auth                & @supabase/supabase-js 2.91 & Authentication \\
-        PDF export          & jsPDF 4.1.0 + jspdf-autotable & Report export \\
-        Unit tests          & Vitest 4.0.18         & Component testing \\
+        Syntax highlight    & react-syntax-highlighter 15.5 & Code block rendering \\
+        Auth                & @supabase/supabase-js 2.91 & Authentication client \\
+        PDF export          & jsPDF 4.1.0           & Report PDF export \\
+        Table export        & jspdf-autotable 5.0   & Table PDF rendering \\
+        File upload         & react-dropzone 14.2   & Drag-and-drop file input \\
+        Icons               & lucide-react 0.468    & Icon library \\
+        Unit tests          & Vitest 4.0.18         & Component test runner \\
         E2E tests           & Playwright 1.58.1     & Browser automation \\
         \bottomrule
     \end{tabular}
 \end{table}
 
-\section{OmniRAG API Contract}
+\section{Full API Contract Reference}
 \label{sec:api-contract}
 
-\subsection{Stream Endpoint}
+\subsection{OmniRAG Stream Endpoint}
 \label{sec:stream-api}
 
 \begin{verbatim}
@@ -76,14 +89,14 @@ Authorization: Bearer <JWT>
 
 Request body:
 {
-  "query":      string,          // Required. Natural language query.
-  "session_id": string | null,   // Optional. Resumes an existing session.
-  "strategy":   string | null,   // Optional. Overrides classifier:
-                                 //   "direct_generation" | "graph_rag"
-                                 //   | "recursive_intensive"
-  "image_urls": [string],        // Optional. Public image URLs.
-  "image_ids":  [string],        // Optional. Stored image IDs.
-  "turbo_quant": {               // Optional. Inference optimization.
+  "query":       string,           // Required. Natural language query.
+  "session_id":  string | null,    // Optional. Resumes an existing session.
+  "strategy":    string | null,    // Optional. Overrides classifier:
+                                   //   "direct_generation" | "graph_rag"
+                                   //   | "recursive_intensive"
+  "image_urls":  [string],         // Optional. Public image URLs.
+  "image_ids":   [string],         // Optional. Stored image IDs.
+  "turbo_quant": {                 // Optional. Inference optimisation.
     "enabled":   boolean,
     "mode":      "auto"|"force"|"off",
     "bit_width": 2..8
@@ -93,14 +106,15 @@ Request body:
 Response: text/event-stream (SSE)
 
 Event types:
-  { "type": "metadata", "complexity": "SINGLE_HOP", ... }
+  { "type": "metadata", "complexity": "SINGLE_HOP", "strategy": "vector_rag",
+    "session_id": "...", "timestamp": "..." }
   { "type": "content",  "content": "..." }
   { "type": "done",     "strategy": "vector_rag",
-    "documents": [...] }
-  { "type": "error",    "message": "..." }
+    "documents": [...], "confidence": 0.87 }
+  { "type": "error",    "message": "...", "code": 500 }
 \end{verbatim}
 
-\subsection{Research Endpoint}
+\subsection{DeepResearch Stream Endpoint}
 \label{sec:research-api}
 
 \begin{verbatim}
@@ -110,103 +124,260 @@ Authorization: Bearer <JWT>
 
 Request body:
 {
-  "query":               string,
-  "depth":               "quick"|"standard"|"deep"|"exhaustive",
-  "max_iterations":      integer (1-10),
-  "include_web_search":  boolean,
-  "include_graph_search":boolean,
-  "output_format":       "detailed"|"summary"|"bullet_points"
+  "query":                string,        // Required.
+  "depth":                "quick"|"standard"|"deep"|"exhaustive",
+  "max_iterations":       integer (1-10),
+  "include_web_search":   boolean,
+  "include_graph_search": boolean,
+  "output_format":        "detailed"|"summary"|"bullet_points"
 }
 
 Response: text/event-stream (SSE)
 
 Event types:
-  { "event_type": "status",       "progress_percent": float, ... }
-  { "event_type": "sub_query",    "progress_percent": float, ... }
-  { "event_type": "source_found", "progress_percent": float, ... }
+  { "event_type": "status",       "progress_percent": float,
+    "message": "Decomposing query..." }
+  { "event_type": "sub_query",    "progress_percent": float,
+    "sub_question": "...", "type": "factual" }
+  { "event_type": "source_found", "progress_percent": float,
+    "source": { "title": "...", "url": "...", "relevance": 0.82 } }
+  { "event_type": "gap_detected", "progress_percent": float,
+    "sub_question": "...", "sources_found": 1 }
   { "event_type": "complete",     "progress_percent": 100.0,
-    "data": { "report": ResearchReport } }
+    "data": { "report": ResearchReport,
+              "sources": [...], "iterations": 3 } }
 \end{verbatim}
 
-\section{Figure Inventory}
-\label{sec:figure-inventory}
+\subsection{Code Execution Endpoint}
+\label{sec:code-api}
 
-\begin{longtable}{lll}
-    \caption{Figure inventory mapping source to chapter placement.}
-    \label{tab:figure-inventory} \\
+\begin{verbatim}
+POST /api/v1/code/execute
+Content-Type: application/json
+Authorization: Bearer <JWT>
+
+Request body:
+{
+  "code":          string,         // Required. Source code to execute.
+  "language":      "python"|"javascript"|"go"|"rust",
+  "stdin":         string | null,  // Optional. Standard input.
+  "timeout":       integer,        // Optional. Max seconds (default 30).
+  "project_id":    string | null   // Optional. Enables terminal reuse.
+}
+
+Response (JSON):
+{
+  "stdout":        string,
+  "stderr":        string,
+  "exit_code":     integer,
+  "duration_ms":   integer,
+  "ai_correction": {              // Present if exit_code != 0
+    "corrected_code": string,
+    "explanation":    string,
+    "diff":           string
+  } | null
+}
+\end{verbatim}
+
+\subsection{Analytics Endpoint}
+\label{sec:analytics-api}
+
+\begin{verbatim}
+POST /api/v1/analytics/analyse
+Content-Type: multipart/form-data
+Authorization: Bearer <JWT>
+
+Form fields:
+  file:            binary           // CSV or XLSX file
+  analysis_type:   string           // "descriptive"|"clustering"|"correlation"
+  n_clusters:      integer | null   // Optional. k for k-means (default auto)
+
+Response (JSON):
+{
+  "dataset_name":  string,
+  "row_count":     integer,
+  "col_count":     integer,
+  "statistics":    { [column]: { mean, std, min, max, q25, q75, nulls } },
+  "clusters":      { "k": integer, "labels": [...], "centroids": [...] },
+  "correlations":  { [col_a]: { [col_b]: float } },
+  "ai_insights":   string           // Natural language summary
+}
+\end{verbatim}
+
+\section{Environment Variable Reference}
+\label{sec:env-vars}
+
+\begin{longtable}{p{5cm} p{5.5cm}}
+    \caption{Backend environment variable reference.} \label{tab:env-vars} \\
     \toprule
-    \textbf{Label} & \textbf{Source} & \textbf{Chapter} \\
+    \textbf{Variable} & \textbf{Description} \\
     \midrule
     \endfirsthead
+    \multicolumn{2}{c}{\tablename\ \thetable{} -- continued} \\
     \toprule
-    \textbf{Label} & \textbf{Source} & \textbf{Chapter} \\
+    \textbf{Variable} & \textbf{Description} \\
     \midrule
     \endhead
-    \midrule
-    \multicolumn{3}{r}{\textit{Continued on next page}} \\
+    \midrule \multicolumn{2}{r}{Continued on next page} \\
     \endfoot
     \bottomrule
     \endlastfoot
-    \texttt{fig:arch-planes}  & \texttt{images/arch\_planes.png}    & Chapter~\ref{chap:design} \\
+    \texttt{GROQ\_API\_KEY}         & Groq API key for LLM inference \\
+    \texttt{SUPABASE\_URL}          & Supabase project URL \\
+    \texttt{SUPABASE\_KEY}          & Supabase anon/service key \\
+    \texttt{DATABASE\_URL}          & PostgreSQL connection string \\
+    \texttt{MONGODB\_URI}           & MongoDB Atlas connection string \\
+    \texttt{REDIS\_URL}             & Redis connection URL \\
+    \texttt{BRAVE\_SEARCH\_API\_KEY} & Brave Search API key (CRAG fallback) \\
+    \texttt{SECRET\_KEY}            & JWT signing secret (min 32 chars) \\
+    \texttt{CORS\_ORIGINS}          & Comma-separated allowed origins \\
+    \texttt{MAX\_UPLOAD\_MB}        & Maximum file upload size in MB \\
+    \texttt{CELERY\_BROKER\_URL}    & Celery message broker URL \\
+    \texttt{FAISS\_INDEX\_PATH}     & Host path for FAISS index files \\
+    \texttt{UPLOADS\_PATH}          & Host path for uploaded documents \\
+    \texttt{LOG\_LEVEL}             & Logging level (DEBUG/INFO/WARNING) \\
+    \texttt{GITHUB\_TOKEN}          & GitHub personal access token (Code Lab git integration) \\
 \end{longtable}
 
-\textit{Note:} The architecture diagram (\texttt{arch\_planes.png}) should be
-generated from the Mermaid source in
-\texttt{docs/MERMAID\_DIAGRAMS\_STANDALONE.md} and exported to
-\texttt{images/arch\_planes.png}. Use:
-\begin{verbatim}
-   mmdc -i MERMAID_DIAGRAMS_STANDALONE.md -o images/arch_planes.png
-\end{verbatim}
-or export the diagram interactively via the Mermaid Live Editor
-(\url{https://mermaid.live}).
+\section{Database Schema Reference}
+\label{sec:db-schema}
 
-\section{Citation Audit}
-\label{sec:citation-audit}
-
-\begin{table}[ht]
-    \centering
-    \caption{Citation audit: verified vs.\ placeholder references.}
-    \label{tab:citation-audit}
-    \begin{tabular}{lll}
-        \toprule
-        \textbf{Cite Key} & \textbf{Status} & \textbf{Note} \\
-        \midrule
-        lewis2020rag       & VERIFIED & RAG paper, NeurIPS 2020 \\
-        gao2023retrieval   & VERIFIED & RAG survey, arXiv 2023 \\
-        yan2024crag        & VERIFIED & CRAG, ICLR 2024 \\
-        shinn2023reflexion & VERIFIED & Reflexion, NeurIPS 2023 \\
-        gao2022precise     & VERIFIED & HyDE, arXiv 2022 \\
-        edge2024local      & VERIFIED & GraphRAG, arXiv 2024 \\
-        yao2022react       & VERIFIED & ReAct, ICLR 2023 \\
-        wu2023autogen      & VERIFIED & AutoGen, arXiv 2023 \\
-        radford2021clip    & VERIFIED & CLIP, ICML 2021 \\
-        jocher2023yolov8   & VERIFIED & Ultralytics YOLOv8 \\
-        liu2023adaptive    & PLACEHOLDER & Verify: adaptive tutoring survey \\
-        placeholder\_sandbox2023 & PLACEHOLDER & Verify: code sandbox reference \\
-        guo2023llm\_quality & PLACEHOLDER & Verify: LLM text quality paper \\
-        \bottomrule
-    \end{tabular}
-\end{table}
-
-\section{Deployment Configuration Reference}
-\label{sec:deployment}
-
-The production deployment guide is documented in
-\texttt{docs/deployment/DEPLOYMENT\_GUIDE\_STEP\_BY\_STEP.md}. The key
-environment variables are:
+\subsection{Core PostgreSQL Tables}
+\label{subsec:pg-schema}
 
 \begin{verbatim}
-SUPABASE_URL          — Supabase project URL
-SUPABASE_SERVICE_KEY  — Service role key (never expose to client)
-DATABASE_URL          — PostgreSQL connection string
-MONGO_URI             — MongoDB Atlas or self-hosted URI
-REDIS_URL             — Redis connection string
-GROQ_API_KEY          — Groq inference API key
-OPENAI_API_KEY        — OpenAI API key (optional, for GPT-4V)
-BRAVE_SEARCH_API_KEY  — Brave Search API (WebSearchFallback)
-ENABLE_TURBO_QUANT_CHAT — Feature flag for TurboQuant (default: false)
+CREATE TABLE users (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email           TEXT UNIQUE NOT NULL,
+    hashed_password TEXT,
+    provider        TEXT DEFAULT 'local',
+    profile_data    JSONB DEFAULT '{}',
+    created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE sessions (
+    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id        UUID REFERENCES users(id) ON DELETE CASCADE,
+    created_at     TIMESTAMPTZ DEFAULT NOW(),
+    last_active    TIMESTAMPTZ DEFAULT NOW(),
+    memory_summary TEXT,
+    turn_count     INTEGER DEFAULT 0
+);
+
+CREATE TABLE documents (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id      UUID REFERENCES users(id) ON DELETE CASCADE,
+    filename     TEXT NOT NULL,
+    file_type    TEXT NOT NULL,
+    chunk_count  INTEGER DEFAULT 0,
+    file_size_kb INTEGER,
+    indexed_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE code_executions (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id     UUID REFERENCES users(id) ON DELETE CASCADE,
+    language    TEXT NOT NULL,
+    exit_code   INTEGER,
+    duration_ms INTEGER,
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+);
 \end{verbatim}
 
-\textbf{Security note:} Never commit the above secrets to version control.
-The \texttt{.env.example.ai} file in \texttt{backend/} provides a safe
-template with all keys listed and empty values.
+\section{Glossary of Terms}
+\label{sec:glossary}
+
+\begin{longtable}{p{3.5cm} p{8cm}}
+    \toprule
+    \textbf{Term} & \textbf{Definition} \\
+    \midrule
+    \endfirsthead
+    \multicolumn{2}{c}{\itshape Glossary -- continued} \\
+    \toprule \textbf{Term} & \textbf{Definition} \\ \midrule
+    \endhead
+    \midrule
+    \endfoot
+    \bottomrule
+    \endlastfoot
+    ANN             & Approximate Nearest Neighbour search: efficient algorithm for finding the closest vectors in a high-dimensional index without exhaustive comparison. \\
+    BM25            & Best Match 25: a probabilistic keyword-based ranking function widely used in information retrieval as an alternative to TF-IDF. \\
+    CRAG            & Corrective Retrieval-Augmented Generation: a RAG variant that evaluates retrieval confidence and triggers web fallback when local documents are insufficient. \\
+    CLIP            & Contrastive Language-Image Pre-training: a model that embeds images and text into a shared semantic space, enabling cross-modal retrieval. \\
+    cgroups         & Linux control groups: kernel mechanism for limiting CPU, memory, and I/O resource consumption of a process or container. \\
+    DAP             & Debug Adapter Protocol: a standardised JSON protocol for communicating between editors and language-specific debuggers. \\
+    DistilBERT      & A distilled (smaller, faster) version of BERT retaining 97\% of its language understanding with 40\% fewer parameters. \\
+    EQS             & Evidence Quality Score: Engunity's four-point rubric for rating the evidential support behind a logical claim. \\
+    FAISS           & Facebook AI Similarity Search: an open-source library for efficient similarity search and clustering of dense vector embeddings. \\
+    GraphRAG        & Graph-based Retrieval-Augmented Generation: a RAG approach that builds a knowledge graph and retrieves community summaries for multi-hop queries. \\
+    HyDE            & Hypothetical Document Embeddings: a retrieval technique that generates a hypothetical answer document and retrieves based on its embedding rather than the query embedding. \\
+    ITS             & Intelligent Tutoring System: a software system that provides personalised instruction by modelling the learner's knowledge state. \\
+    JWT             & JSON Web Token: a compact, URL-safe token format used for stateless authentication. \\
+    Louvain         & A community detection algorithm that maximises modularity in a graph by iteratively merging nodes into communities. \\
+    LLM             & Large Language Model: a neural network with billions of parameters trained on large text corpora to generate and understand natural language. \\
+    MRR             & Mean Reciprocal Rank: the average of the reciprocal ranks of the first relevant result across a query set. \\
+    OmniRAG         & Engunity's adaptive RAG pipeline that routes queries to one of four strategies based on complexity classification. \\
+    P95             & 95th percentile latency: the latency value below which 95\% of requests complete; a standard measure of tail latency. \\
+    PWA             & Progressive Web Application: a web application that can be installed on a device and function offline using service workers. \\
+    RAG             & Retrieval-Augmented Generation: a framework that combines a retriever (finding relevant documents) with a generator (producing a response conditioned on those documents). \\
+    RLS             & Row-Level Security: a PostgreSQL feature that restricts which rows a database user can read or modify based on policy predicates. \\
+    RLHF            & Reinforcement Learning from Human Feedback: a fine-tuning technique that trains a reward model on human preference comparisons and uses it to guide LLM behaviour. \\
+    SSE             & Server-Sent Events: a unidirectional HTTP streaming protocol where the server pushes events to the client over a long-lived connection. \\
+    SaaS            & Software as a Service: a cloud-based software delivery model where the application is hosted remotely and accessed via a web browser. \\
+    SpaCy           & An industrial-strength NLP library used in Engunity for named entity recognition during knowledge graph construction. \\
+    YOLOv8          & You Only Look Once version 8: a real-time object detection model family by Ultralytics. \\
+\end{longtable}
+
+\section{List of Abbreviations}
+\label{sec:abbreviations}
+
+\renewcommand{\arraystretch}{1.3}
+\begin{longtable}{ll}
+    \toprule
+    \textbf{Abbreviation} & \textbf{Full Form} \\
+    \midrule
+    \endfirsthead
+    \toprule
+    \textbf{Abbreviation} & \textbf{Full Form} \\
+    \midrule
+    \endhead
+    \endfoot
+    \bottomrule
+    \endlastfoot
+    AI     & Artificial Intelligence \\
+    ANN    & Approximate Nearest Neighbour \\
+    API    & Application Programming Interface \\
+    ASGI   & Asynchronous Server Gateway Interface \\
+    BM25   & Best Match 25 \\
+    CLIP   & Contrastive Language-Image Pre-training \\
+    COCO   & Common Objects in Context \\
+    CRAG   & Corrective Retrieval-Augmented Generation \\
+    CSV    & Comma-Separated Values \\
+    DAP    & Debug Adapter Protocol \\
+    EQS    & Evidence Quality Score \\
+    FAISS  & Facebook AI Similarity Search \\
+    GPU    & Graphics Processing Unit \\
+    HTTP   & HyperText Transfer Protocol \\
+    HyDE   & Hypothetical Document Embeddings \\
+    IDE    & Integrated Development Environment \\
+    ITS    & Intelligent Tutoring System \\
+    JWT    & JSON Web Token \\
+    LLM    & Large Language Model \\
+    MRR    & Mean Reciprocal Rank \\
+    NER    & Named Entity Recognition \\
+    NLP    & Natural Language Processing \\
+    OCR    & Optical Character Recognition \\
+    ORM    & Object-Relational Mapping \\
+    P95    & 95th Percentile Latency \\
+    PDF    & Portable Document Format \\
+    PWA    & Progressive Web Application \\
+    RAG    & Retrieval-Augmented Generation \\
+    RLHF   & Reinforcement Learning from Human Feedback \\
+    RLS    & Row-Level Security \\
+    SaaS   & Software as a Service \\
+    SSE    & Server-Sent Events \\
+    TF-IDF & Term Frequency -- Inverse Document Frequency \\
+    UI     & User Interface \\
+    UX     & User Experience \\
+    ViT    & Vision Transformer \\
+    YOLO   & You Only Look Once \\
+\end{longtable}

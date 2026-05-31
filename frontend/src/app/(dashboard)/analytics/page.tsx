@@ -4125,20 +4125,28 @@ FROM dataset`;
                   <tbody className="divide-y divide-slate-200">
                     {queryResults.rows.slice(0, 100).map((row, rowIndex) => (
                       <tr key={rowIndex} className="hover:bg-slate-50">
-                        {queryResults.columns.map((column, colIndex) => (
-                          <td key={colIndex} className="px-4 py-3 text-sm text-slate-600">
-                            {row[colIndex] === null || row[colIndex] === undefined ? (
-                              <span className="text-slate-400 italic">null</span>
-                            ) : (
-                              String(row[colIndex]).length > 50 ?
-                                String(row[colIndex]).substring(0, 50) + '...' :
-                                String(row[colIndex])
-                            )}
-                          </td>
-                        ))}
+                        {queryResults.columns.map((column, colIndex) => {
+                          // Rows from the API are objects keyed by column name.
+                          // Demo/mock rows are plain arrays indexed by position.
+                          const cellValue = Array.isArray(row)
+                            ? (row as (string | number | boolean | null)[])[colIndex]
+                            : (row as Record<string, string | number | boolean | null>)[column];
+                          return (
+                            <td key={colIndex} className="px-4 py-3 text-sm text-slate-600">
+                              {cellValue === null || cellValue === undefined ? (
+                                <span className="text-slate-400 italic">null</span>
+                              ) : (
+                                String(cellValue).length > 50
+                                  ? String(cellValue).substring(0, 50) + '...'
+                                  : String(cellValue)
+                              )}
+                            </td>
+                          );
+                        })}
                       </tr>
                     ))}
                   </tbody>
+
                 </table>
               ) : (
                 <div className="text-center py-8 text-slate-500">

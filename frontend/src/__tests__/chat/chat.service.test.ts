@@ -79,7 +79,7 @@ describe('chatService', () => {
 
             const result = await chatService.getSession('s1');
 
-            expect(global.fetch).toHaveBeenCalledWith(`${API_URL}/chat/s1`, {
+            expect(global.fetch).toHaveBeenCalledWith(`${API_URL}/chat/history/s1`, {
                 method: 'GET',
                 headers: { Authorization: 'Bearer test-token-123' },
             });

@@ -128,7 +128,7 @@ vi.mock('@/services/image', () => ({
 }));
 
 // Import component after all mocks
-import ChatPage from '@/app/(dashboard)/chat/page';
+import ChatPage, { getImageRenderKey, getMessageRenderKey, getSessionRenderKey, normalizeMessageHistory } from '@/app/(dashboard)/chat/page';
 
 // ------------------------------------------------------------------
 // Test Helpers
@@ -165,6 +165,27 @@ function setupWithSessions() {
         message_count: 0
     });
     mockDeleteSession.mockResolvedValue({ success: true });
+}
+
+function setupWithMalformedHistory() {
+    mockGetSessions.mockResolvedValue([
+        { id: 's1', title: 'First Chat', created_at: '2026-01-01', updated_at: '2026-01-02', message_count: 3 },
+        { id: 's2', title: 'Second Chat', created_at: '2026-01-01', updated_at: '2026-01-03', message_count: 2 },
+    ]);
+    mockGetSession.mockImplementation(async (id: any) => ({
+        id,
+        title: id === 's2' ? 'Second Chat' : 'First Chat',
+        messages: id === 's2'
+            ? [
+                { id: '', role: 'user', content: 'Second history message', timestamp: '2026-01-03T10:00:00Z' },
+                { id: '', role: 'assistant', content: 'Second history answer', timestamp: '2026-01-03T10:00:01Z' },
+            ]
+            : [
+                { id: '', role: 'user', content: 'First history message', timestamp: '2026-01-02T10:00:00Z' },
+                { id: '', role: 'assistant', content: 'First history answer', timestamp: '2026-01-02T10:00:01Z' },
+                { role: 'assistant', content: 'Missing id message', timestamp: '' },
+            ],
+    }));
 }
 
 // ------------------------------------------------------------------
@@ -224,6 +245,56 @@ describe('ChatPage', () => {
                 expect(screen.getByText('First Chat')).toBeDefined();
                 expect(screen.getByText('Second Chat')).toBeDefined();
             });
+        });
+
+        it('renders malformed history without duplicate-key warnings', async () => {
+            setupWithMalformedHistory();
+            const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+            render(<ChatPage />);
+
+            await waitFor(() => {
+                expect(screen.getByText('First history message')).toBeDefined();
+                expect(screen.getByText('Missing id message')).toBeDefined();
+            });
+
+            const duplicateKeyWarnings = consoleError.mock.calls.filter((call) =>
+                call.some((arg) => String(arg).includes('Encountered two children with the same key'))
+            );
+            expect(duplicateKeyWarnings).toHaveLength(0);
+        });
+
+        it('loads clicked chat history into the message pane', async () => {
+            const user = userEvent.setup();
+            setupWithMalformedHistory();
+
+            render(<ChatPage />);
+
+            await waitFor(() => {
+                expect(screen.getByText('Second Chat')).toBeDefined();
+            });
+
+            await user.click(screen.getByText('Second Chat'));
+
+            await waitFor(() => {
+                expect(mockGetSession).toHaveBeenCalledWith('s2');
+                expect(screen.getByText('Second history message')).toBeDefined();
+                expect(screen.getByText('Second history answer')).toBeDefined();
+            });
+        });
+    });
+
+    describe('stable render keys', () => {
+        it('generates non-empty keys for sessions, messages, and images with missing IDs', () => {
+            const normalized = normalizeMessageHistory([
+                { id: '', content: 'A', role: 'user', timestamp: '' },
+                { id: '', content: 'B', role: 'assistant', timestamp: '' },
+            ]);
+
+            expect(getSessionRenderKey({ id: '', title: 'Untitled', timestamp: new Date('2026-01-01') }, 0)).toBeTruthy();
+            expect(getMessageRenderKey(normalized[0], 0)).toBeTruthy();
+            expect(getMessageRenderKey(normalized[0], 0)).not.toBe(getMessageRenderKey(normalized[1], 1));
+            expect(getImageRenderKey({ id: '', public_url: 'https://example.com/a.png' } as any, 'msg-1', 0)).toContain('https://example.com/a.png');
         });
     });
 
