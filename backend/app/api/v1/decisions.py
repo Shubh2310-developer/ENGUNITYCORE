@@ -12,6 +12,7 @@ from app.schemas.decision import Decision, DecisionCreate, DecisionUpdate, Decis
 from app.services.ai.decision_ai import decision_ai_service, DecisionAnalysisError
 from app.services.export.decision_export import decision_export_service
 from datetime import datetime
+from app.services.code.scanner import scan_local_workspace
 import uuid
 import json
 import hashlib
@@ -20,6 +21,49 @@ import logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+@router.post("/scan-workspace")
+async def scan_workspace(
+    *,
+    project_path: str = "/home/agentrogue/projects/ENGUNITYCORE",
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """
+    Scans the repository and returns actual code metadata evidence.
+    """
+    stats = scan_local_workspace(project_path)
+    
+    # Package telemetry into valid client-side Evidence schemas
+    evidence_list = [
+        {
+            "id": f"scan-files-{stats['files_scanned']}",
+            "source_type": "code_run",
+            "source_id": "workspace_scanner",
+            "excerpt": f"Parsed {stats['files_scanned']} workspace source files totaling {stats['total_lines']} lines of code.",
+            "credibility": "primary",
+            "added_at": datetime.utcnow().isoformat(),
+            "relevance_score": 0.95
+        },
+        {
+            "id": "scan-ast-imports",
+            "source_type": "code_run",
+            "source_id": "workspace_scanner",
+            "excerpt": f"Detected backend imports: {', '.join(stats['imports'][:8])}. AST contains {stats['num_functions']} functions.",
+            "credibility": "primary",
+            "added_at": datetime.utcnow().isoformat(),
+            "relevance_score": 0.90
+        }
+    ]
+    return {"evidence": evidence_list}
+
+
+def _to_decision_response(decision: DecisionModel, email: str | None = None) -> Decision:
+    """Serialize a DecisionModel to the Decision response schema, injecting created_by."""
+    d = Decision.model_validate(decision)
+    d.created_by = email
+    return d
+
+
 
 @router.get("/", response_model=List[Decision])
 def get_decisions(
@@ -30,7 +74,7 @@ def get_decisions(
     Retrieve decisions for the current user.
     """
     decisions = db.query(DecisionModel).filter(DecisionModel.user_id == current_user.id).order_by(DecisionModel.updated_at.desc()).all()
-    return decisions
+    return [_to_decision_response(d, current_user.email) for d in decisions]
 
 @router.post("/", response_model=Decision)
 async def create_decision(
@@ -44,6 +88,9 @@ async def create_decision(
     Create a new decision.
     Metadata goes to Postgres, Reasoning traces go to MongoDB.
     """
+    from app.core.sanitization import sanitize_decision_in
+    sanitize_decision_in(decision_in)
+
     payload_hash = hashlib.sha256(
         json.dumps(decision_in.model_dump(), sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
     ).hexdigest()
@@ -102,7 +149,7 @@ async def create_decision(
         except Exception as exc:
             logger.warning("Decision trace persistence failed for %s: %s", decision_id, exc)
 
-    return decision
+    return _to_decision_response(decision, current_user.email)
 
 @router.post("/analyze", response_model=List[AIFlagSchema])
 async def analyze_decision(
@@ -149,7 +196,8 @@ async def get_decision(
         # We can attach these to a separate field or return them in a detailed view
         # For now, we'll just ensure they are retrievable
 
-    return decision
+    return _to_decision_response(decision, current_user.email)
+
 
 @router.patch("/{decision_id}", response_model=Decision)
 def update_decision(
@@ -168,6 +216,9 @@ def update_decision(
     if not decision:
         raise HTTPException(status_code=404, detail="Decision not found")
 
+    from app.core.sanitization import sanitize_decision_in
+    sanitize_decision_in(decision_in)
+
     update_data = decision_in.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(decision, field, value)
@@ -175,7 +226,7 @@ def update_decision(
     db.add(decision)
     db.commit()
     db.refresh(decision)
-    return decision
+    return _to_decision_response(decision, current_user.email)
 
 @router.get("/{decision_id}/export/json")
 def export_decision_json(

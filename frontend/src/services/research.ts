@@ -1,4 +1,18 @@
 import { API_BASE } from './config';
+import type { ToolKey } from '@/types/research';
+
+// Re-export so callers can import ToolKey from either the service or the types
+// file without breaking existing imports.
+export type { ToolKey };
+
+const getUrl = (path: string): string => {
+  const base = API_BASE.endsWith('/') ? API_BASE.slice(0, -1) : API_BASE;
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  if (base.endsWith('/api/v1') && normalizedPath.startsWith('/api/v1')) {
+    return `${base}${normalizedPath.substring(7)}`;
+  }
+  return `${base}${normalizedPath}`;
+};
 
 export interface ResearchRequest {
     query: string;
@@ -17,16 +31,6 @@ export interface ResearchStreamEvent {
     progress_percent: number;
 }
 
-export type ToolKey =
-  | 'gap_detector'
-  | 'method_comparator'
-  | 'assumption_extractor'
-  | 'strength_weakness'
-  | 'question_generator'
-  | 'argument_checker'
-  | 'conflict_resolver'
-  | 'trend_forecaster'
-  | 'scenario_planner';
 
 export interface ToolInvokeResult {
   tool: ToolKey;
@@ -35,33 +39,37 @@ export interface ToolInvokeResult {
 }
 
 export async function fetchSources(token: string): Promise<any[]> {
-  const response = await fetch(`${API_BASE}/api/v1/research/workspace/sources`, {
+  const response = await fetch(getUrl('/api/v1/research/workspace/sources'), {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) {
     throw new Error(`Failed to fetch sources: ${response.status}`);
   }
-  return response.json();
+  const data = await response.json();
+  // Backend returns { sources: [...], project_id: null }
+  return Array.isArray(data) ? data : (data.sources ?? []);
 }
 
 export async function fetchClusters(token: string): Promise<any[]> {
-  const response = await fetch(`${API_BASE}/api/v1/research/workspace/clusters`, {
+  const response = await fetch(getUrl('/api/v1/research/workspace/clusters'), {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) {
     throw new Error(`Failed to fetch clusters: ${response.status}`);
   }
-  return response.json();
+  const data = await response.json();
+  return Array.isArray(data) ? data : (data.clusters ?? []);
 }
 
 export async function fetchGraphNodes(token: string): Promise<any[]> {
-  const response = await fetch(`${API_BASE}/api/v1/research/workspace/graph-nodes`, {
+  const response = await fetch(getUrl('/api/v1/research/workspace/graph-nodes'), {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) {
     throw new Error(`Failed to fetch graph nodes: ${response.status}`);
   }
-  return response.json();
+  const data = await response.json();
+  return Array.isArray(data) ? data : (data.nodes ?? []);
 }
 
 export async function invokeTool(
@@ -70,7 +78,7 @@ export async function invokeTool(
   sourceTitles: string[] = [],
   token: string
 ): Promise<ToolInvokeResult> {
-  const response = await fetch(`${API_BASE}/api/v1/research/workspace/tool-invoke`, {
+  const response = await fetch(getUrl('/api/v1/research/workspace/tool-invoke'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -118,7 +126,7 @@ export async function startDeepResearch(
     onError: (error: string) => void
 ): Promise<void> {
     try {
-        const response = await fetch(`${API_BASE}/api/v1/research/deep-research/stream`, {
+        const response = await fetch(getUrl('/api/v1/research/deep-research/stream'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

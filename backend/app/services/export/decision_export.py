@@ -133,9 +133,13 @@ class DecisionExportService:
         # Decision
         adr.append("## Decision\n\n")
         if decision.get('final_decision'):
-            # Find the chosen option
+            # final_decision may be stored as option id or option label (frontend stores label)
             options = decision.get('options', [])
-            chosen = next((o for o in options if o.get('id') == decision.get('final_decision')), None)
+            chosen = next(
+                (o for o in options if o.get('id') == decision.get('final_decision')
+                 or o.get('label') == decision.get('final_decision')),
+                None,
+            )
             if chosen:
                 adr.append(f"We will **{chosen.get('label', 'proceed with selected option')}**.\n\n")
                 adr.append(f"{chosen.get('description', '')}\n\n")
@@ -257,11 +261,16 @@ class DecisionExportService:
         
         if decision.get('final_decision'):
             options = decision.get('options', [])
-            chosen = next((o for o in options if o.get('id') == decision.get('final_decision')), None)
+            # final_decision may be stored as option id or option label (frontend stores label)
+            chosen = next(
+                (o for o in options if o.get('id') == decision.get('final_decision')
+                 or o.get('label') == decision.get('final_decision')),
+                None,
+            )
             if chosen:
                 star.append(f"**Decision:** {chosen.get('label', 'Selected option')}\n\n")
                 star.append(f"**Rationale:** {decision.get('rationale', 'See decision analysis.')}\n\n")
-                
+
                 star.append("**Expected Outcomes:**\n")
                 for pro in chosen.get('pros', [])[:3]:  # Top 3 benefits
                     star.append(f"- {pro}\n")

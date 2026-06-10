@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from datetime import datetime
 from app.schemas.image import ImageResponse
@@ -43,8 +43,7 @@ class ChatMessage(ChatMessageBase):
     memory_summary: Optional[str] = None
     turbo_quant: Optional[TurboQuantMetadata] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ChatSessionBase(BaseModel):
     title: Optional[str] = None
@@ -59,5 +58,4 @@ class ChatSession(ChatSessionBase):
     message_count: Optional[int] = 0
     messages: List[ChatMessage] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

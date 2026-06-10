@@ -1,469 +1,143 @@
-# Decision Vault - End-to-End Implementation Verification Report
+# 🛡️ Decision Vault - E2E Verification Report
 
-**Date**: January 23, 2026  
-**Status**: ✅ FULLY FUNCTIONAL  
-**Verified By**: Full Stack Implementation & Testing
-
----
-
-## Executive Summary
-
-The Decision Vault feature has been successfully implemented and verified end-to-end. All components are functional, integrated, and ready for production use. The system provides adversarial AI-powered decision analysis, structured decision tracking, and cross-module integration.
+This E2E Verification Report documents the functional validation of the **Decision Vault** feature
+within a real Chrome browser session, operating in the **conda `engunity` environment** on local
+ports `3000` (Frontend) and `8000` (Backend). The test was not automated; it was conducted manually
+via a browser subagent session.
 
 ---
 
-## 1. Backend Infrastructure ✅
+## 📊 Test Execution Summary
 
-### Database Layer
-- **PostgreSQL**: `decisions` table successfully created and verified
-  - Location: `backend/app/models/decision.py`
-  - Relationships: Proper foreign key to `users` table
-  - Fields: Complete schema with JSON columns for nested structures
-  
-- **MongoDB**: Configured for reasoning traces (optional)
-  - Collection: `decision_traces`
-  - Purpose: High-volume event logging and reasoning history
+| Metric | Target | Status | Notes |
+|:---|:---|:---|:---|
+| **Frontend Server** | localhost:3000 | ✅ Running | Next.js (Turbopack) successfully initialized |
+| **Backend Server** | localhost:8000 | ✅ Running | FastAPI running in `engunity` Conda environment |
+| **Database Schema** | PostgreSQL | ✅ Initialized | `decisions` table created via `init_db_tables.py` using SQLAlchemy |
+| **Test User Seeding** | Local PostgreSQL only | ✅ Seeded | `create_test_user.py` inserts user into local Postgres. No Supabase sync performed. |
+| **E2E Authentication** | JWT (local FastAPI) | ✅ Functional | `test@example.com` / `testpassword123` via `/api/v1/auth/login` |
+| **AI Adversarial Review** | ENABLE_AI=true | ✅ Verified | Calls `/api/v1/decisions/analyze`; adversarially checks biases in real-time |
+| **Export Formats** | ADR (Markdown) & STAR | ✅ Verified | Generated; see §4 for scope of each format |
 
-### API Endpoints
-All endpoints tested and verified:
+> **Authentication Scope Clarification:** The test user is seeded into the **local PostgreSQL
+> database** only (via `scripts/maintenance/create_test_user.py` → SQLAlchemy `SessionLocal`).
+> This script does **not** call the Supabase API or sync with any Supabase project. If the
+> deployment uses Supabase Auth, user management must be handled separately.
 
-| Endpoint | Method | Status | Purpose |
-|----------|--------|--------|---------|
-| `/api/v1/decisions/` | GET | ✅ | Retrieve all decisions for user |
-| `/api/v1/decisions/` | POST | ✅ | Create new decision |
-| `/api/v1/decisions/analyze` | POST | ✅ | AI adversarial analysis |
-| `/api/v1/decisions/{id}` | GET | ✅ | Retrieve specific decision |
-| `/api/v1/decisions/{id}` | PATCH | ✅ | Update decision |
+---
 
-### AI Service Integration
-- **Service**: `DecisionAIService` (`backend/app/services/ai/decision_ai.py`)
-- **LLM Provider**: Groq (LLaMA 3.3 70B)
-- **Purpose**: Adversarial intelligence review
-- **Capabilities**:
-  - Detects cognitive biases (confirmation bias, optimism bias, sunk cost fallacy)
-  - Identifies missing options
-  - Flags weak evidence
-  - Checks confidence calibration
+## 🗺️ E2E Verification Flow
 
-**Sample AI Output** (from testing):
-```json
-[
-  {
-    "flag_type": "sunk_cost_fallacy",
-    "severity": "critical",
-    "message": "Decision context mentions 'already invested 6 months'...",
-    "suggested_action": "Evaluate options based on future value, not past investment"
-  },
-  {
-    "flag_type": "missing_option",
-    "severity": "warning",
-    "message": "Only two options considered. A hybrid approach might be worth exploring."
-  }
-]
+The E2E test was executed inside a Chrome session via a persistent terminal/browser subagent.
+The lifecycle below shows every step validated:
+
+```mermaid
+graph TD
+    A[Launch App at :3000] --> B[Log In as test@example.com]
+    B --> C[Navigate to Decision Vault]
+    C --> D[Check Kanban / Timeline / Analytics views]
+    D --> E[Click New Decision → Open 7-Step Wizard]
+    E --> F[Step 1 — Identity: Title, Category, Confidence]
+    F --> G[Step 2 — Context: Problem Statement]
+    G --> H[Step 3 — Options: Two alternatives with effort & risk]
+    H --> I[Step 4 — Evidence: AI Context Linker / Scan Project]
+    I --> J[Step 5 — Analysis: Tradeoff Matrix sliders]
+    J --> K[Step 6 — AI Review: Adversarial flag generation]
+    K --> L[Step 7 — Resolution: Final decision + revisit rule]
+    L --> M[Initialize Decision → POST /api/v1/decisions/]
+    M --> N[Decision appears in Kanban board]
+    N --> O[Open Detail Drawer]
+    O --> P[STAR Breakdown & ADR Export actions]
+    P --> Q[Success ✅]
 ```
 
 ---
 
-## 2. Frontend Integration ✅
+## 🎨 Visual State & Export Fidelity
 
-### Main Interface
-- **Location**: `frontend/src/app/(dashboard)/decisionvault/page.tsx`
-- **URL**: http://localhost:3000/decisionvault
-- **Features Implemented**:
-  - ✅ Kanban board view (Tentative, Confirmed, Revisited, Deprecated)
-  - ✅ Timeline view for decision history
-  - ✅ Analytics dashboard with metrics
-  - ✅ Multi-step creation wizard
-  - ✅ AI analysis integration
-  - ✅ Evidence linking
-  - ✅ Export capabilities (ADR, STAR format)
+The screenshot below demonstrates the **ADR Export** feature rendering in high fidelity:
 
-### Service Layer
-- **Location**: `frontend/src/services/decision.ts`
-- **Methods Implemented**:
-  - `getDecisions()` - Fetch all decisions
-  - `getDecision(id)` - Fetch single decision
-  - `createDecision(data)` - Create new decision
-  - `updateDecision(id, updates)` - Update decision
-  - `analyzeDecision(data)` - Get AI analysis
+![Final Verification Screenshot](/home/agentrogue/.gemini/antigravity/brain/fb3b7164-61c1-4591-a48c-6796b95b12d4/.system_generated/click_feedback/click_feedback_1780240370425.png)
 
 ---
 
-## 3. Cross-Module Integration ✅
+## 🧪 Detailed Steps Verified
 
-### Chat Module Integration
-**File**: `frontend/src/app/(dashboard)/chat/page.tsx`
+### 1. **Auth & Database Readiness**
+- Created database tables in PostgreSQL via `init_db_tables.py` in the `engunity` Conda environment.
+- Seeded test user `test@example.com` / `testpassword123` via `scripts/maintenance/create_test_user.py`,
+  which writes directly to the local PostgreSQL `users` table using SQLAlchemy.
+- **No Supabase API or Supabase authentication was exercised** by this script. The login flow
+  uses a local FastAPI JWT endpoint (`/api/v1/auth/login`).
 
-**Integration Points**:
-1. **Header Button**: "Convert to Decision" button in chat header
-   - Line 793-800
-   - Passes session title and last user message
-   
-2. **Message Actions**: Per-message conversion
-   - Line 863
-   - Context: Specific message content becomes decision context
+### 2. **Navigation & Main Layout**
+- Verified **Active Decisions** (Kanban Board: `Tentative`, `Confirmed`, `Revisited`, `Deprecated`).
+- Verified **Timeline View** (chronological rendering by `created_at` descending).
+- Verified **Analytics & Patterns View** (Decision Velocity, Evidence Quality, Reversal Rate,
+  Category Distribution bar chart, Confidence Calibration chart, AI Pattern Insights panel).
+  > **Note:** Analytics panel metrics (Decision Velocity, Evidence Quality, Reversal Rate,
+  > Category Distribution) and **AI Pattern Insights** (Decision Drift, Low Evidence Quality,
+  > Decision Outcome Rate, and Stability Score) are **dynamically computed live** from the loaded
+  > decision data history, providing real-time cognitive bias feedback.
 
-**URL Pattern**:
-```
-/decisionvault?source=chat&title=<session_title>&problem=<message_content>
-```
+### 3. **Multi-Step Creation Wizard (7 Steps)**
+The creation wizard has **7 steps** as defined in `page.tsx` (`STEPS` array, lines 168–176):
 
-### Research Module Integration
-**File**: `frontend/src/app/(dashboard)/research/page.tsx`
+| Step | Label | What It Collects |
+|------|-------|-----------------|
+| 1 | **Identity** | Title, Category (type), Initial Confidence |
+| 2 | **Context** | Problem Statement |
+| 3 | **Options** | Minimum 2 alternatives; Label, Description, Effort, Risk |
+| 4 | **Evidence** | "Scan Project" (simulated context linker); manual review |
+| 5 | **Analysis** | Tradeoff Matrix: 6 dimensions (Performance, Cost, Complexity, Risk, Scalability, Time to Implement) via 1–5 sliders |
+| 6 | **AI Review** | Adversarial flag generation — real HTTP call to `/api/v1/decisions/analyze`. Displayed flags include type, severity, message, and suggested action. User may retry if unavailable. |
+| 7 | **Resolution** | Final option selection, Decision Rationale, Privacy Level, Initial Status, Revisit Rule (trigger type/value, notification toggle) |
 
-**Integration Points**:
-1. **Research Node Actions**: Convert research findings to decisions
-   - Line 455
-   - Passes research methodology and context
-   
-2. **Synthesis Workspace**: "Finalize as Decision" button
-   - Line 687
-   - Context: Research synthesis becomes decision foundation
+Validation performed during session:
+- **Identity:** Added Title (`Choose Database Migration Strategy`), Category (`Architecture`), Confidence (`medium`).
+- **Context:** Set legacy problem background.
+- **Options:** Defined two alternatives (Aurora PostgreSQL vs. NoSQL MongoDB) with effort/risk ratings.
+- **Evidence:** Used "Scan Project" button — returns **mock/simulated evidence** (2 hardcoded evidence nodes after a 4.5-second animated delay). This is **not** a live codebase analysis.
+- **Analysis:** Set Tradeoff Matrix sliders across all 6 dimensions.
+- **AI Review:** Backend returned adversarial flags challenging optimism bias and missing options.
+- **Resolution:** Set final decision and rationale; initialized as `confirmed` status.
 
-**URL Pattern**:
-```
-/decisionvault?source=research&title=<research_title>&problem=<findings>
-```
+### 4. **Export Engines (Post-Creation — Detail Drawer)**
 
----
+These actions are available in the **decision detail panel** (not within the wizard itself):
 
-## 4. Testing & Verification
+#### STAR Breakdown
+- Triggered by clicking **"STAR Breakdown"** button on a saved decision.
+- **Implementation:** `convertToSTAR()` function in `page.tsx`. Client-side template interpolation
+  from the decision's stored fields (`context`, `problem_statement`, `options`, `tradeoffs`,
+  `final_decision`, `rationale`).
+- **This is NOT a separate LLM/AI call.** The content is generated deterministically from the
+  saved decision data.
+- Output is displayed inline in the detail drawer panel.
 
-### Automated Test Results
-
-#### Test 1: API Endpoints (✅ PASSED)
-```
-✓ Authentication: Success
-✓ GET /decisions/: Success (1 decision found)
-✓ POST /decisions/: Success
-✓ POST /decisions/analyze: Success (4 AI flags generated)
-✓ PATCH /decisions/{id}: Success
-✓ GET /decisions/{id}: Success
-```
-
-#### Test 2: End-to-End Flow (✅ PASSED)
-Complete decision lifecycle tested:
-1. ✅ User authentication
-2. ✅ Decision creation with 3 options, 2 evidence nodes
-3. ✅ AI adversarial analysis (detected 4 cognitive biases)
-4. ✅ Decision update with AI flags
-5. ✅ Final decision confirmation
-6. ✅ Retrieval and verification
-7. ✅ Persistence across requests
-
-#### Test 3: AI Analysis Quality (✅ PASSED)
-The AI successfully detected:
-- **Sunk Cost Fallacy**: Identified "already invested 6 months" language
-- **Missing Option**: Detected only 2 options, suggested 3rd
-- **Weak Evidence**: Flagged high confidence with no evidence
-- **Bias Detection**: Identified overconfidence indicators
+#### ADR Export
+- Triggered by clicking **"ADR Export"** button on a saved decision.
+- **Implementation:** `exportADR()` function in `page.tsx`. Client-side Markdown template
+  generation from decision fields (Status, Context, Problem Statement, Options, Tradeoffs,
+  Rationale, Confidence).
+- Output is displayed as preformatted Markdown text with a **"Copy Markdown" button** that
+  writes to `navigator.clipboard`.
+- **No file download dialog is produced. No GitHub commit or ADR folder integration is
+  implemented in the current frontend.** That integration is described as a future capability
+  in `decisionvault.md` §8.
 
 ---
 
-## 5. Data Schema Verification
+> [!TIP]
+> The application is fully functional for local development and review, running completely
+> decoupled from Docker Compose on local ports. All features operate as described above.
+> Features marked ⚠️ in the Quick Access Guide are simulated or display-only and require
+> additional backend implementation to become fully functional.
 
-### Decision Model Structure
-```python
-{
-  "id": "uuid",
-  "title": "string",
-  "type": "Architecture|Research|Code|Product|Career|Compliance",
-  "status": "tentative|confirmed|revisited|deprecated",
-  "confidence": "low|medium|high",
-  "problem_statement": "string",
-  "context": "string (optional)",
-  "workspace_id": "string",
-  "user_id": "integer",
-  "constraints": [
-    {
-      "type": "budget|time|technical|policy|team_capacity",
-      "description": "string",
-      "hard_limit": "boolean",
-      "current_status": "string"
-    }
-  ],
-  "options": [
-    {
-      "id": "string",
-      "label": "string",
-      "description": "string",
-      "pros": ["string"],
-      "cons": ["string"],
-      "estimated_effort": "low|medium|high",
-      "risk_level": "low|medium|high"
-    }
-  ],
-  "evidence": [
-    {
-      "id": "string",
-      "source_type": "chat|document|code_run|external_url|research_paper",
-      "source_id": "string",
-      "excerpt": "string",
-      "credibility": "primary|secondary|anecdotal",
-      "added_at": "ISO datetime string",
-      "relevance_score": "float"
-    }
-  ],
-  "tradeoffs": {
-    "performance": "int (1-5)",
-    "cost": "int (1-5)",
-    "complexity": "int (1-5)",
-    "risk": "int (1-5)",
-    "scalability": "int (1-5)",
-    "time_to_implement": "int (1-5)"
-  },
-  "ai_flags": [
-    {
-      "id": "string",
-      "flag_type": "missing_option|weak_evidence|bias_detected|contradiction|sunk_cost_fallacy",
-      "severity": "info|warning|critical",
-      "message": "string",
-      "suggested_action": "string",
-      "dismissed": "boolean"
-    }
-  ],
-  "final_decision": "string (option_id)",
-  "rationale": "string",
-  "tags": ["string"],
-  "privacy": "private|team|public",
-  "created_at": "datetime",
-  "updated_at": "datetime"
-}
-```
-
----
-
-## 6. Bug Fixes Applied
-
-### Issue 1: Database Session Not Committing
-**Problem**: SQLAlchemy session wasn't committing transactions
-**File**: `backend/app/api/v1/decisions.py`
-**Fix**: Added `db.commit()` before `db.refresh()`
-```python
-db.add(decision)
-db.commit()  # ← Added
-db.refresh(decision)
-```
-
-### Issue 2: Duplicate Route Definition
-**Problem**: `/analyze` endpoint defined twice
-**File**: `backend/app/api/v1/decisions.py`
-**Fix**: Removed duplicate route definition (lines 121-133)
-
-### Issue 3: Datetime Serialization Error
-**Problem**: `datetime` objects in Evidence schema couldn't be JSON serialized
-**File**: `backend/app/schemas/decision.py`
-**Fix**: Changed `added_at` field from `datetime` to `str`
-```python
-class EvidenceSchema(BaseModel):
-    # ...
-    added_at: str  # Changed from datetime to str
-```
-
----
-
-## 7. Strategic Features Verification
-
-### Adversarial Intelligence ✅
-The Decision Vault implements a unique "challenge-first" AI approach:
-- ✅ System prompt designed for skepticism, not validation
-- ✅ Detects 5+ cognitive bias types
-- ✅ Suggests missing alternatives
-- ✅ Questions confidence levels
-
-### Evidence Credibility Framework ✅
-Three-tier evidence classification:
-- **Primary**: Code benchmarks, research papers, raw data
-- **Secondary**: Summaries, reports, external articles  
-- **Anecdotal**: Opinions, assumptions, hearsay
-
-### Professional Utility ✅
-- **ADR Export**: Architecture Decision Records for documentation
-- **STAR Export**: Situation-Task-Action-Result for interviews
-- **Audit Trail**: Immutable decision history
-
----
-
-## 8. Performance & Scalability
-
-### Database Performance
-- **Index Strategy**: 
-  - Primary key on `id` (UUID)
-  - Index on `user_id` for fast user queries
-  - Index on `workspace_id` for workspace filtering
-  
-- **JSON Columns**: Used for flexible nested structures without JOIN overhead
-
-### AI Analysis Performance
-- **Average Response Time**: 2-3 seconds
-- **Provider**: Groq (fastest LLM inference)
-- **Model**: LLaMA 3.3 70B
-- **Rate Limiting**: Handled by API key rotation (3 keys configured)
-
----
-
-## 9. Security & Privacy
-
-### Authentication ✅
-- JWT-based authentication required for all endpoints
-- User isolation: Decisions filtered by `user_id`
-- No cross-user data leakage
-
-### Data Privacy ✅
-- Privacy levels: `private`, `team`, `public`
-- Default: `private`
-- Future: Team sharing capability planned
-
----
-
-## 10. Environment Configuration
-
-### Required Environment Variables
-```bash
-# Database (PostgreSQL)
-DATABASE_URL=postgresql://user:pass@host:5432/engunity
-
-# AI Service (Groq)
-GROQ_API_KEYS=key1,key2,key3  # Comma-separated for rotation
-
-# MongoDB (Optional - for reasoning traces)
-MONGODB_URL=mongodb+srv://user:pass@cluster/db
-MONGODB_DB_NAME=engunity
-
-# Frontend
-NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
-```
-
-### Verified Configuration
-✅ PostgreSQL: Connected and operational  
-✅ Groq API: 3 keys configured for rotation  
-⚠️ MongoDB: SSL certificate issue (non-critical, traces optional)
-
----
-
-## 11. User Workflows Verified
-
-### Workflow 1: Create Decision from Scratch
-1. Navigate to `/decisionvault`
-2. Click "New Decision"
-3. Follow 5-step wizard:
-   - **Identity**: Title, type, problem statement
-   - **Context**: Background, constraints
-   - **Options**: Add multiple alternatives
-   - **Evidence**: Link to chat, research, code runs
-   - **Analysis**: Get AI review, address flags
-4. Confirm or iterate based on AI feedback
-
-### Workflow 2: Convert Chat to Decision
-1. In Chat module, click "Convert to Decision"
-2. Context auto-populated from chat history
-3. Complete wizard with additional details
-4. Decision saved with chat reference
-
-### Workflow 3: Finalize Research as Decision
-1. In Research module, complete investigation
-2. Click "Finalize as Decision"
-3. Research findings become evidence nodes
-4. AI validates research completeness
-
----
-
-## 12. Known Limitations & Future Enhancements
-
-### Current Limitations
-1. **MongoDB SSL**: Certificate validation issue (traces not persisted currently)
-   - **Impact**: Low - traces are optional
-   - **Workaround**: Use PostgreSQL exclusively or fix SSL cert
-
-2. **Frontend Mock Data**: Some analytics still use simulated data
-   - **Impact**: Medium - charts show but may not reflect real metrics
-   - **Plan**: Connect to actual decision data
-
-### Planned Enhancements
-- [ ] Decision templates (common architectural patterns)
-- [ ] Team decision workflows (voting, consensus)
-- [ ] Decision drift detection (repeated reversals)
-- [ ] Advanced analytics (velocity, calibration accuracy)
-- [ ] Integration with Code Lab (link to implementation)
-- [ ] Slack/Discord notifications for team decisions
-
----
-
-## 13. Quick Start Guide
-
-### For Developers
-```bash
-# 1. Start Backend
-cd backend
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
-# 2. Start Frontend
-cd frontend
-npm run dev
-
-# 3. Access Decision Vault
-# Open browser: http://localhost:3000/decisionvault
-
-# 4. Run Verification
-python tmp_rovodev_test_e2e_verification.py
-```
-
-### For Users
-1. **Register/Login** at http://localhost:3000
-2. **Navigate** to Decision Vault from dashboard
-3. **Create Decision** using "New Decision" button
-4. **Get AI Review** in the wizard's final step
-5. **Track Progress** via Kanban board
-
----
-
-## 14. Conclusion
-
-The Decision Vault is **100% functional** and ready for use. It represents a unique competitive advantage in the AI-assisted development space by providing:
-
-1. **Adversarial Intelligence**: Unlike generic AI that validates, this system challenges
-2. **Structured Decision Tracking**: Professional-grade decision history
-3. **Cross-Platform Integration**: Seamless flow from Chat → Research → Code → Decision
-4. **Career Utility**: STAR and ADR exports for interviews and documentation
-
-### System Health Status
-```
-✅ Backend API         : Operational
-✅ Frontend UI         : Operational  
-✅ Database            : Operational
-✅ AI Analysis         : Operational
-✅ Cross-Module Links  : Operational
-⚠️  MongoDB Traces     : Optional (SSL issue)
-```
-
-### Test Coverage
-```
-✅ API Endpoints       : 6/6 passing
-✅ E2E Flow           : Complete lifecycle verified
-✅ AI Quality         : 4/4 bias types detected
-✅ Cross-Module       : Chat & Research integration confirmed
-```
-
----
-
-## 15. Appendix: Test Artifacts
-
-### Test Script Locations
-- `tmp_rovodev_test_decision_api.py` - API endpoint tests
-- `tmp_rovodev_test_e2e_verification.py` - Full E2E verification
-
-### Sample Decision Created
-- **ID**: `02ffb0cb-896d-4c4a-b8d0-70433cfd6417`
-- **Title**: "E2E Test: Migrate to Microservices Architecture"
-- **Options**: 3 (Full Microservices, Keep Monolith, Modular Monolith)
-- **Evidence**: 2 primary sources
-- **AI Flags**: 4 detected
-- **Final Decision**: Modular Monolith (opt3)
-- **Status**: Confirmed
-
----
-
-**Report Generated**: January 23, 2026  
-**Verification Status**: ✅ COMPLETE  
-**Recommendation**: Ready for production deployment
-
+> [!NOTE]
+> **Ambiguities & Follow-up Checks Required:**
+> - The `FinalVerification.md` document states MongoDB is connected and reasoning traces are
+>   persisted to `decision_traces`. This was **not independently verified** in this session.
+>   Confirm `MONGODB_URL` is set and traces appear in the collection after POST.
+> - The "Project Scan" feature returns hardcoded mock evidence. Keep it labeled as
+>   "Demo Mode" in the UI until a real backend scanner is implemented.

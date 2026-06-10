@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import HTTPException as FastAPIHTTPException
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.types import ASGIApp
 from contextlib import asynccontextmanager
 import traceback
 
@@ -34,6 +36,7 @@ from app.api.v1.jobprep import router as jobprep_router
 from app.api.v1.agent_tools import router as agent_tools_router
 from app.api.v1.coding_team import router as coding_team_router
 from app.api.v1.wellbeing import router as wellbeing_router
+from app.api.v1.workspace import router as workspace_router
 
 ALLOWED_ORIGINS = {
     "http://localhost:3000",
@@ -41,6 +44,34 @@ ALLOWED_ORIGINS = {
     "http://localhost:3001",
     "http://127.0.0.1:3001",
 }
+
+# OWASP-recommended security response headers
+SECURITY_HEADERS = {
+    "X-Frame-Options": "DENY",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
+    "X-XSS-Protection": "1; mode=block",
+    # Broad but safe CSP for an API backend; tighten per feature if needed
+    "Content-Security-Policy": (
+        "default-src 'none'; "
+        "frame-ancestors 'none';"
+    ),
+    # HSTS: 1 year, include subdomains
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+}
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Inject OWASP security headers on every non-WebSocket response."""
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        # Don't add headers to WebSocket upgrade responses
+        if request.headers.get("upgrade", "").lower() != "websocket":
+            for header, value in SECURITY_HEADERS.items():
+                response.headers.setdefault(header, value)
+        return response
 
 
 def _cors_error_headers(request: Request) -> dict:
@@ -140,14 +171,24 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 # Add Response Caching Middleware
 app.add_middleware(ResponseCacheMiddleware, ttl=300)
 
+# Add OWASP security headers to all responses
+app.add_middleware(SecurityHeadersMiddleware)
+
 # Add CORS middleware last so it's outermost and can attach headers
 # to both success and error responses in local development.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=list(ALLOWED_ORIGINS),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=[
+        "Content-Type",
+        "Authorization",
+        "Accept",
+        "Origin",
+        "X-Requested-With",
+        "Idempotency-Key",
+    ],
 )
 
 @app.get("/")
@@ -178,3 +219,4 @@ app.include_router(jobprep_router, prefix=f"{settings.API_V1_STR}/jobprep", tags
 app.include_router(agent_tools_router, prefix=f"{settings.API_V1_STR}/agent-tools", tags=["agent-tools"])
 app.include_router(coding_team_router, prefix=f"{settings.API_V1_STR}/coding-team", tags=["coding-team"])
 app.include_router(wellbeing_router, prefix=f"{settings.API_V1_STR}/wellbeing", tags=["wellbeing"])
+app.include_router(workspace_router, prefix=f"{settings.API_V1_STR}/research", tags=["workspace"])

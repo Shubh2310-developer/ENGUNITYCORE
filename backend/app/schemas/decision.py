@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import List, Optional, Dict, Any, Literal
 from datetime import datetime
 
@@ -132,8 +132,8 @@ class Decision(DecisionBase):
     id: str
     workspace_id: str
     user_id: int
+    created_by: Optional[str] = None  # Author email, populated from user.email at serialization
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

@@ -216,8 +216,31 @@ async def upload_image(
     1. Synchronous: Validation, EXIF stripping, Original storage, DB entry (pending)
     2. Asynchronous: Thumbnails, Gemini AI analysis, OCR, Semantic Indexing
     """
-    if not file.content_type.startswith("image/"):
+    # ── Security: MIME pre-check on declared content-type ──────────────────────
+    if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
+
+    # ── Security: Read with size cap (prevents zip-bomb / DoS) ─────────────────
+    MAX_SIZE = 10 * 1024 * 1024  # 10 MB
+    content = await file.read(MAX_SIZE + 1)
+    if len(content) > MAX_SIZE:
+        raise HTTPException(status_code=413, detail="Image exceeds maximum size of 10 MB")
+
+    # ── Security: magic-bytes content inspection (prevents MIME bypass) ─────────
+    try:
+        import magic
+        detected_mime = magic.from_buffer(content[:2048], mime=True)
+        if not detected_mime.startswith("image/"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"File content is not a valid image (detected: {detected_mime})"
+            )
+    except ImportError:
+        pass  # python-magic not available; fall back to declared content-type only
+
+    # Reconstruct a file-like object so the image_processor can read it
+    import io
+    file.file = io.BytesIO(content)
 
     try:
         # Stage 1: Immediate Processing
@@ -265,3 +288,4 @@ async def upload_image(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Image upload failed: {str(e)}")
+

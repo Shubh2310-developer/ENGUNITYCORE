@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, HttpUrl, field_validator, validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator, ConfigDict
 from typing import List, Optional, Any, Dict
 from datetime import datetime
 from uuid import UUID
@@ -20,7 +20,8 @@ class JobPrepProfileBase(BaseModel):
     learning_style: Optional[str] = Field(None, max_length=50)
     notifications_enabled: bool = True
 
-    @validator('preferred_companies')
+    @field_validator('preferred_companies')
+    @classmethod
     def validate_companies(cls, v):
         if v and len(v) > 20:
             raise ValueError('Maximum 20 preferred companies allowed')
@@ -42,8 +43,7 @@ class JobPrepProfile(JobPrepProfileBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- Target Role ---
 class JobPrepTargetRoleBase(BaseModel):
@@ -65,7 +65,8 @@ class JobPrepTargetRoleBase(BaseModel):
     is_primary: bool = False
     is_active: bool = True
 
-    @validator('role_title')
+    @field_validator('role_title')
+    @classmethod
     def validate_role_title(cls, v):
         if not v or not v.strip():
             raise ValueError('Role title cannot be empty')
@@ -73,7 +74,8 @@ class JobPrepTargetRoleBase(BaseModel):
         v = re.sub(r'<[^>]+>', '', v)
         return v.strip()[:200]
 
-    @validator('required_skills', 'nice_to_have_skills', 'preparation_focus_areas')
+    @field_validator('required_skills', 'nice_to_have_skills', 'preparation_focus_areas')
+    @classmethod
     def validate_skill_lists(cls, v):
         if v and len(v) > 50:
             raise ValueError('Maximum 50 items allowed in list')
@@ -95,8 +97,7 @@ class JobPrepTargetRole(JobPrepTargetRoleBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- Skill ---
 class JobPrepSkillBase(BaseModel):
@@ -106,7 +107,8 @@ class JobPrepSkillBase(BaseModel):
     target_level: Optional[int] = Field(None, ge=1, le=5)
     is_critical: bool = False
 
-    @validator('skill_name', 'skill_category')
+    @field_validator('skill_name', 'skill_category')
+    @classmethod
     def sanitize_strings(cls, v):
         if not v or not v.strip():
             raise ValueError('Field cannot be empty')
@@ -141,8 +143,7 @@ class JobPrepSkill(JobPrepSkillBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- Skill Evidence ---
 class JobPrepSkillEvidenceBase(BaseModel):
@@ -154,7 +155,8 @@ class JobPrepSkillEvidenceBase(BaseModel):
     impact_level: Optional[str] = Field(None, max_length=50)
     evidence_metadata: Optional[Dict[str, Any]] = None
 
-    @validator('title', 'description')
+    @field_validator('title', 'description')
+    @classmethod
     def sanitize_text(cls, v):
         if v:
             # Remove HTML tags and scripts
@@ -163,7 +165,8 @@ class JobPrepSkillEvidenceBase(BaseModel):
             return v.strip()
         return v
 
-    @validator('source_url')
+    @field_validator('source_url')
+    @classmethod
     def validate_url(cls, v):
         if v and v.strip():
             if not re.match(r'https?://', v):
@@ -184,8 +187,7 @@ class JobPrepSkillEvidence(JobPrepSkillEvidenceBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- Project ---
 class JobPrepProjectBase(BaseModel):
@@ -201,7 +203,8 @@ class JobPrepProjectBase(BaseModel):
     is_complete: bool = True
     completion_date: Optional[datetime] = None
 
-    @validator('title', 'description')
+    @field_validator('title', 'description')
+    @classmethod
     def sanitize_text(cls, v):
         if v:
             # Remove HTML tags and scripts
@@ -210,7 +213,8 @@ class JobPrepProjectBase(BaseModel):
             return v.strip()
         return v
 
-    @validator('github_url', 'live_demo_url')
+    @field_validator('github_url', 'live_demo_url')
+    @classmethod
     def validate_urls(cls, v):
         if v and v.strip():
             # Basic URL validation
@@ -218,7 +222,8 @@ class JobPrepProjectBase(BaseModel):
                 raise ValueError('URL must start with http:// or https://')
         return v
 
-    @validator('tech_stack', 'key_features', 'challenges_solved')
+    @field_validator('tech_stack', 'key_features', 'challenges_solved')
+    @classmethod
     def validate_lists(cls, v):
         if v and len(v) > 100:
             raise ValueError('Maximum 100 items allowed')
@@ -250,8 +255,7 @@ class JobPrepProject(JobPrepProjectBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- Simulation ---
 class JobPrepInterviewSimulationBase(BaseModel):
@@ -297,8 +301,7 @@ class JobPrepInterviewSimulation(JobPrepInterviewSimulationBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- Evaluation ---
 class JobPrepPracticeEvaluate(BaseModel):
@@ -307,7 +310,8 @@ class JobPrepPracticeEvaluate(BaseModel):
     practice_type: str = Field("conceptual", max_length=50)
     difficulty: str = Field("medium", max_length=50)
 
-    @validator('topic', 'user_answer')
+    @field_validator('topic', 'user_answer')
+    @classmethod
     def sanitize_input(cls, v):
         if not v or not v.strip():
             raise ValueError('Field cannot be empty')
@@ -320,7 +324,8 @@ class JobPrepInterviewEvaluate(BaseModel):
     question: str = Field(..., min_length=1, max_length=2000)
     user_response: str = Field(..., min_length=1, max_length=50000)
 
-    @validator('question', 'user_response')
+    @field_validator('question', 'user_response')
+    @classmethod
     def sanitize_input(cls, v):
         if not v or not v.strip():
             raise ValueError('Field cannot be empty or whitespace only')
@@ -347,5 +352,4 @@ class JobPrepReadinessAssessment(BaseModel):
     assessment_type: str
     assessed_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

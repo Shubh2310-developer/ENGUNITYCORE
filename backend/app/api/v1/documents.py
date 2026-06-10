@@ -37,6 +37,11 @@ def create_document(
     """
     Create a new document.
     """
+    from app.core.sanitization import sanitize_html, sanitize_plain_text
+    document_in.title = sanitize_plain_text(document_in.title)
+    if document_in.content is not None:
+        document_in.content = sanitize_html(document_in.content)
+
     db_obj = Document(
         **document_in.model_dump(),
         user_id=current_user.id
@@ -138,6 +143,12 @@ def update_document(
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
 
+    from app.core.sanitization import sanitize_html, sanitize_plain_text
+    if document_in.title is not None:
+        document_in.title = sanitize_plain_text(document_in.title)
+    if document_in.content is not None:
+        document_in.content = sanitize_html(document_in.content)
+
     update_data = document_in.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(document, field, value)
@@ -198,8 +209,11 @@ async def upload_document(
     extension = os.path.splitext(file.filename)[1]
     safe_filename = f"{file_id}{extension}"
 
-    # Read file content
-    content = await file.read()
+    # ── Security: enforce file size limit (prevents zip-bomb / DoS) ───────────
+    MAX_SIZE = 50 * 1024 * 1024  # 50 MB
+    content = await file.read(MAX_SIZE + 1)
+    if len(content) > MAX_SIZE:
+        raise HTTPException(status_code=413, detail="Document exceeds maximum size of 50 MB")
 
     # 1. Upload to Supabase Storage
     try:

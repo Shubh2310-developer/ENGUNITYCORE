@@ -72,9 +72,9 @@ async function mockSessions(page: any, sessions: any[] = []) {
   });
 }
 
-/** Mock GET /chat/{sessionId} */
+/** Mock GET /chat/history/{sessionId} */
 async function mockGetSession(page: any, session: any) {
-  await page.route(`**/api/v1/chat/${session.id}`, async (route: any) => {
+  await page.route(`**/api/v1/chat/history/${session.id}`, async (route: any) => {
     if (route.request().method() === 'GET') {
       await route.fulfill({
         status: 200,

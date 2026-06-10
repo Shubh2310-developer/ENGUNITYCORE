@@ -769,7 +769,7 @@ async def export_dataset(
 async def execute_query(
     dataset_id: int,
     query: str = Query(...),
-    query_type: str = Query("sql", regex="^(sql|nlq)$"),
+    query_type: str = Query("sql", pattern="^(sql|nlq)$"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

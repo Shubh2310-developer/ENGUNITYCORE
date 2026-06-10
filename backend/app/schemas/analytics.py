@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
@@ -70,8 +70,7 @@ class Dataset(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DatasetWithData(Dataset):
@@ -113,8 +112,7 @@ class Analysis(BaseModel):
     created_at: datetime
     completed_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==================== Chart Schemas ====================
@@ -144,8 +142,7 @@ class Chart(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==================== Dashboard Schemas ====================
@@ -181,8 +178,7 @@ class DashboardWidget(BaseModel):
     position: Dict[str, int]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class Dashboard(BaseModel):
@@ -196,8 +192,7 @@ class Dashboard(BaseModel):
     updated_at: datetime
     widgets: List[DashboardWidget] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==================== Session Schemas ====================
@@ -255,8 +250,7 @@ class AnalysisSession(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==================== ML Schemas ====================

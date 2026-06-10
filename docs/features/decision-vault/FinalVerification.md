@@ -16,10 +16,15 @@
     - **Context Parsing**: Auto-fills Problem Statement and Title based on source module context.
 
 ## 3. Data Flow Validation
-1. **Creation**: User initiates from Research -> Context passed via URL -> Wizard pre-fills data.
-2. **Analysis**: Wizard Step 5 calls `/analyze` -> Backend returns logical flags (e.g., Sunk Cost detected).
-3. **Persistence**: `handleCreateDecision` calls `POST /decisions/` -> Metadata saved to SQL -> Trace saved to Mongo.
-4. **Retrieval**: Dashboard refreshes -> Decision appears in "Tentative" column of Kanban board.
+1. **Creation**: User initiates from Research → Context passed via URL query params → Wizard pre-fills Title, Problem, and Context.
+2. **Analysis**: **Wizard Step 6 (AI Review)** calls `POST /api/v1/decisions/analyze` → Backend returns logical flags (e.g., Sunk Cost, Missing Options detected). This is triggered automatically when advancing from Step 5 → Step 6 (`nextStep()` at `currentStep === 5`).
+3. **Persistence**: `handleCreateDecision` at Step 7 calls `POST /decisions/` → Metadata saved to PostgreSQL → Reasoning trace intended for MongoDB `decision_traces` collection (requires `MONGODB_URL`).
+4. **Retrieval**: Dashboard refreshes → Decision appears in the Kanban column matching its `status` field.
+
+> **⚠️ Verification Scope Note:** MongoDB connectivity (`decision_traces` persistence) and
+> Supabase integration were **not independently exercised** in this E2E session. The test user
+> was seeded into local PostgreSQL only (see `scripts/maintenance/create_test_user.py`).
+> MongoDB trace persistence should be verified separately if `MONGODB_URL` is configured.
 
 ## 4. Environment Checklist
 | Env Var | Status | Purpose |

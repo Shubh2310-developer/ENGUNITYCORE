@@ -72,7 +72,7 @@ export const authService = {
   async getMe(token: string) {
     try {
       if (process.env.NODE_ENV === 'development') {
-        console.log('[Auth Service] Fetching user data with token:', token.substring(0, 50) + '...');
+        console.log('[Auth Service] Fetching user data with token present:', !!token);
       }
       const response = await fetch(`${FINAL_API_URL}/auth/me`, {
         method: 'GET',

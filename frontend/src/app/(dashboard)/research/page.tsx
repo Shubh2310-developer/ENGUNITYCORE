@@ -801,11 +801,11 @@ export default function ResearchPage() {
 
       {/* Share Workspace Modal */}
       {showShareModal && (
-        <div className={styles.shareOverlay}>
+        <div className={`${styles.shareOverlay} ${styles.shareOverlayOpen}`}>
           <div className={styles.shareModal}>
             <div className={styles.shareHeader}>
               <h3>Share Workspace</h3>
-              <button className={styles.closeBtn} onClick={() => setShowShareModal(false)}>
+              <button className={styles.closeBtn} aria-label="Close" onClick={() => setShowShareModal(false)}>
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -853,7 +853,7 @@ export default function ResearchPage() {
 
       {/* Analysis Tool Modal */}
       {activeTool && (
-        <div className={styles.shareOverlay} onClick={() => setActiveTool(null)}>
+        <div className={`${styles.shareOverlay} ${styles.shareOverlayOpen}`} onClick={() => setActiveTool(null)}>
           <div className={styles.shareModal} onClick={e => e.stopPropagation()}>
             <div className={styles.shareHeader} style={{ marginBottom: '1.5rem' }}>
               <div className="flex items-center gap-3">
@@ -865,7 +865,7 @@ export default function ResearchPage() {
                 </div>
                 <h3 className="text-xl font-extrabold text-slate-900">{toolDetails[activeTool].title}</h3>
               </div>
-              <button className={styles.closeBtn} onClick={() => setActiveTool(null)}>
+              <button className={styles.closeBtn} aria-label="Close" onClick={() => setActiveTool(null)}>
                 <X className="w-4 h-4" />
               </button>
             </div>

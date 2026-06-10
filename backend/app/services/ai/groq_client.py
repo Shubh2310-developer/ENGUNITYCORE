@@ -227,7 +227,28 @@ export const LoginButton = () => {
         if "you are a code reviewer" in last_msg:
              return "APPROVED"
 
-        # 7. General Chat / Unknown
+        # 7. Decision Vault Adversarial Review Mock
+        if "adversarial flags" in last_msg or "decision" in last_msg or "decision_id" in last_msg:
+             return json.dumps([
+                 {
+                     "id": "flag_mock_sunk_cost",
+                     "flag_type": "sunk_cost_fallacy",
+                     "severity": "warning",
+                     "message": "Potential sunk cost fallacy detected. The reasoning heavily emphasizes team familiarity and past investments in existing frameworks.",
+                     "suggested_action": "Assess the options purely on future development velocity and operational complexity, ignoring historical alignment.",
+                     "dismissed": False
+                 },
+                 {
+                     "id": "flag_mock_missing_option",
+                     "flag_type": "missing_option",
+                     "severity": "info",
+                     "message": "Narrow scope of options. The current draft focuses on two extreme paths without considering a lighter-weight hybrid or phased migration.",
+                     "suggested_action": "Incorporate a third hybrid path to balance risk and development velocity.",
+                     "dismissed": False
+                 }
+             ])
+
+        # 8. General Chat / Unknown
         return "This is a simulated response from the Engunity AI Mock (due to API rate limits). I can help you with programming, system design, and more. Please ask your question."
 
     async def _mock_stream(self, messages: List[Dict[str, str]]) -> AsyncGenerator[str, None]:

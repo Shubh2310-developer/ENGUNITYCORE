@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from typing import Optional, List
 
@@ -26,8 +26,7 @@ class Document(DocumentBase):
     updated_at: datetime
     links: List['DocumentLink'] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ThinkingTraceBase(BaseModel):
     event_type: str
@@ -43,8 +42,7 @@ class ThinkingTrace(ThinkingTraceBase):
     user_id: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class DocumentLinkBase(BaseModel):
     target_type: str
@@ -60,5 +58,4 @@ class DocumentLink(DocumentLinkBase):
     document_id: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

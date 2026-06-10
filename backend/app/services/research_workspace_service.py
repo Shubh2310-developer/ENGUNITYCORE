@@ -15,7 +15,7 @@ DB backend:  MongoDB Atlas (motor async) – collection "research_workspaces".
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from loguru import logger
@@ -78,6 +78,89 @@ async def _llm(system: str, user: str, max_tokens: int = 1024) -> str:
 
 
 # ─── Data Fetchers  ───────────────────────────────────────────────────────────
+
+
+async def save_workspace_from_report(
+    user_id: str,
+    report: Any,
+    project_id: Optional[str] = None,
+) -> None:
+    """
+    Persist workspace data derived from a completed ResearchReport into MongoDB.
+    Called by the stream endpoint after a successful research run so that
+    subsequent GET /workspace/sources|clusters|graph-nodes return real data.
+
+    Data is upserted (not appended) so the collection always holds the latest
+    research run for the (user_id, project_id) pair.
+    """
+    try:
+        db = mongodb.db
+        if db is None:
+            return
+
+        # ── Build sources from SourceEvaluation list ──────────────────────────
+        sources: List[Dict] = []
+        for s in getattr(report, "sources", []):
+            sources.append({
+                "title":     getattr(s, "source_name", "Unknown"),
+                "type":      getattr(s, "source_type", "web"),
+                "author":    getattr(s, "url", "") or "Unknown",
+                "date":      datetime.now(timezone.utc).strftime("%Y"),
+                "relevance": f"{int(getattr(s, 'relevance_score', 0) * 100)}%",
+            })
+
+        # ── Build clusters from key_insights (one cluster per insight) ────────
+        clusters: List[Dict] = []
+        for i, insight in enumerate(getattr(report, "key_insights", [])[:5]):
+            label = insight[:40] if isinstance(insight, str) else str(insight)[:40]
+            clusters.append({
+                "name":     label,
+                "progress": min(100, 30 + i * 15),
+            })
+
+        # ── Keep existing graph-nodes layout or use defaults ──────────────────
+        query: Dict[str, Any] = {"user_id": user_id}
+        if project_id:
+            query["project_id"] = project_id
+
+        existing = await db.research_workspaces.find_one(query)
+        graph_nodes = (existing or {}).get("graph_nodes", _DEFAULT_NODES)
+
+        # Refresh active nodes from report's related_topics
+        related = getattr(report, "related_topics", [])
+        if related:
+            graph_nodes = [
+                {
+                    "id":     idx + 1,
+                    "label":  topic[:20],
+                    "top":    f"{20 + (idx * 15) % 60}%",
+                    "left":   f"{20 + (idx * 17) % 60}%",
+                    "active": idx == 0,
+                }
+                for idx, topic in enumerate(related[:6])
+            ]
+
+        doc = {
+            "user_id":    user_id,
+            "project_id": project_id,
+            "query":      getattr(report, "query", ""),
+            "sources":    sources or _DEFAULT_SOURCES,
+            "clusters":   clusters or _DEFAULT_CLUSTERS,
+            "graph_nodes": graph_nodes,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        await db.research_workspaces.replace_one(
+            query, doc, upsert=True
+        )
+        logger.info(
+            f"[WorkspaceService] Saved workspace for user {user_id[:8]}… "
+            f"({len(sources)} sources, {len(clusters)} clusters)"
+        )
+    except Exception as exc:
+        # Non-fatal: workspace page still falls back to defaults
+        logger.warning(f"[WorkspaceService] save_workspace_from_report error: {exc}")
+
 
 async def get_sources(
     user_id: str, project_id: Optional[str] = None

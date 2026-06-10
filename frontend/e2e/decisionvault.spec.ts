@@ -100,16 +100,20 @@ test.describe('Decision Vault', () => {
     await decisionTitleInput(page).fill('Decision Vault smoke create');
     await page.getByRole('button', { name: 'Next Step' }).click();
     await problemTextarea(page).fill('Validate that decision creation works end to end.');
+    await page.getByRole('button', { name: 'Next Step' }).click();
 
+    // Fill Options Step 3
+    await page.getByPlaceholder('Option 1 Label').fill('Option A');
+    await page.getByPlaceholder('Option 2 Label').fill('Option B');
     await page.getByRole('button', { name: 'Next Step' }).click();
-    await page.getByRole('button', { name: 'Next Step' }).click();
+
     await page.getByRole('button', { name: 'Next Step' }).click();
     await page.getByRole('button', { name: 'Next Step' }).click();
 
     await expect(page.getByText('No major issues detected')).toBeVisible();
 
     await page.getByRole('button', { name: 'Next Step' }).click();
-    await page.getByText('Untitled Option').first().click();
+    await page.getByText('Option A').first().click();
     await page
       .locator('label:has-text("Decision Rationale")')
       .locator('xpath=following-sibling::textarea[1]')
@@ -148,12 +152,18 @@ test.describe('Decision Vault', () => {
     await decisionTitleInput(page).fill('Duplicate submit guard');
     await page.getByRole('button', { name: 'Next Step' }).click();
     await problemTextarea(page).fill('Should submit exactly once.');
+    await page.getByRole('button', { name: 'Next Step' }).click();
 
-    for (let i = 0; i < 5; i += 1) {
+    // Fill Options Step 3
+    await page.getByPlaceholder('Option 1 Label').fill('Option A');
+    await page.getByPlaceholder('Option 2 Label').fill('Option B');
+    
+    // We are at step 3. Needs 4 clicks to go 3->4->5->6->7
+    for (let i = 0; i < 4; i += 1) {
       await page.getByRole('button', { name: 'Next Step' }).click();
     }
 
-    await page.getByText('Untitled Option').first().click();
+    await page.getByText('Option A').first().click();
     await page.locator('label:has-text("Decision Rationale")').locator('xpath=following-sibling::textarea[1]').fill('Only one request expected.');
 
     const submitBtn = page.getByRole('button', { name: 'Initialize Decision' });
@@ -189,11 +199,19 @@ test.describe('Decision Vault', () => {
     await page.goto('/decisionvault?source=code&title=Context%20Test&problem=Need%20context&context=Language%3A%20ts%3Cscript%3Ebad%3C%2Fscript%3E');
     await expect(page.getByText('New Decision Entry')).toBeVisible();
 
-    for (let i = 0; i < 6; i += 1) {
+    await page.getByRole('button', { name: 'Next Step' }).click(); // 1 -> 2
+    await page.getByRole('button', { name: 'Next Step' }).click(); // 2 -> 3
+
+    // Fill Options Step 3
+    await page.getByPlaceholder('Option 1 Label').fill('Option A');
+    await page.getByPlaceholder('Option 2 Label').fill('Option B');
+
+    // We are at step 3. Needs 4 clicks to go 3->4->5->6->7
+    for (let i = 0; i < 4; i += 1) {
       await page.getByRole('button', { name: 'Next Step' }).click();
     }
 
-    await page.getByText('Untitled Option').first().click();
+    await page.getByText('Option A').first().click();
     const privacySelect = page.locator('label:has-text("Privacy Level")').locator('xpath=following-sibling::select[1]');
     await privacySelect.selectOption('workspace');
     await page.locator('label:has-text("Decision Rationale")').locator('xpath=following-sibling::textarea[1]').fill('Context and privacy validation.');
@@ -221,11 +239,15 @@ test.describe('Decision Vault', () => {
     await decisionTitleInput(page).fill('AI failure test');
     await page.getByRole('button', { name: 'Next Step' }).click();
     await problemTextarea(page).fill('Reach analysis step and fail cleanly.');
+    await page.getByRole('button', { name: 'Next Step' }).click();
 
-    await page.getByRole('button', { name: 'Next Step' }).click();
-    await page.getByRole('button', { name: 'Next Step' }).click();
-    await page.getByRole('button', { name: 'Next Step' }).click();
-    await page.getByRole('button', { name: 'Next Step' }).click();
+    // Fill Options Step 3
+    await page.getByPlaceholder('Option 1 Label').fill('Option A');
+    await page.getByPlaceholder('Option 2 Label').fill('Option B');
+    await page.getByRole('button', { name: 'Next Step' }).click(); // 3 -> 4
+
+    await page.getByRole('button', { name: 'Next Step' }).click(); // 4 -> 5
+    await page.getByRole('button', { name: 'Next Step' }).click(); // 5 -> 6
 
     await expect(page.getByText('AI review unavailable')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Retry AI Review' })).toBeVisible();

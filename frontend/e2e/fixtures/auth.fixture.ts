@@ -12,7 +12,7 @@ export const test = base.extend<AuthFixtures>({
         // Use environment variable if available, otherwise use placeholder
         const testPassword = process.env.TEST_USER_PASSWORD || 'TestP@ssw0rd!2026';
         const user = {
-            email: `test-${Date.now()}@engunity.test`,
+            email: `test-${Date.now()}@engunity.com`,
             password: testPassword,
         };
         await use(user);

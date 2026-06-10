@@ -21,7 +21,7 @@ def _open_test_db_session():
 
 
 @pytest.fixture(scope="function")
-def setup_decision_table():
+def setup_decision_table(setup_database):
     db, session_gen = _open_test_db_session()
     bind = db.get_bind()
     DecisionModel.__table__.create(bind=bind, checkfirst=True)
@@ -139,6 +139,26 @@ class TestDecisionsAPI:
         listed = list_resp.json()
         assert len(listed) == 1
         assert listed[0]["id"] == created["id"]
+
+    def test_created_by_populated_from_email(self, client, decision_auth_override):
+        """
+        POST /decisions/ and GET /decisions/ must both include created_by
+        equal to the authenticated user's email — not a hardcoded placeholder.
+        """
+        create_resp = client.post("/api/v1/decisions/", json=_create_payload("Author email test"))
+        assert create_resp.status_code == 200
+        created = create_resp.json()
+        # created_by must match the stub user's email (set in decision_auth_override)
+        assert created.get("created_by") == "decision-a@test.com", (
+            f"Expected created_by='decision-a@test.com', got {created.get('created_by')!r}"
+        )
+
+        list_resp = client.get("/api/v1/decisions/")
+        assert list_resp.status_code == 200
+        items = list_resp.json()
+        assert any(d["created_by"] == "decision-a@test.com" for d in items), (
+            "created_by not present or incorrect in list response"
+        )
 
     def test_get_and_patch_decision(self, client, decision_auth_override):
         create_resp = client.post("/api/v1/decisions/", json=_create_payload("Decision for patch"))
@@ -286,3 +306,77 @@ class TestDecisionsAPI:
         pdf_ok = client.get(f"/api/v1/decisions/{decision_id}/export/pdf")
         assert pdf_ok.status_code == 200
         assert "application/pdf" in pdf_ok.headers.get("content-type", "")
+
+    def test_export_adr_final_decision_stored_as_label(self, client, decision_auth_override):
+        """
+        Frontend stores final_decision as the option label string (not option id).
+        The export service must find the chosen option by label when id lookup fails.
+        """
+        payload = _create_payload("Label-based final decision")
+        # Override final_decision to use the option label (as the frontend does)
+        payload["final_decision"] = "Adopt Turborepo"  # matches opt-1's label, not id
+
+        create_resp = client.post("/api/v1/decisions/", json=payload)
+        assert create_resp.status_code == 200
+        decision_id = create_resp.json()["id"]
+
+        adr_resp = client.get(f"/api/v1/decisions/{decision_id}/export/adr")
+        assert adr_resp.status_code == 200
+        adr_text = adr_resp.text
+        # The export should find and render the chosen option by label
+        assert "Adopt Turborepo" in adr_text
+
+        star_resp = client.get(f"/api/v1/decisions/{decision_id}/export/star")
+        assert star_resp.status_code == 200
+        star_text = star_resp.text
+        assert "Adopt Turborepo" in star_text
+
+    def test_export_adr_missing_final_decision_option_graceful(self, client, decision_auth_override):
+        """
+        If final_decision references neither a valid id nor a valid label,
+        exports should not crash — they should render a fallback.
+        """
+        payload = _create_payload("Orphaned final decision")
+        payload["final_decision"] = "option-that-does-not-exist"
+
+        create_resp = client.post("/api/v1/decisions/", json=payload)
+        assert create_resp.status_code == 200
+        decision_id = create_resp.json()["id"]
+
+        adr_resp = client.get(f"/api/v1/decisions/{decision_id}/export/adr")
+        assert adr_resp.status_code == 200
+        # Should still render a decision section with fallback text
+        assert "Decision" in adr_resp.text
+
+    def test_analyze_decision_invalid_schema_from_ai(self, client, decision_auth_override, monkeypatch):
+        """
+        When the AI provider returns a response with a valid JSON array but
+        flags that fail AIFlagSchema validation, the endpoint must return 502
+        with code AI_RESPONSE_SCHEMA_INVALID.
+        """
+        from app.services.ai.decision_ai import DecisionAnalysisError as DAE
+
+        async def _mock_analyze_invalid_schema(_decision_in):
+            raise DAE("AI_RESPONSE_SCHEMA_INVALID", "malformed flag returned", retryable=False)
+
+        monkeypatch.setattr(decision_ai_service, "analyze_decision", _mock_analyze_invalid_schema)
+
+        resp = client.post("/api/v1/decisions/analyze", json=_create_payload("Schema invalid test"))
+        assert resp.status_code == 502
+        detail = resp.json()["detail"]
+        assert detail["code"] == "AI_RESPONSE_SCHEMA_INVALID"
+        assert detail["retryable"] is False
+
+    def test_title_too_short_rejected(self, client, decision_auth_override):
+        """Schema must reject titles shorter than 3 characters."""
+        payload = _create_payload()
+        payload["title"] = "AB"
+        resp = client.post("/api/v1/decisions/", json=payload)
+        assert resp.status_code == 422
+
+    def test_list_empty_for_new_user(self, client, decision_auth_override):
+        """GET /decisions/ returns an empty list for a user with no decisions, not a 404."""
+        resp = client.get("/api/v1/decisions/")
+        assert resp.status_code == 200
+        assert resp.json() == []
+

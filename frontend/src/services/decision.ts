@@ -68,7 +68,8 @@ export interface Decision {
   title: string;
   type: DecisionType;
   workspace_id: string;
-  created_by: string;
+  user_id: number;
+  created_by?: string;  // Author email, populated by the API from user.email
   created_at: string;
   updated_at: string;
   status: DecisionStatus;
@@ -118,28 +119,22 @@ export class DecisionAIError extends Error {
 export const decisionService = {
   async getDecisions() {
     const token = useAuthStore.getState().token;
-    try {
-      const response = await fetch(`${FINAL_API_URL}/decisions/`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+    const response = await fetch(`${FINAL_API_URL}/decisions/`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (!Array.isArray(data)) return [];
-        return data.map(normalizeDecision);
-      }
-      if (response.status === 404) {
-        console.warn('Decisions endpoint not found, feature might be in frontend-only mode');
-        return [];
-      }
-      return []; // Return empty array if not found or error for now (frontend mockable)
-    } catch (error) {
-      console.error('Decision service error:', error);
-      return [];
+    if (response.status === 401) {
+      throw new Error('Session expired. Please log in again.');
     }
+    if (!response.ok) {
+      throw new Error(`Failed to load decisions (HTTP ${response.status}).`);
+    }
+    const data = await response.json();
+    if (!Array.isArray(data)) return [];
+    return data.map(normalizeDecision);
   },
 
   async getDecision(id: string): Promise<Decision | null> {
@@ -241,6 +236,27 @@ export const decisionService = {
         throw error;
       }
       throw new DecisionAIError('Decision analysis unavailable. Please retry.', 0);
+    }
+  },
+
+  async scanWorkspace(): Promise<{ evidence: Evidence[] }> {
+    const token = useAuthStore.getState().token;
+    try {
+      const response = await fetch(`${FINAL_API_URL}/decisions/scan-workspace`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        return response.json();
+      }
+      throw new Error('Failed to run codebase scan');
+    } catch (error) {
+      console.error('Scan workspace error:', error);
+      throw error;
     }
   }
 };

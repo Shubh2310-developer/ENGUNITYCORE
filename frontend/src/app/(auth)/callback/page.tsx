@@ -49,8 +49,8 @@ export default function AuthCallbackPage() {
           // Update global state with user record
           setAuth(userData, session.access_token);
 
-          console.log('[Callback] Redirecting to githubrepos...');
-          router.push('/githubrepos');
+          console.log('[Callback] Redirecting to overview...');
+          router.push('/overview');
         } else {
           console.log('[Callback] No access token found');
           // Check for error in query params

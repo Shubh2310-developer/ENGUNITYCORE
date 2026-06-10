@@ -91,7 +91,12 @@ async def execute_shell_command(
     Execute a shell command within the project sandbox.
     """
     # Security check: Only allow admin or specifically permitted users
-    # For now, we allow all authenticated users but log heavily
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Only administrators are allowed to execute commands."
+        )
+
     logger.warning(f"User {current_user.email} executing command: {request.command}")
 
     try:

@@ -2634,7 +2634,7 @@ FROM dataset`;
             <div className="p-4 border-b border-slate-200 bg-slate-50">
               <h3 className="font-semibold text-slate-800">Column Metadata</h3>
             </div>
-            <div className="divide-y divide-slate-200">
+            <div className="divide-y divide-slate-200 max-h-[480px] overflow-y-auto">
               {Array.isArray(columnMetadata) ? columnMetadata.map((column, index) => (
                 <div key={index} className="p-4">
                   <div className="flex items-start justify-between mb-3">
@@ -2837,12 +2837,12 @@ FROM dataset`;
         {Array.isArray(columnMetadata) && columnMetadata.length > 0 && (
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-slate-800 mb-4">Data Type Inference</h3>
-            <div className="space-y-3">
+            <div className="space-y-3 max-h-80 overflow-y-auto">
               {Array.isArray(columnMetadata) ? columnMetadata.map((column, index) => (
                 <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
-                  <div className="flex items-center gap-3">
-                    <span className="font-medium text-slate-800">{column.name}</span>
-                    <span className="text-sm text-slate-500">({column.uniqueCount} unique values)</span>
+                  <div className="flex items-center gap-3 min-w-0 mr-3">
+                    <span className="font-medium text-slate-800 truncate">{column.name}</span>
+                    <span className="text-sm text-slate-500 shrink-0">({column.uniqueCount} unique)</span>
                   </div>
                   <select
                     value={column.type}
@@ -2853,7 +2853,7 @@ FROM dataset`;
                         col.name === column.name ? { ...col, type: newType } : col
                       ));
                     }}
-                    className="px-3 py-1 text-sm border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="px-3 py-1 text-sm border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent shrink-0"
                   >
                     <option value="numeric">Numeric</option>
                     <option value="categorical">Categorical</option>
@@ -2922,20 +2922,20 @@ FROM dataset`;
     return (
       <div className="bg-white rounded-xl border border-slate-200 p-6">
         <h3 className="text-lg font-semibold text-slate-800 mb-4">Correlation Heatmap</h3>
-        <div className="overflow-auto">
+        <div className="overflow-auto max-h-[520px]">
           <div className="min-w-max">
-            <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${(correlationData?.columns?.length || 0) + 1}, minmax(80px, 1fr))` }}>
+            <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${(correlationData?.columns?.length || 0) + 1}, minmax(72px, 1fr))` }}>
               <div></div>
               {correlationData?.columns?.map((col) => (
                 <div key={col} className="p-2 text-xs font-medium text-slate-600 text-center">
-                  {col.length > 10 ? col.substring(0, 10) + '...' : col}
+                  {col.length > 8 ? col.substring(0, 8) + '…' : col}
                 </div>
               ))}
               {(correlationData.matrix || []).map((row, rowIndex) => (
                 <React.Fragment key={rowIndex}>
                   <div className="p-2 text-xs font-medium text-slate-600">
-                    {correlationData.columns[rowIndex] && correlationData.columns[rowIndex].length > 10 ?
-                      correlationData.columns[rowIndex].substring(0, 10) + '...' :
+                    {correlationData.columns[rowIndex] && correlationData.columns[rowIndex].length > 8 ?
+                      correlationData.columns[rowIndex].substring(0, 8) + '…' :
                       correlationData.columns[rowIndex] || ''}
                   </div>
                   {row?.map((cell, colIndex) => {
@@ -4690,7 +4690,7 @@ FROM dataset`;
 
   // Main Render
   return (
-    <div className={`${styles['analytics-theme']} min-h-screen transition-colors ${theme.isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
+    <div className={`${styles['analytics-theme']} h-screen overflow-hidden flex flex-col transition-colors ${theme.isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
       {/* Hidden file input */}
       <input
         ref={fileInputRef}
@@ -4836,9 +4836,9 @@ FROM dataset`;
       <WellbeingBanner activeTab={activeTab} datasetId={currentFileId} isDark={theme.isDark} />
 
       {/* Main Content */}
-      <main className="flex h-[calc(100vh-69px)] max-w-screen-2xl mx-auto">
+      <main className="flex flex-1 min-h-0 max-w-screen-2xl mx-auto w-full">
         {/* Left Panel - Dataset Management */}
-        <div className={`w-1/4 border-r p-6 overflow-y-auto transition-colors ${theme.isDark
+        <div className={`w-1/4 min-w-[220px] max-w-xs shrink-0 border-r p-6 overflow-y-auto min-h-0 transition-colors ${theme.isDark
           ? 'bg-slate-800 border-slate-700'
           : 'bg-white border-slate-200'
           }`}>
@@ -4980,7 +4980,7 @@ FROM dataset`;
         </div>
 
         {/* Right Panel - Analysis & Visuals */}
-        <div className={`flex-1 flex flex-col transition-colors ${theme.isDark ? 'bg-slate-800' : 'bg-white'
+        <div className={`flex-1 min-w-0 flex flex-col min-h-0 transition-colors ${theme.isDark ? 'bg-slate-800' : 'bg-white'
           }`}>
           <div className={`border-b px-6 transition-colors ${theme.isDark ? 'border-slate-700' : 'border-slate-200'
             }`}>
@@ -5009,7 +5009,7 @@ FROM dataset`;
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 min-h-0 overflow-y-auto p-6">
             <motion.div
               key={activeTab}
               initial={{ opacity: 0, y: 20 }}

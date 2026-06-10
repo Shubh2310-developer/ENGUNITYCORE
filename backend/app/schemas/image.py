@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, Dict, Any, List
 from uuid import UUID
 from datetime import datetime
@@ -21,8 +21,7 @@ class ImageVariantResponse(BaseModel):
     file_size: int
     format: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ImageResponse(ImageBase):
     id: UUID | str
@@ -36,8 +35,7 @@ class ImageResponse(ImageBase):
     processing_status: str
     created_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class BatchImageAction(BaseModel):
     action: str # 'delete', 'tag'

@@ -366,6 +366,7 @@ export default function ChatPage() {
   const handleDeepResearch = async (query: string) => {
     if (!query.trim() || isLoading) return;
 
+    setInput('');
     setIsResearchMode(true);
     setIsLoading(true);
     setResearchProgress(0);
@@ -1836,10 +1837,10 @@ export default function ChatPage() {
                   {/* Deep Research Button */}
                   <button
                     onClick={() => {
-                      if (input.trim()) {
-                        handleDeepResearch(input);
-                        setInput('');
-                      }
+                      // Capture the current input value before handleDeepResearch
+                      // clears it internally via setInput('').
+                      const q = input.trim();
+                      if (q) handleDeepResearch(q);
                     }}
                     disabled={isLoading || !input.trim()}
                     className={`${styles.inputActionBtn} ${styles.researchBtn}`}

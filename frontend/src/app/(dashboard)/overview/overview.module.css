@@ -98,15 +98,9 @@
 
 .metricsGrid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 1.25rem;
     margin-bottom: 2.5rem;
-}
-
-@media (max-width: 1024px) {
-    .metricsGrid {
-        grid-template-columns: repeat(2, 1fr);
-    }
 }
 
 @media (max-width: 640px) {
@@ -137,12 +131,25 @@
     border-left: 3px solid #16A34A;
 }
 
-.metricCardNotebooks {
-    border-left: 3px solid #7C3AED;
-}
 
 .metricCardCode {
     border-left: 3px solid #D97706;
+}
+
+.metricCardAnalytics {
+    border-left: 3px solid #0891B2;
+}
+
+.metricCardDecisions {
+    border-left: 3px solid #7C3AED;
+}
+
+.metricCardJobprep {
+    border-left: 3px solid #16A34A;
+}
+
+.metricCardResearch {
+    border-left: 3px solid #EA580C;
 }
 
 .metricLabel {
@@ -465,4 +472,186 @@
 
 .overviewLight::-webkit-scrollbar-thumb:hover {
     background-color: #CBD5E1;
+}
+
+/* ========================================
+   12. ADDITIONAL WORK ICON COLOURS
+======================================== */
+
+.workIconAnalytics {
+    color: #0891B2;
+}
+
+.workIconDecision {
+    color: #7C3AED;
+}
+
+.workIconJobprep {
+    color: #16A34A;
+}
+
+/* ========================================
+   13. METRIC CARD LINK
+======================================== */
+
+.metricCardLink {
+    display: block;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.metricCardLink:hover {
+    border-color: #CBD5E1;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.07);
+}
+
+.metricErrorBadge {
+    display: inline-block;
+    margin-top: 0.375rem;
+    font-size: 0.625rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #DC2626;
+    background-color: #FEF2F2;
+    border: 1px solid #FECACA;
+    border-radius: 4px;
+    padding: 1px 6px;
+}
+
+/* ========================================
+   14. LOADING SKELETON
+======================================== */
+
+@keyframes shimmer {
+    0%   { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
+}
+
+.skeletonBase {
+    background: linear-gradient(90deg, #F1F5F9 25%, #E2E8F0 50%, #F1F5F9 75%);
+    background-size: 800px 100%;
+    animation: shimmer 1.4s infinite;
+    border-radius: 6px;
+}
+
+.skeletonTitle {
+    composes: skeletonBase;
+    height: 1.75rem;
+    width: 60%;
+    margin-bottom: 0.5rem;
+}
+
+.skeletonMeta {
+    composes: skeletonBase;
+    height: 0.875rem;
+    width: 30%;
+}
+
+.skeletonCard {
+    opacity: 0.6;
+}
+
+.skeletonLine {
+    composes: skeletonBase;
+    height: 0.75rem;
+    width: 45%;
+    margin-bottom: 0.75rem;
+}
+
+.skeletonValue {
+    composes: skeletonBase;
+    height: 1.75rem;
+    width: 30%;
+}
+
+.loadingHint {
+    text-align: center;
+    color: #94A3B8;
+    font-size: 0.8125rem;
+    padding: 2rem 0;
+}
+
+/* ========================================
+   15. ERROR / WARNING BANNERS
+======================================== */
+
+.errorBanner {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background-color: #FEF2F2;
+    border: 1px solid #FECACA;
+    color: #DC2626;
+    border-radius: 10px;
+    padding: 0.875rem 1.25rem;
+    font-size: 0.875rem;
+    margin-bottom: 1.5rem;
+}
+
+.warningBanner {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background-color: #FFFBEB;
+    border: 1px solid #FDE68A;
+    color: #92400E;
+    border-radius: 10px;
+    padding: 0.75rem 1.25rem;
+    font-size: 0.8125rem;
+    margin-bottom: 1.5rem;
+}
+
+/* ========================================
+   16. EMPTY STATES
+======================================== */
+
+.emptyState {
+    color: #94A3B8;
+    font-size: 0.875rem;
+    padding: 1.5rem 1rem;
+    text-align: center;
+    border: 1px dashed #E2E8F0;
+    border-radius: 8px;
+}
+
+.emptyStateSm {
+    color: #94A3B8;
+    font-size: 0.8125rem;
+    padding: 0.875rem 0;
+    text-align: center;
+}
+
+/* ========================================
+   17. REFRESH BUTTON + SPIN ANIMATION
+======================================== */
+
+.refreshBtn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+    color: #94A3B8;
+    display: flex;
+    align-items: center;
+    transition: color 0.15s, background-color 0.15s;
+}
+
+.refreshBtn:hover {
+    color: #2563EB;
+    background-color: #EFF6FF;
+}
+
+.refreshBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.spinning {
+    animation: spin 0.8s linear infinite;
 }

@@ -72,17 +72,4 @@ export const DocsIllustration = () => (
   </svg>
 );
 
-export const NotebookIllustration = () => (
-  <svg viewBox="0 0 800 500" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full p-8">
-    <rect x="50" y="50" width="340" height="180" rx="12" fill="#1E293B" stroke="#334155" />
-    <rect x="410" y="50" width="340" height="180" rx="12" fill="#1E293B" stroke="#334155" />
-    <rect x="50" y="250" width="700" height="200" rx="12" fill="#1E293B" stroke="#334155" />
 
-    <rect x="80" y="80" width="60" height="60" rx="8" fill="#2DD4BF" fillOpacity="0.2" />
-    <rect x="160" y="80" width="200" height="15" rx="4" fill="#334155" />
-    <rect x="160" y="110" width="150" height="10" rx="4" fill="#334155" />
-
-    <circle cx="450" cy="140" r="40" stroke="#7DD3FC" strokeWidth="4" strokeDasharray="20 10" />
-    <text x="510" y="130" fill="#7DD3FC" fontSize="24" fontWeight="bold">84%</text>
-  </svg>
-);

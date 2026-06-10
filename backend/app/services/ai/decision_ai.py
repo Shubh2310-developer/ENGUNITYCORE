@@ -1,10 +1,26 @@
 from typing import List, Dict, Any
 import json
 import logging
+import hashlib
+import os
 from app.services.ai.groq_client import groq_client
 from app.schemas.decision import DecisionBase, AIFlagSchema
 
 logger = logging.getLogger(__name__)
+
+# Establish defensive Redis cache integration
+try:
+    import redis
+    REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+    redis_client = redis.from_url(REDIS_URL, decode_responses=True)
+    redis_client.ping()
+    logger.info("Decision Vault AI cache connected to Redis at %s", REDIS_URL)
+except Exception as exc:
+    logger.info("Redis not available for Decision Vault AI cache, using in-memory fallback: %s", exc)
+    redis_client = None
+
+# Internal fallback dict for dev / test environments without Redis
+_local_memory_cache: Dict[str, List[Dict[str, Any]]] = {}
 
 
 class DecisionAnalysisError(Exception):
@@ -61,10 +77,31 @@ class DecisionAIService:
 
     async def analyze_decision(self, decision: DecisionBase) -> List[Dict[str, Any]]:
         """
-        Analyze a decision and return AI flags.
+        Analyze a decision and return AI flags. Includes cache checks.
         """
         decision_data = decision.model_dump()
         
+        # 1. Deterministic cache key based on decision contents
+        payload_bytes = json.dumps(decision_data, sort_keys=True, default=str).encode('utf-8')
+        cache_key = f"decision_ai_cache:{hashlib.sha256(payload_bytes).hexdigest()}"
+
+        # 2. Redis cache check
+        if redis_client is not None:
+            try:
+                cached_res = redis_client.get(cache_key)
+                if cached_res:
+                    logger.info("⚡ AI Critique Cache HIT (Redis): %s", cache_key)
+                    return json.loads(cached_res)
+            except Exception as exc:
+                logger.warning("Redis cache read failed: %s", exc)
+
+        # 3. Local memory fallback check
+        if cache_key in _local_memory_cache:
+            logger.info("⚡ AI Critique Cache HIT (Memory): %s", cache_key)
+            return _local_memory_cache[cache_key]
+
+        # 4. Cache Miss - Live Call
+        logger.info("🌀 Cache MISS. Fetching AI analysis from model service...")
         prompt = f"Analyze the following decision and provide adversarial flags in JSON format:\n\n{json.dumps(decision_data, indent=2, default=str)}"
         
         try:
@@ -101,6 +138,17 @@ class DecisionAIService:
                 logger.warning("Decision AI schema validation failed for flag: %s", item)
                 raise DecisionAnalysisError("AI_RESPONSE_SCHEMA_INVALID", f"Decision analysis returned malformed flag: {exc}", retryable=False) from exc
 
+        # 5. Populate caches for future requests
+        _local_memory_cache[cache_key] = validated
+        if redis_client is not None:
+            try:
+                # Set TTL of 24 hours (86400 seconds)
+                redis_client.setex(cache_key, 86400, json.dumps(validated))
+                logger.info("💾 Cached AI analysis in Redis: %s", cache_key)
+            except Exception as exc:
+                logger.warning("Redis cache write failed: %s", exc)
+
         return validated
 
 decision_ai_service = DecisionAIService()
+

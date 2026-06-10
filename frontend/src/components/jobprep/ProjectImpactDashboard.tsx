@@ -62,7 +62,8 @@ export const ProjectImpactDashboard = ({
                 </div>
                 <button
                   onClick={() => onDelete(project.id)}
-                  className="p-1.5 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                  aria-label={`Delete project ${project.title}`}
+                  className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-red-300"
                 >
                   <X size={16} />
                 </button>

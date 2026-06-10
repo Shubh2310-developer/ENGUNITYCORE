@@ -370,28 +370,29 @@ Return ONLY the JSON array, no other text."""
         search_tasks = []
         for sq in sub_queries:
             # RAG search (always)
-            # Using process_query from OmniRAGPipeline
             search_tasks.append(
-                self.omni_rag.process_query(
-                    query=sq.question,
-                    user_id=user_id,
-                    session_id=session_id,
-                    use_memory=False,
-                    strategy="vector_rag" # Explicitly use vector RAG to avoid recursive loops
+                asyncio.wait_for(
+                    self._rag_search_wrapper(sq.question, user_id, session_id),
+                    timeout=15.0
                 )
             )
             
             # Web search (optional)
             if include_web:
                 search_tasks.append(
-                    self.web_search.search(sq.question)
+                    asyncio.wait_for(
+                        self.web_search.search(sq.question),
+                        timeout=15.0
+                    )
                 )
             
             # Graph traversal (optional)
             if include_graph:
                 search_tasks.append(
-                    # Wrap graph search to match task interface if needed
-                    self._graph_search_wrapper(sq.question, user_id)
+                    asyncio.wait_for(
+                        self._graph_search_wrapper(sq.question, user_id),
+                        timeout=15.0
+                    )
                 )
         
         results = await asyncio.gather(*search_tasks, return_exceptions=True)
@@ -401,23 +402,8 @@ Return ONLY the JSON array, no other text."""
                 logger.warning(f"Search task failed: {result}")
                 continue
             
-            # Handle RAG result structure
-            if isinstance(result, dict) and "documents" in result:
-                # This is likely from process_query
-                docs = result.get("documents", [])
-                for d in docs:
-                    # Normalize RAG docs
-                    all_results.append({
-                        "content": d.get("content", ""),
-                        "source": d.get("metadata", {}).get("filename", "Internal Doc"),
-                        "type": "rag_document",
-                        "url": None,
-                        "metadata": d.get("metadata", {})
-                    })
-            
-            # Handle Web Search result structure (List[Dict])
-            elif isinstance(result, list):
-                # Could be web search results or graph results
+            # Handle list of results
+            if isinstance(result, list):
                 for item in result:
                      all_results.append(item)
             
@@ -427,27 +413,56 @@ Return ONLY the JSON array, no other text."""
         
         return all_results
 
+    async def _rag_search_wrapper(
+        self,
+        query: str,
+        user_id: str,
+        session_id: Optional[str]
+    ) -> List[Dict[str, Any]]:
+        """Wrapper to call vector store and normalize output"""
+        try:
+            # Call synchronous search in a thread pool to avoid blocking the event loop
+            docs = await asyncio.to_thread(
+                self.omni_rag.vector_store.search,
+                query=query,
+                user_id=user_id,
+                session_id=session_id,
+                k=10
+            )
+            results = []
+            for d in docs:
+                results.append({
+                    "content": d.get("content", ""),
+                    "source": d.get("metadata", {}).get("filename", "Internal Doc"),
+                    "type": "rag_document",
+                    "url": None,
+                    "metadata": d.get("metadata", {})
+                })
+            return results
+        except Exception as e:
+            logger.error(f"RAG search wrapper error: {e}")
+            return []
+
     async def _graph_search_wrapper(self, query: str, user_id: str) -> List[Dict]:
         """Wrapper to call graph store and normalize output"""
         try:
-             # Search communities using keyword fallback as we don't have embedder locally easily accessible 
-             # without accessing omni_rag's embedder, which is standard.
-             # Ideally pass omni_rag.embedder if exposed.
-             communities = self.graph_store.search_communities(
-                 query, 
-                 embedder=self.omni_rag.vector_store.model, 
-                 top_k=3, 
-                 user_id=user_id
-             )
-             results = []
-             for comm in communities:
-                 results.append({
-                     "content": comm.get("summary", ""),
-                     "source": f"Community {comm.get('community_id')}",
-                     "type": "graph_node",
-                     "metadata": {"score": comm.get("score")}
-                 })
-             return results
+            # Search communities using thread pool to avoid blocking the event loop
+            communities = await asyncio.to_thread(
+                self.graph_store.search_communities,
+                query,
+                embedder=self.omni_rag.vector_store.model,
+                top_k=3,
+                user_id=user_id
+            )
+            results = []
+            for comm in communities:
+                results.append({
+                    "content": comm.get("summary", ""),
+                    "source": f"Community {comm.get('community_id')}",
+                    "type": "graph_node",
+                    "metadata": {"score": comm.get("score")}
+                })
+            return results
         except Exception as e:
             logger.error(f"Graph search wrapper error: {e}")
             return []
@@ -458,50 +473,61 @@ Return ONLY the JSON array, no other text."""
         sources: List[Dict[str, Any]],
         exclude: Optional[List[str]] = None
     ) -> List[SourceEvaluation]:
-        """Score and filter sources for relevance and quality"""
-        evaluations = []
-        
+        """Score and filter sources for relevance and quality.
+
+        Relevance scoring is done in parallel across all accepted sources to
+        avoid the serial-LLM-call bottleneck that previously stalled the
+        event loop when there were many sources.
+        """
+        # --- Build (index, content, source_name) tuples, respecting exclude --- #
+        candidates: List[tuple] = []
         for i, source in enumerate(sources):
-            # Extract content robustly
-            content = source.get("content", "")
-            if not content:
-                content = source.get("snippet", "") # Web search often has snippet
-                
+            content = source.get("content", "") or source.get("snippet", "")
             source_name = source.get("source", source.get("title", f"Source_{i}"))
-            
             if exclude and source_name in exclude:
                 continue
-            
-            # Use quality metrics for scoring
-            relevance = await self._score_relevance(query, content)
+            candidates.append((i, source, content, source_name))
+
+        if not candidates:
+            return []
+
+        # --- Score all sources in parallel --- #
+        relevance_scores = await asyncio.gather(
+            *[self._score_relevance(query, content) for _, _, content, _ in candidates],
+            return_exceptions=True,
+        )
+
+        evaluations: List[SourceEvaluation] = []
+        for (i, source, content, source_name), relevance in zip(candidates, relevance_scores):
+            if isinstance(relevance, Exception):
+                logger.warning(f"Relevance scoring failed for source {source_name}: {relevance}")
+                relevance = 0.5  # fallback
             quality = self._assess_quality(content)
-            
             evaluations.append(SourceEvaluation(
                 source_id=f"src_{i}",
                 source_name=source_name,
                 source_type=source.get("type", "rag_document"),
-                relevance_score=relevance,
+                relevance_score=float(relevance),
                 quality_score=quality,
-                freshness_score=0.8,  # Default; enhance with metadata
+                freshness_score=0.8,
                 content_snippet=content[:800],
-                url=source.get("url") or source.get("metadata", {}).get("url")
+                url=source.get("url") or source.get("metadata", {}).get("url"),
             ))
-        
+
         # Sort by combined score
         evaluations.sort(
             key=lambda e: (e.relevance_score * 0.7 + e.quality_score * 0.3),
-            reverse=True
+            reverse=True,
         )
-        
-        # Remove duplicates based on content similarity or names?
-        # For now, unique by source_name
-        unique_evaluations = []
-        seen_names = set()
+
+        # Deduplicate by source name (keep highest-ranked)
+        seen_names: set = set()
+        unique_evaluations: List[SourceEvaluation] = []
         for e in evaluations:
             if e.source_name not in seen_names:
                 seen_names.add(e.source_name)
                 unique_evaluations.append(e)
-                
+
         return unique_evaluations
 
     async def _score_relevance(self, query: str, content: str) -> float:
@@ -725,11 +751,25 @@ Return valid JSON array of strings: ["item1", "item2"]"""
         return round(type_diversity * 0.4 + source_quality * 0.6, 2)
 
 
-# Singleton factory
-_research_agent = None
+# ---------------------------------------------------------------------------
+# Module-level concurrency guard
+# Caps the number of simultaneous research pipelines to avoid overwhelming
+# the LLM rate limit and the vector-store thread pool.
+# ---------------------------------------------------------------------------
+_RESEARCH_SEMAPHORE = asyncio.Semaphore(3)
+
+# Singleton factory — one agent per process (stateless between calls)
+_research_agent: Optional[DeepResearchAgent] = None
+
 
 def get_research_agent(omni_rag: OmniRAGPipeline) -> DeepResearchAgent:
+    """Return the module-level DeepResearchAgent singleton.
+
+    The agent is stateless between calls so a single instance is safe to
+    share across concurrent requests.  If the passed ``omni_rag`` instance
+    changes (e.g. after a service restart) we reinitialise.
+    """
     global _research_agent
-    if _research_agent is None:
+    if _research_agent is None or _research_agent.omni_rag is not omni_rag:
         _research_agent = DeepResearchAgent(omni_rag)
     return _research_agent

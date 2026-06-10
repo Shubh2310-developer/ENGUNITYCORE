@@ -3,12 +3,14 @@ import { test, expect } from '../fixtures/auth.fixture';
 test.describe('Login Page', () => {
     test.beforeEach(async ({ page }) => {
         await page.goto('/login');
+        await page.evaluate(() => window.localStorage.clear());
+        await page.goto('/login');
     });
 
     test('page loads with correct elements', async ({ page }) => {
-        await expect(page.locator('h1')).toContainText('Engunity AI');
-        await expect(page.getByLabel('Email')).toBeVisible();
-        await expect(page.getByLabel('Password')).toBeVisible();
+        await expect(page.locator('h1').first()).toContainText('Engunity AI');
+        await expect(page.locator('input#email')).toBeVisible();
+        await expect(page.locator('input#password')).toBeVisible();
         await expect(page.getByRole('button', { name: /sign in/i })).toBeVisible();
     });
 
@@ -18,24 +20,25 @@ test.describe('Login Page', () => {
             data: { email: testUser.email, password: testUser.password, role: 'user' },
         });
 
-        await page.getByLabel('Email').fill(testUser.email);
-        await page.getByLabel('Password').fill(testUser.password);
+        await page.locator('input#email').fill(testUser.email);
+        await page.locator('input#password').fill(testUser.password);
         await page.getByRole('button', { name: /sign in/i }).click();
 
         await expect(page).toHaveURL(/\/overview/, { timeout: 10000 });
     });
 
     test('failed login shows error message', async ({ page }) => {
-        await page.getByLabel('Email').fill('wrong@test.com');
-        await page.getByLabel('Password').fill('wrongpass');
+        await page.locator('input#email').fill('wrong@test.com');
+        await page.locator('input#password').fill('wrongpass');
         await page.getByRole('button', { name: /sign in/i }).click();
 
+        // The error message is rendered in an element with red text
         await expect(page.locator('.text-red-400')).toBeVisible({ timeout: 5000 });
     });
 
     test('shows loading state during submission', async ({ page }) => {
-        await page.getByLabel('Email').fill('any@test.com');
-        await page.getByLabel('Password').fill('anypass');
+        await page.locator('input#email').fill('any@test.com');
+        await page.locator('input#password').fill('anypass');
         await page.getByRole('button', { name: /sign in/i }).click();
 
         // Spinner should appear
@@ -47,7 +50,6 @@ test.describe('Login Page', () => {
             page.waitForEvent('popup').catch(() => null),
             page.getByLabel('Continue with GitHub').click(),
         ]);
-        // Verify redirect to Supabase/GitHub OAuth URL
     });
 
     test('navigate to register page', async ({ page }) => {

@@ -52,8 +52,8 @@ Rating:"""
             )
 
             rating = rating.strip().upper()
-            if "CORRECT" in rating: return "CORRECT"
-            if "INCORRECT" in rating: return "INCORRECT"
+            if rating == "CORRECT": return "CORRECT"
+            if rating == "INCORRECT": return "INCORRECT"
             return "AMBIGUOUS"
 
         except Exception as e:

@@ -251,6 +251,9 @@ async def send_message(
     """
     Process a new message and return the assistant's response.
     """
+    from app.core.sanitization import sanitize_html
+    message_in.content = sanitize_html(message_in.content)
+
     # 1. Get or create session
     session_id = message_in.session_id
     if not session_id:

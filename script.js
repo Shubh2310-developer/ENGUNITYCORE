@@ -1,0 +1,675 @@
+'use strict';
+
+const isNode = typeof require !== 'undefined' && typeof process !== 'undefined' && process.versions && process.versions.node;
+const docxLib = isNode ? require('docx') : window.docx;
+const fs = isNode ? require('fs') : null;
+
+const {
+  Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+  HeadingLevel, AlignmentType, LevelFormat, BorderStyle, WidthType,
+  ShadingType, PageBreak, VerticalAlign, Header, Footer, PageNumber
+} = docxLib;
+
+// ─── COLORS ──────────────────────────────────────────────────────────────────
+const COL = {
+  navy: "1F3864", blue: "2E75B6", teal: "1F7A8C",
+  white: "FFFFFF", lgray: "EEF2F7", mgray: "D0D7E0",
+  border: "BDBDBD", black: "111111", gray: "666666", red: "C62828",
+  p0: "1565C0", p1: "2E7D32", p2: "4527A0", p3: "BF360C",
+  p4: "01579B", p5: "880E4F", p6: "4E342E", p7: "37474F",
+  p8: "1B5E20", p9: "B71C1C", p10: "1A237E"
+};
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+const sp = (b = 0, a = 0) => ({ spacing: { before: b, after: a } });
+
+function h1(text, color) {
+  return new Paragraph({
+    heading: HeadingLevel.HEADING_1, ...sp(360, 200),
+    children: [new TextRun({ text, font: "Arial", size: 42, bold: true, color: color || COL.navy })]
+  });
+}
+function h2(text) {
+  return new Paragraph({
+    heading: HeadingLevel.HEADING_2, ...sp(280, 160),
+    children: [new TextRun({ text, font: "Arial", size: 30, bold: true, color: COL.blue })]
+  });
+}
+function h3(text) {
+  return new Paragraph({
+    heading: HeadingLevel.HEADING_3, ...sp(200, 100),
+    children: [new TextRun({ text, font: "Arial", size: 26, bold: true, color: COL.teal })]
+  });
+}
+function body(text, opts = {}) {
+  return new Paragraph({
+    ...sp(80, 80),
+    alignment: opts.center ? AlignmentType.CENTER : AlignmentType.LEFT,
+    children: [new TextRun({
+      text, font: "Arial", size: opts.size || 22,
+      bold: opts.bold || false, color: opts.color || COL.black,
+      italics: opts.italic || false
+    })]
+  });
+}
+function bul(text) {
+  return new Paragraph({
+    numbering: { reference: "bullets", level: 0 }, ...sp(50, 50),
+    children: [new TextRun({ text, font: "Arial", size: 22, color: COL.black })]
+  });
+}
+function projItem(name, desc, phaseId) {
+  return new Paragraph({
+    numbering: { reference: "proj-" + phaseId, level: 0 }, ...sp(120, 100),
+    children: [
+      new TextRun({ text: name, font: "Arial", size: 23, bold: true, color: COL.navy }),
+      new TextRun({ text: "  |  ", font: "Arial", size: 22, color: COL.gray }),
+      new TextRun({ text: desc, font: "Arial", size: 22, color: COL.black })
+    ]
+  });
+}
+function gap() {
+  return new Paragraph({ ...sp(0, 100), children: [new TextRun({ text: "", size: 22 })] });
+}
+function pgBreak() {
+  return new Paragraph({ children: [new PageBreak()] });
+}
+function divLine() {
+  return new Paragraph({
+    ...sp(120, 120),
+    border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: COL.mgray } },
+    children: [new TextRun({ text: "", size: 4 })]
+  });
+}
+function badge(text, color) {
+  return new Paragraph({
+    ...sp(60, 60),
+    children: [new TextRun({ text: "  " + text + "  ", font: "Arial", size: 20, bold: true, color: COL.white, highlight: undefined, shading: { fill: color || COL.blue, type: ShadingType.CLEAR } })]
+  });
+}
+
+// ─── BOOKS TABLE ─────────────────────────────────────────────────────────────
+function booksTable(rows) {
+  const br = { style: BorderStyle.SINGLE, size: 1, color: COL.border };
+  const borders = { top: br, bottom: br, left: br, right: br };
+  const mg = { top: 100, bottom: 100, left: 160, right: 160 };
+
+  const hdrCell = (txt, w) => new TableCell({
+    borders, width: { size: w, type: WidthType.DXA },
+    shading: { fill: COL.navy, type: ShadingType.CLEAR }, margins: mg,
+    children: [new Paragraph({ children: [new TextRun({ text: txt, bold: true, color: COL.white, font: "Arial", size: 20 })] })]
+  });
+
+  const dataCell = (kids, w, fill) => new TableCell({
+    borders, width: { size: w, type: WidthType.DXA },
+    shading: { fill, type: ShadingType.CLEAR }, margins: mg,
+    verticalAlign: VerticalAlign.TOP, children: kids
+  });
+
+  const headerRow = new TableRow({
+    tableHeader: true,
+    children: [hdrCell("Concept / Topic", 2800), hdrCell("Recommended Books & Resources", 6560)]
+  });
+
+  const dataRows = rows.map((row, i) => {
+    const fill = i % 2 === 0 ? "FFFFFF" : COL.lgray;
+    return new TableRow({
+      children: [
+        dataCell([new Paragraph({ children: [new TextRun({ text: row.concept, bold: true, font: "Arial", size: 20, color: COL.navy })] })], 2800, fill),
+        dataCell(
+          row.books.map(b => new Paragraph({ ...sp(30, 30), children: [new TextRun({ text: "- " + b, font: "Arial", size: 20, color: COL.black })] })),
+          6560, fill
+        )
+      ]
+    });
+  });
+
+  return new Table({ width: { size: 9360, type: WidthType.DXA }, columnWidths: [2800, 6560], rows: [headerRow, ...dataRows] });
+}
+
+// ─── PHASE DATA ───────────────────────────────────────────────────────────────
+const PHASES = [
+  {
+    id: 0, color: COL.p0, duration: "2-3 Months",
+    title: "Phase 0: Python Foundations",
+    intro: "Master Python before anything else. Agentic AI is 90% Python engineering. You must write clean, efficient, async Python code integrating APIs, processing files, and running data pipelines. Shortcuts here create compounding pain later.",
+    topics: [
+      "Variables, Data Types, Control Flow, List Comprehensions",
+      "Functions, Closures, Lambda, Higher-Order Functions",
+      "Object-Oriented Programming — Classes, Inheritance, Magic Methods, Dataclasses",
+      "File Handling — JSON, CSV, XML, PDF (PyMuPDF, pdfplumber)",
+      "REST API Integration — requests, httpx, response handling",
+      "Async Programming — asyncio, aiohttp, async/await patterns",
+      "Generators & Iterators — yield, lazy evaluation",
+      "Decorators & Context Managers — @property, @staticmethod, with statements",
+      "Error Handling, Logging, Environment Management (python-dotenv)",
+      "Testing — pytest, unittest, mocking"
+    ],
+    books: [
+      { concept: "Python Core + OOP", books: ["Fluent Python (2nd Ed.) — Luciano Ramalho (O'Reilly)", "Effective Python (3rd Ed.) — Brett Slatkin (Addison-Wesley)"] },
+      { concept: "Automation & APIs", books: ["Automate the Boring Stuff with Python — Al Sweigart (Free at automatetheboringstuff.com)", "Python for Data Analysis (3rd Ed.) — Wes McKinney (O'Reilly)"] },
+      { concept: "Async Programming", books: ["Python Concurrency with asyncio — Matthew Fowler (Manning)", "Using Asyncio in Python — Caleb Hattingh (O'Reilly)"] },
+      { concept: "Clean Code & Patterns", books: ["Architecture Patterns with Python — Harry Percival & Bob Gregory (O'Reilly)", "Clean Code in Python — Mariano Anaya (Packt)"] }
+    ],
+    projects: [
+      { name: "SyllabusMapper", desc: "Reads PDF syllabi from 10+ universities using PyMuPDF and pdfplumber, extracts course topics with regex + NLP, deduplicates using fuzzy matching (rapidfuzz), builds a prerequisite dependency graph using NetworkX, and outputs an interactive HTML study-order visualizer. First tool that aggregates cross-university curriculum into a single knowledge dependency graph." },
+      { name: "ContractAnomalyDetector", desc: "Parses legal contracts (PDF/DOCX) using python-docx and pdfplumber, extracts key clauses (payment terms, liability caps, termination, indemnity) with regex pipelines, compares clause language against industry-standard templates using TF-IDF cosine similarity, and outputs a color-coded HTML report flagging unusual deviations with severity scores. Designed for SMBs that can't afford legal review on every contract." },
+      { name: "ArXivTrendCrawler", desc: "Polls the ArXiv API asynchronously across 20 AI/ML/CS categories using asyncio and httpx, tracks paper submission velocity over rolling 7-day windows, ranks emerging topics by velocity change using a weighted momentum algorithm, and emails a weekly digest with matplotlib trend charts and top-5 breakout papers per category. Unique because it targets velocity (rate of change) not absolute volume." }
+    ]
+  },
+  {
+    id: 1, color: COL.p1, duration: "1-2 Months",
+    title: "Phase 1: CS Foundations for Agents",
+    intro: "Agents internally use graph traversal, search, state management, and planning — all rooted in CS fundamentals. Understanding DSA and system design separates amateur agent builders from professional engineers who can debug why an agent is slow, stuck, or wrong.",
+    topics: [
+      "Arrays, Hash Maps, Sets — O(1) lookup patterns",
+      "Stacks, Queues, Priority Queues (heapq)",
+      "Trees — Binary Trees, BST, Tries, Segment Trees",
+      "Graphs — Directed, Weighted, DAGs, Adjacency Lists vs. Matrix",
+      "BFS, DFS, Dijkstra, A* Search — agents use these for planning",
+      "Dynamic Programming — memoization, tabulation",
+      "REST APIs, HTTP/HTTPS, WebSockets",
+      "Relational Databases — PostgreSQL, SQL, indexing strategies",
+      "Caching Strategies — Redis, TTL, cache invalidation",
+      "Authentication — JWT, OAuth 2.0, API keys",
+      "FastAPI for building high-performance AI backends"
+    ],
+    books: [
+      { concept: "DSA Theory", books: ["Introduction to Algorithms (CLRS 4th Ed.) — Cormen, Leiserson, Rivest, Stein (MIT Press)", "Cracking the Coding Interview (6th Ed.) — Gayle Laakmann McDowell"] },
+      { concept: "DSA in Python", books: ["Data Structures & Algorithms in Python — Goodrich, Tamassia, Goldwasser (Wiley)", "Problem Solving with Algorithms and Data Structures Using Python — Miller & Ranum (Free: runestone.academy)"] },
+      { concept: "System Design", books: ["Designing Data-Intensive Applications — Martin Kleppmann (O'Reilly)", "System Design Interview Vol. 1 & Vol. 2 — Alex Xu (ByteByteGo)"] },
+      { concept: "FastAPI & Backend", books: ["Building Python Microservices with FastAPI — Sheryll Donerson (Packt)", "Full Stack FastAPI and React — David Abera (Packt)"] }
+    ],
+    projects: [
+      { name: "VulnChainMapper", desc: "Parses Python/Node project dependency files (requirements.txt, package.json, poetry.lock), builds a directed dependency graph using NetworkX, queries the OSV (Open Source Vulnerabilities) API for CVE data on each package, then runs BFS from each vulnerable node to compute the blast radius — how many transitive dependents are exposed. Outputs a risk-scored dependency tree in the terminal with ASCII art and a JSON report. Unique focus on transitive vulnerability propagation analysis." },
+      { name: "APICallSimulator", desc: "Models a microservice architecture as a weighted directed graph where edges carry latency distributions (mean, stddev). Uses DFS to enumerate all call paths from an entry point, simulates concurrent load using asyncio with probabilistic cache hit/miss ratios, and runs Monte Carlo simulation (10,000 iterations) to compute theoretical P50/P95/P99 latency. Outputs a performance heatmap in matplotlib. Built for architects who want to stress-test topology designs before writing code." }
+    ]
+  },
+  {
+    id: 2, color: COL.p2, duration: "2-3 Months",
+    title: "Phase 2: LLM Fundamentals",
+    intro: "This is where Agentic AI begins. Understanding how LLMs work — from transformers to attention to fine-tuning — is non-negotiable. You must understand what is happening inside the model, not just call an API. Engineers who know the internals ship 10x better agents.",
+    topics: [
+      "Transformer Architecture — Self-Attention, Multi-Head Attention, Feed-Forward Layers",
+      "Positional Encoding, Layer Normalization, Residual Connections",
+      "Tokenization — BPE, SentencePiece, tiktoken",
+      "Context Windows, KV Cache, Sliding Window Attention",
+      "Embeddings — dense vector representations, semantic similarity",
+      "Fine-Tuning — LoRA, QLoRA, PEFT, instruction tuning",
+      "Quantization — GGUF, GPTQ, AWQ, int4/int8",
+      "Zero-Shot, Few-Shot Prompting",
+      "Chain-of-Thought (CoT), ReAct, Self-Reflection, Tree of Thoughts",
+      "Models — GPT-4o, Llama 3.3, Qwen2.5, DeepSeek-V3, Gemma 3, Phi-4",
+      "Local model inference with Ollama and llama.cpp"
+    ],
+    books: [
+      { concept: "Transformers & LLMs from Scratch", books: ["Build a Large Language Model (From Scratch) — Sebastian Raschka (Manning, 2024)", "Natural Language Processing with Transformers — Lewis Tunstall et al. (O'Reilly, Free on HuggingFace)"] },
+      { concept: "Deep Learning Foundations", books: ["Deep Learning — Goodfellow, Bengio & Courville (MIT Press, Free: deeplearningbook.org)", "Dive into Deep Learning — Aston Zhang et al. (Free: d2l.ai)"] },
+      { concept: "Prompt Engineering", books: ["Prompt Engineering for LLMs — John Berryman & Albert Ziegler (O'Reilly)", "The Prompt Report: A Systematic Survey of Prompting Techniques (arxiv:2406.06608, Free)"] },
+      { concept: "Fine-Tuning & Quantization", books: ["LLM Engineer's Handbook — Paul Iusztin & Maxime Labonne (Packt, 2024)", "Hands-On Large Language Models — Jay Alammar & Maarten Grootendorst (O'Reilly, 2024)"] }
+    ],
+    projects: [
+      { name: "ClinicalSOAP Structurer", desc: "A multi-step pipeline that ingests unstructured physician consultation notes (plain text), uses Chain-of-Thought prompting with a local Llama-3.2-8B model (via Ollama) to extract the four SOAP components (Subjective, Objective, Assessment, Plan), assigns per-field confidence scores, suggests relevant ICD-10 codes with justification, and flags low-confidence extractions for human review. Exports structured JSON + a formatted clinical note PDF. Purpose: give small clinics lacking EHR budgets a free-to-run note structuring tool." },
+      { name: "LegalJurisdiction Translator", desc: "A few-shot system that translates legal contract clauses between three jurisdictions — US common law, EU civil law (GDPR era), and Indian Contract Act standards — while preserving legal intent and obligation scope. Uses GPT-4o with carefully constructed few-shot pairs per clause type, then a Self-Reflection loop where a second LLM call checks the translation for logical consistency and scope drift. Exports a three-column side-by-side comparison document with change annotations. No public tool performs three-way jurisdiction translation with self-verification." }
+    ]
+  },
+  {
+    id: 3, color: COL.p3, duration: "2-3 Months",
+    title: "Phase 3: RAG Mastery",
+    intro: "80% of production AI systems use Retrieval-Augmented Generation. Before building agents, master RAG — it is the foundational pattern for connecting LLMs to private data. Naive RAG is dead. Advanced RAG with hybrid retrieval, re-ranking, and agentic retrieval planning is the 2026 standard.",
+    topics: [
+      "Vector Databases — FAISS, Chroma, Qdrant, Weaviate, Pinecone",
+      "Embedding Models — BGE-M3, E5-large-v2, GTE, OpenAI text-embedding-3-large",
+      "Chunking Strategies — Fixed-size, Semantic, Hierarchical, Sliding Window, Proposition-level",
+      "Dense Retrieval — cosine similarity, dot product, HNSW index",
+      "Hybrid Retrieval — BM25 + Dense with Reciprocal Rank Fusion",
+      "Re-ranking — Cross-encoders, Cohere Rerank, BGE Reranker",
+      "HyDE (Hypothetical Document Embeddings)",
+      "Query Rewriting and Multi-Query Retrieval",
+      "Contextual Compression and Redundancy Filtering",
+      "Parent-Child Document Retrieval",
+      "LlamaIndex and LangChain RAG pipelines"
+    ],
+    books: [
+      { concept: "RAG Architecture", books: ["Building LLM-Powered Applications — Valentina Alto (Packt, 2024)", "Hands-On Large Language Models — Jay Alammar & Maarten Grootendorst (O'Reilly, 2024)"] },
+      { concept: "Information Retrieval Theory", books: ["Introduction to Information Retrieval — Manning, Raghavan & Schutze (Cambridge, Free: nlp.stanford.edu/IR-book)", "Search Engines: Information Retrieval in Practice — Croft, Metzler & Strohman (Free PDF)"] },
+      { concept: "Vector Databases", books: ["Vector Databases in Practice — Weaviate eBook (Free: weaviate.io/ebooks)", "Qdrant Concepts Documentation (qdrant.tech/documentation/concepts)"] },
+      { concept: "Advanced RAG Frameworks", books: ["LlamaIndex Documentation — Advanced RAG modules (docs.llamaindex.ai)", "RAGAS Paper: Automated Evaluation of RAG Pipelines (arxiv:2309.15217)"] }
+    ],
+    projects: [
+      { name: "PatentPriorArtFinder", desc: "Enterprise RAG system that ingests USPTO patent XML dumps (fully public domain), chunks patent claims at the sentence and claim-level using a custom semantic chunker, indexes into Qdrant with BGE-M3 embeddings, implements hybrid BM25 + dense retrieval with a BGE Reranker cross-encoder as final pass. Given a new invention description, returns the top-10 most relevant prior art patents ranked by semantic similarity and claim overlap, with a citation graph showing inter-patent references. Includes FastAPI backend and Streamlit frontend for patent attorneys. First open-source prior art finder with hybrid + rerank." },
+      { name: "IncidentPostmortemOracle", desc: "Ingests engineering incident postmortem documents (Markdown, PDF, Confluence exports) from internal wikis, builds a hierarchical RAG with section-level parent chunks and sentence-level children, stores temporal metadata (incident date, severity, team) in Qdrant payload filters. Answers root cause questions with full citations and temporal filters ('show me P0 incidents in Q1 2025 caused by deployment automation'). Measures hallucination rate on a held-out test set using RAGAS. Deployed via FastAPI. Uniquely targets SRE knowledge management with postmortem-specific chunking logic." },
+      { name: "GrantMatcher Pro", desc: "Asynchronously crawls grants.gov API and NIH Reporter API (both public), extracts eligibility criteria, funding objectives, and deadline information per grant, chunks by eligibility clause type, and builds a semantic search index in Chroma. A researcher inputs their lab profile (publications list, research abstract, institution type), and the system returns ranked grant opportunities with: (1) an eligibility match score, (2) a gap analysis showing what the lab's profile lacks, (3) a tailored application angle for each grant. Unique because it generates gap analysis and application strategy, not just semantic matches." }
+    ]
+  },
+  {
+    id: 4, color: COL.p4, duration: "2-3 Months",
+    title: "Phase 4: Agent Engineering",
+    intro: "Agents are the core product of 2026. An agent is an LLM that can reason, plan, use tools, reflect on its outputs, and maintain memory across steps to complete long-horizon tasks. This phase is where you become a full Agentic AI Engineer. Every concept here maps directly to production job requirements.",
+    topics: [
+      "ReAct Pattern — Reason + Act cycles, scratchpad reasoning",
+      "Tool Calling / Function Calling — schema design, error handling",
+      "Agent Planning — task decomposition, subgoal generation",
+      "Self-Reflection and Self-Critique — agents reviewing their own outputs",
+      "Short-Term Memory — conversation history, sliding window",
+      "Long-Term Memory — vector store retrieval, structured DB storage",
+      "Episodic Memory — storing past task outcomes for future reference",
+      "Semantic Memory — structured knowledge base the agent maintains",
+      "LangGraph — state machines, nodes, edges, conditional routing, checkpointing",
+      "PydanticAI — type-safe, structured agent development",
+      "OpenAI Agents SDK — handoffs, guardrails, tracing",
+      "AutoGen (Microsoft) — conversational multi-agent framework",
+      "CrewAI — role-based agent crews with process flows"
+    ],
+    books: [
+      { concept: "Agent Fundamentals", books: ["AI Agents in Action — Valentina Alto & Gilberto Titericz (Manning, 2024)", "Artificial Intelligence: A Modern Approach (4th Ed.) — Stuart Russell & Peter Norvig (Pearson)"] },
+      { concept: "LangGraph & LangChain", books: ["LangGraph Official Documentation (langchain-ai.github.io/langgraph)", "LangChain Expression Language (LCEL) Docs (python.langchain.com/docs/expression_language)"] },
+      { concept: "Planning & Reasoning", books: ["Automated Planning and Acting — Malik Ghallab, Dana Nau & Paolo Traverso (Cambridge)", "ReAct: Synergizing Reasoning and Acting in Language Models (arxiv:2210.03629, Free)"] },
+      { concept: "Memory Systems", books: ["MemGPT: Towards LLMs as Operating Systems — Packer et al. (arxiv:2310.08560, Free)", "Cognitive Architectures for Language Agents — Sumers et al. (arxiv:2309.02427, Free)"] }
+    ],
+    projects: [
+      { name: "TechDebt Archaeologist", desc: "A LangGraph-based agent that reads a GitHub repository via the GitHub API, analyzes full git commit history for debt-introducing patterns, computes code complexity metrics using radon and pyflakes, detects dependency staleness via PyPI API, and classifies each technical debt item by type (high coupling, code duplication, outdated dependencies, naming anti-patterns). Uses an LLM to score each item's business risk based on file change frequency and team ownership, then produces a prioritized remediation roadmap as a formatted Markdown report and creates Notion page. No public project targets the full git history + code analysis + LLM business risk scoring pipeline." },
+      { name: "CompliancePatrol Agent", desc: "A ReAct agent that monitors live regulatory RSS feeds (SEC EDGAR full-text search, FDA guidance RSS, GDPR enforcement tracker, RBI circulars), uses a PDF tool to read new regulatory documents, extracts key obligations and effective dates with structured extraction, maps obligations to affected internal policy sections via semantic search over a company policy RAG, drafts compliance update memos in the company's writing style, and creates Jira tickets for legal team review — fully autonomously on a nightly schedule. Unique end-to-end regulatory monitoring to ticket pipeline." },
+      { name: "AcademicPeerReview Bot", desc: "A multi-step agent that receives a research paper PDF and evaluates it across five structured dimensions: (1) novelty assessment via RAG over Semantic Scholar API, (2) methodology soundness against a rubric of statistical best practices, (3) reproducibility checklist (code availability, data provenance, hyperparameter reporting), (4) claim-to-evidence alignment using NLI models, (5) writing clarity score. Aggregates scores into an accept/major-revision/reject recommendation with confidence percentage and detailed justification for each dimension, formatted as an ACL/NeurIPS-style peer review. First tool performing fully automated five-dimension paper evaluation." }
+    ]
+  },
+  {
+    id: 5, color: COL.p5, duration: "2-3 Months",
+    title: "Phase 5: Multi-Agent Systems",
+    intro: "Single agents hit cognitive and context limits. In 2026, the most capable AI systems are multi-agent: specialized agents collaborate, verify each other's work, and tackle complexity no single agent can handle. This is the fastest-growing area in Agentic AI engineering.",
+    topics: [
+      "Agent Roles — Planner, Researcher, Critic, Executor, Validator, Formatter",
+      "Agent Communication — Shared Memory, Message Passing, Blackboard Pattern",
+      "Supervisor Pattern — one orchestrator directing many specialized workers",
+      "Hierarchical Pattern — nested supervisors managing sub-teams",
+      "Swarm Pattern — emergent coordination without central authority",
+      "Inter-Agent Trust and Output Verification",
+      "Parallel vs. Sequential Agent Execution",
+      "State Sharing and Conflict Resolution",
+      "LangGraph multi-agent graphs with handoffs",
+      "AutoGen conversational multi-agent pipelines",
+      "CrewAI role-based crew definitions and process flows"
+    ],
+    books: [
+      { concept: "Multi-Agent Theory", books: ["Multi-Agent Systems: Algorithmic, Game-Theoretic, and Logical Foundations — Shoham & Leyton-Brown (Free: masfoundations.org)", "An Introduction to MultiAgent Systems (2nd Ed.) — Michael Wooldridge (Wiley)"] },
+      { concept: "AutoGen & CrewAI", books: ["AutoGen Documentation (microsoft.github.io/autogen)", "CrewAI Documentation & Tutorials (docs.crewai.com)"] },
+      { concept: "Distributed Systems Principles", books: ["Designing Distributed Systems (2nd Ed.) — Brendan Burns (O'Reilly)", "Distributed Systems: Principles and Paradigms (3rd Ed.) — Tanenbaum & Van Steen"] },
+      { concept: "Coordination & Game Theory", books: ["Multiagent Systems — Gerhard Weiss (Ed.), MIT Press (2nd Ed.)", "Game Theory Evolving — Herbert Gintis (Princeton University Press)"] }
+    ],
+    projects: [
+      { name: "StartupPostmortem Intelligence", desc: "A LangGraph multi-agent system performing forensic startup failure analysis. Agent 1 (Researcher) scrapes Crunchbase, TechCrunch, LinkedIn, and SEC filings for data on a failed startup. Agent 2 (Financial Analyst) analyzes funding rounds vs. burn rate progression. Agent 3 (Market Timing Analyst) assesses competitive landscape saturation and macro timing at time of failure. Agent 4 (Critic) challenges each conclusion with specific counterevidence found via web search. Agent 5 (Synthesizer) produces a structured 10-page forensic autopsy with failure taxonomy. Unique because it targets failure analysis with evidence-backed counterargument loops." },
+      { name: "AutoSciSynthesizer", desc: "Given a research question, a Coordinator Agent decomposes it into 5-8 subtopics. Searcher Agents query Semantic Scholar, PubMed, and ArXiv APIs in parallel. Extractor Agents pull methodologies, sample sizes, and key findings per paper into structured schemas. A Contradiction Detector Agent flags papers with conflicting conclusions and quantifies disagreement severity. A Synthesizer Agent writes a structured literature review with gap analysis. A Formatter Agent applies APA citation style. Output: a publication-ready mini-review paper in PDF. Targets graduate students needing rapid systematic literature synthesis." },
+      { name: "PitchDeck Orchestrator", desc: "Multi-agent pipeline that converts a startup idea into a complete investor pitch deck. Market Research Agent computes TAM/SAM/SOM from public datasets (Statista, government trade data). Competitor Intelligence Agent builds a feature comparison matrix from public competitor websites. Financial Projection Agent generates a 5-year model benchmarked against comparable companies' public filings. Narrative Writer Agent constructs a problem-solution-traction-ask storytelling arc. Design Critic Agent scores slide structure against YC and a16z pitch standards. Output: final PPTX with all slides. Unique in grounding financial projections in actual public comparable data." }
+    ]
+  },
+  {
+    id: 6, color: COL.p6, duration: "1-2 Months",
+    title: "Phase 6: MCP — Model Context Protocol",
+    intro: "MCP is becoming the USB-C of AI — a universal standard for connecting AI models to external tools, databases, and services. By 2026, every serious Agentic AI engineer is expected to build and consume MCP servers. It is becoming a standard hiring requirement at AI-first companies.",
+    topics: [
+      "MCP Architecture — Client, Server, Host roles and responsibilities",
+      "MCP Primitives — Tools, Resources, Prompts, Sampling",
+      "Transport Layers — stdio (local), HTTP + SSE (remote)",
+      "Building MCP Servers with Python MCP SDK",
+      "FastMCP — rapid MCP server development framework",
+      "TypeScript MCP SDK for Node.js-based servers",
+      "OAuth and capability scoping for MCP security",
+      "Claude Desktop MCP integration and debugging",
+      "OpenAI client-side MCP consumption",
+      "Composing multiple MCP servers in a single agent"
+    ],
+    books: [
+      { concept: "MCP Core Protocol", books: ["MCP Official Specification (modelcontextprotocol.io/specification)", "MCP Python SDK Guide (github.com/modelcontextprotocol/python-sdk)", "FastMCP Documentation (github.com/jlowin/fastmcp)"] },
+      { concept: "API & Protocol Design", books: ["API Design Patterns — JJ Geewax (Manning)", "RESTful API Design — Matthias Biehl (API-University Press)"] },
+      { concept: "Distributed Protocols", books: ["Designing Distributed Systems (2nd Ed.) — Brendan Burns (O'Reilly)", "gRPC: Up and Running — Kasun Indrasiri & Danesh Kuruppu (O'Reilly)"] }
+    ],
+    projects: [
+      { name: "ObservabilityMCP Server", desc: "An MCP server (built with FastMCP) that exposes Prometheus metric queries, Grafana alert states, and Kubernetes pod logs as LLM-callable tools. An agent connected to this server can diagnose production incidents in natural language: 'Why is payment service P99 latency above 2 seconds?' The agent queries metrics, reads correlated pod logs, identifies anomalous time windows, and writes a structured root cause analysis report with remediation suggestions. First MCP bridge between full observability stack (Prometheus + Grafana + K8s) and conversational AI agents." },
+      { name: "DataLineageMCP Server", desc: "An MCP server wrapping dbt Cloud API and Apache Atlas lineage endpoints, exposing data lineage graphs as traversable tools. Agents can answer questions like 'Where does the weekly_revenue metric in the CFO dashboard come from?' by walking the lineage graph backward from the metric to source tables, identifying transformation logic at each hop, and flagging stale or schema-drifted upstream sources. Includes a 'data quality inspector' tool that runs profiling queries and returns freshness, null rate, and distribution stats. Unique data trust infrastructure MCP." },
+      { name: "KnowledgeBaseCurator MCP", desc: "An MCP server connecting to Confluence and Notion APIs with tools: read_page, update_page, create_page, search_pages, compute_staleness. A background Curator Agent embeds all wiki pages at ingestion, recomputes embeddings on a weekly schedule, detects content drift by comparing embedding similarity over time, identifies factually stale pages by cross-referencing their claims against live web search results, drafts updated content for stale pages, and sends Slack notifications with one-click approval links. Targets engineering teams with hundreds of outdated internal wiki pages." }
+    ]
+  },
+  {
+    id: 7, color: COL.p7, duration: "1-2 Months",
+    title: "Phase 7: AI Infrastructure",
+    intro: "Building an agent in a Jupyter notebook is easy. Deploying it to serve 10,000 users, ensuring it self-heals, scales automatically, stays observable, and costs a predictable amount per task — that is the hard part. This phase separates engineers who build demos from those who build products.",
+    topics: [
+      "LLM Serving — vLLM (continuous batching, PagedAttention), Ollama, SGLang, TGI",
+      "Docker — multi-stage builds, layer caching, security hardening, compose",
+      "Kubernetes — pods, deployments, services, ConfigMaps, HPA autoscaling",
+      "Message Queues — RabbitMQ for task distribution, Kafka for event streaming",
+      "Observability — LangSmith, Arize Phoenix, Weights & Biases (W&B Weave)",
+      "Distributed Tracing — OpenTelemetry for LLM call chains",
+      "Cost Management — token budgeting, model routing by task complexity",
+      "Rate Limiting, Circuit Breakers, Retry with Exponential Backoff",
+      "Secrets Management — Vault, K8s Secrets, environment isolation"
+    ],
+    books: [
+      { concept: "MLOps & LLM Systems", books: ["Designing Machine Learning Systems — Chip Huyen (O'Reilly, 2022)", "LLM Engineer's Handbook — Paul Iusztin & Maxime Labonne (Packt, 2024)"] },
+      { concept: "Docker & Kubernetes", books: ["Kubernetes in Action (2nd Ed.) — Marko Luksa (Manning)", "Docker Deep Dive — Nigel Poulton (Independently Published, 2024 Ed.)"] },
+      { concept: "Message Queues & Streaming", books: ["Kafka: The Definitive Guide (2nd Ed.) — Shapira, Palino, Sivaram, Petty (O'Reilly)", "RabbitMQ in Action — Alvaro Videla & Jason Williams (Manning)"] },
+      { concept: "Observability", books: ["Observability Engineering — Charity Majors, Liz Fong-Jones, George Miranda (O'Reilly)", "Cloud Native Observability with OpenTelemetry — Alex Boten (Packt)"] }
+    ],
+    projects: [
+      { name: "AgentFleet Platform", desc: "A complete production-grade multi-agent deployment platform: (1) Specialized agents packaged as Docker containers with readiness/liveness probes; (2) Kubernetes cluster (kind for local dev, EKS/GKE for cloud) with HPA scaling on Kafka consumer lag; (3) Kafka queues for async agent task distribution with dead-letter queues and retry policies; (4) vLLM serving Llama-3.1-70B with PagedAttention and continuous batching for up to 200 concurrent requests; (5) OpenTelemetry spans wrapping every LLM call with model, token count, latency, and cost attribution tags; (6) LangSmith for prompt version control and A/B evaluation; (7) Unified REST API gateway with per-tenant rate limiting; (8) Cost dashboard showing per-agent, per-model, per-task token spend over time. Designed as a reusable open-source template for AI startups launching production agent products." }
+    ]
+  },
+  {
+    id: 8, color: COL.p8, duration: "1 Month",
+    title: "Phase 8: Agent Evaluation",
+    intro: "You cannot improve what you cannot measure. In 2026, companies are experiencing expensive failures from hallucinating, unreliable agents making autonomous decisions. Agent evaluation is a distinct engineering discipline — and one of the highest-leverage skills you can develop. This is what makes promotion-worthy engineers.",
+    topics: [
+      "Evaluation Metrics — Hallucination Rate, Faithfulness, Groundedness, Answer Relevancy",
+      "Retrieval Metrics — Precision@k, Recall@k, MRR, NDCG",
+      "Agent Metrics — Task Completion Rate, Tool Use Accuracy, Latency, Cost per Task",
+      "LLM-as-Judge — GPT-4o grading agent outputs with structured rubrics",
+      "RAGAS Framework — automated RAG pipeline evaluation",
+      "DeepEval — unit testing for LLM outputs, custom metrics",
+      "TruLens — agent observability and feedback collection",
+      "Human-in-the-Loop evaluation pipelines",
+      "Regression testing for prompt and model changes",
+      "Statistical significance testing for evaluation results"
+    ],
+    books: [
+      { concept: "LLM Evaluation Theory", books: ["A Survey on Evaluation of Large Language Models — Chang et al. (arxiv:2307.03109, Free)", "RAGAS: Automated Evaluation of Retrieval Augmented Generation (arxiv:2309.15217, Free)"] },
+      { concept: "Testing Frameworks", books: ["The Art of Software Testing (3rd Ed.) — Myers, Sandler & Badgett (Wiley)", "DeepEval Documentation — Confident AI (docs.confident-ai.com)"] },
+      { concept: "Statistics for Evaluation", books: ["Practical Statistics for Data Scientists (2nd Ed.) — Bruce, Bruce & Gedeck (O'Reilly)", "Evaluating Machine Learning Models — Alice Zheng (O'Reilly, Free PDF)"] }
+    ],
+    projects: [
+      { name: "AgentIQ Benchmark Suite", desc: "A novel open-source evaluation framework for AI agents featuring four adversarial test dimensions: (1) Security Robustness — indirect prompt injection attacks embedded in realistic tool return values (webpage content, database results, email bodies), (2) Multi-Hop Reasoning — cross-document evidence chaining requiring 3-5 tool calls to answer, with provenance tracking, (3) Temporal Accuracy — time-sensitive factual questions where the correct answer changed after a known cutoff date, (4) Tool Precision — correct tool selection vs. semantically similar decoy tools. A Generator Agent auto-creates 500+ test cases from seed topics using diverse mutation strategies. An LLM-as-Judge evaluator scores outputs on accuracy, reasoning quality, and source citation correctness. Produces a radar chart dashboard and a leaderboard. First agent benchmark with adversarial indirect injection as a first-class dimension." }
+    ]
+  },
+  {
+    id: 9, color: COL.p9, duration: "1-2 Months",
+    title: "Phase 9: Agent Security",
+    intro: "As agents gain real-world capabilities — executing code, querying databases, sending emails, making API calls with financial implications — security becomes mission-critical. Agent security is an emerging specialization with very few experts and extremely high compensation. Getting ahead of this curve now creates career leverage for years.",
+    topics: [
+      "Prompt Injection — direct (user input) and indirect (tool outputs, web content)",
+      "Jailbreaks and Model Manipulation techniques",
+      "Data Poisoning in RAG systems — backdooring the knowledge base",
+      "Tool Abuse — agents calling tools with malicious or unintended parameters",
+      "Insecure Output Handling — agents writing executable content",
+      "RBAC for Agents — role-based capability scoping",
+      "Sandboxing — E2B, Modal for isolated code execution environments",
+      "Pre/Post Tool Call Verification Layers",
+      "Guardrails AI — input/output validation pipelines",
+      "Llama Guard — LLM-based content safety classifier",
+      "NeMo Guardrails — conversational guardrails with topic rails",
+      "OWASP LLM Top 10 vulnerability taxonomy"
+    ],
+    books: [
+      { concept: "AI Security Foundations", books: ["Security Engineering (3rd Ed.) — Ross Anderson (Free: cl.cam.ac.uk/~rja14/book.html)", "Adversarial Machine Learning — Huang, Joseph, Nelson et al. (Cambridge University Press)"] },
+      { concept: "LLM Security Specific", books: ["OWASP Top 10 for LLM Applications (owasp.org/www-project-top-10-for-large-language-model-applications)", "Llama Guard: LLM-based Input-Output Safeguard (arxiv:2312.06674, Free)"] },
+      { concept: "Guardrails & Policy Enforcement", books: ["Guardrails AI Documentation (guardrailsai.com/docs)", "NeMo Guardrails — NVIDIA Documentation (github.com/NVIDIA/NeMo-Guardrails)"] }
+    ],
+    projects: [
+      { name: "AgentRedTeam Studio", desc: "An automated security testing platform for AI agents. (1) Mutation Engine generates adversarial attack prompts by applying 15+ mutation strategies to seed scenarios: synonym substitution, Base64 encoding tricks, roleplay persona framing, nested instruction injection, indirect injection via simulated tool outputs (fake web pages, database results). (2) Injection Simulator replays realistic tool return values containing injected instructions and tests if the agent executes them. (3) Tool Abuse Analyzer monitors for anomalous tool call sequences (unexpected parameter values, out-of-scope tool combinations, privilege escalation attempts). (4) Data Exfiltration Scanner tests if the agent can be manipulated into leaking system prompt contents or user data. (5) Scoring Engine produces CVSS-style severity scores with reproduction steps and fix recommendations for each finding. Outputs a full penetration test report. First holistic automated red-teaming studio for AI agents." }
+    ]
+  },
+  {
+    id: 10, color: COL.p10, duration: "Ongoing — No Finish Line",
+    title: "Phase 10: Advanced Research Level",
+    intro: "This is expert-level territory. Here you work at the frontier: reasoning models, self-improving agents, graph-based memory, and AI operating systems. The engineers at this level are shaping the direction of the field. This phase has no completion — it is a continuous research practice and a lifestyle.",
+    topics: [
+      "Reasoning Models — DeepSeek-R1, OpenAI o1/o3, Qwen-QwQ, process reward models",
+      "Test-Time Compute Scaling — Best-of-N, Beam Search, MCTS, DVTS",
+      "Graph RAG — Microsoft GraphRAG, LlamaIndex Property Graph RAG",
+      "Self-RAG — models deciding when and what to retrieve",
+      "Corrective RAG (CRAG) — validating retrieved documents before generation",
+      "Agentic RAG — agents planning and orchestrating multi-step retrieval strategies",
+      "MemGPT and long-context memory management architectures",
+      "Generative Agents — emergent social behavior in agent simulations",
+      "AI Operating Systems — OpenDevin, SWE-agent, Computer-Use agents",
+      "Browser Agents — WebArena, VisualWebArena, web navigation agents",
+      "Diverse Verifier Tree Search (DVTS) for solution exploration",
+      "Process Reward Models (PRMs) vs. Outcome Reward Models (ORMs)"
+    ],
+    books: [
+      { concept: "Reasoning & Test-Time Compute", books: ["DeepSeek-R1 Technical Report (arxiv:2501.12948, Free)", "Scaling LLM Test-Time Compute Optimally — Snell et al. (arxiv:2408.03314, Free)", "Let's Verify Step by Step — Lightman et al. (arxiv:2305.20050, Free)"] },
+      { concept: "Advanced RAG Research", books: ["From Local to Global: GraphRAG — Edge et al. (arxiv:2404.16130, Free)", "Self-RAG: Learning to Retrieve, Generate, and Critique — Asai et al. (arxiv:2310.11511, Free)", "Corrective Retrieval Augmented Generation — Yan et al. (arxiv:2401.15884, Free)"] },
+      { concept: "Memory & Cognitive Architecture", books: ["MemGPT: Towards LLMs as Operating Systems — Packer et al. (arxiv:2310.08560, Free)", "Generative Agents: Interactive Simulacra of Human Behavior — Park et al. (arxiv:2304.03442, Free)", "A Survey on the Memory Mechanism of LLM-based Agents (arxiv:2404.13501, Free)"] },
+      { concept: "AI OS & Autonomous Agents", books: ["OpenDevin: An Open Platform for AI Software Developers (arxiv:2407.16741, Free)", "SWE-bench: Can LLMs Resolve Real-World GitHub Issues? (arxiv:2310.06770, Free)", "WebArena: A Realistic Web Environment for Autonomous Agents (arxiv:2307.13854, Free)"] }
+    ],
+    projects: [
+      { name: "CognitiveMesh OS", desc: "A self-improving multi-agent operating system with four interlocked components: (1) A library of specialized agents (Coder, Researcher, Planner, Critic, Formatter) each powered by appropriate reasoning models (o1 for planning, DeepSeek-R1 for math, fast models for formatting); (2) A MetaLearner Agent that analyzes task failure logs from a structured JSON failure database, identifies recurring failure patterns using clustering, and autonomously rewrites the system prompts of underperforming agents to address identified weaknesses; (3) A graph-based long-term episodic memory in Neo4j storing each task as a connected node linked to: agents used, tools called, outcomes achieved, and lessons extracted; (4) A PersonalityDrift Detector that embeds each new system prompt and checks cosine similarity to the original baseline to prevent value drift from meta-learning. Benchmarks automatically run every 24 hours to measure whether agents improved. No public project implements the complete MetaLearner + graph memory + drift detection self-improvement loop." },
+      { name: "AutoHypothesis Agent", desc: "A reasoning-model-powered research automation agent: (1) Accepts a scientific domain and a gap statement as input; (2) Uses DeepSeek-R1 to generate 5 testable hypotheses, each with an explicit falsification criterion and confidence reasoning chain; (3) Searches Semantic Scholar and ArXiv via API to validate each hypothesis's novelty using a RAG pipeline over 1M+ recent papers; (4) For each novel hypothesis, designs a computational experiment plan specifying statistical tests, minimum sample sizes (via power analysis), and publicly available datasets to use; (5) Generates a structured hypothesis paper in LaTeX with abstract, background, hypothesis statements, proposed methodology, and citations; (6) Runs a self-critique pass comparing the draft against a 12-point peer review checklist and iterates on weak sections. Output: a camera-ready LaTeX source. Targets early-career researchers exploring directions in data-rich domains." }
+    ]
+  }
+];
+
+// ─── NUMBERING CONFIG ─────────────────────────────────────────────────────────
+const numberingConfig = {
+  config: [
+    {
+      reference: "bullets",
+      levels: [{
+        level: 0, format: LevelFormat.BULLET, text: "\u2022",
+        alignment: AlignmentType.LEFT,
+        style: { paragraph: { indent: { left: 680, hanging: 340 } } }
+      }]
+    },
+    ...PHASES.map(ph => ({
+      reference: "proj-" + ph.id,
+      levels: [{
+        level: 0, format: LevelFormat.DECIMAL, text: "%1.",
+        alignment: AlignmentType.LEFT,
+        style: { paragraph: { indent: { left: 680, hanging: 340 } } }
+      }]
+    }))
+  ]
+};
+
+// ─── STYLES CONFIG ────────────────────────────────────────────────────────────
+const stylesConfig = {
+  default: { document: { run: { font: "Arial", size: 22 } } },
+  paragraphStyles: [
+    {
+      id: "Heading1", name: "Heading 1", basedOn: "Normal", next: "Normal", quickFormat: true,
+      run: { size: 42, bold: true, font: "Arial" },
+      paragraph: { spacing: { before: 360, after: 200 }, outlineLevel: 0 }
+    },
+    {
+      id: "Heading2", name: "Heading 2", basedOn: "Normal", next: "Normal", quickFormat: true,
+      run: { size: 30, bold: true, font: "Arial" },
+      paragraph: { spacing: { before: 280, after: 160 }, outlineLevel: 1 }
+    },
+    {
+      id: "Heading3", name: "Heading 3", basedOn: "Normal", next: "Normal", quickFormat: true,
+      run: { size: 26, bold: true, font: "Arial" },
+      paragraph: { spacing: { before: 200, after: 100 }, outlineLevel: 2 }
+    }
+  ]
+};
+
+// ─── BUILD DOCUMENT CONTENT ───────────────────────────────────────────────────
+const children = [];
+
+// ── COVER PAGE ────────────────────────────────────────────────────────────────
+children.push(
+  new Paragraph({ ...sp(2400, 0), children: [new TextRun({ text: "", size: 22 })] }),
+  new Paragraph({
+    alignment: AlignmentType.CENTER, ...sp(0, 120),
+    children: [new TextRun({ text: "2026 AGENTIC AI ENGINEER", font: "Arial", size: 64, bold: true, color: COL.navy })]
+  }),
+  new Paragraph({
+    alignment: AlignmentType.CENTER, ...sp(0, 80),
+    children: [new TextRun({ text: "COMPLETE ROADMAP", font: "Arial", size: 64, bold: true, color: COL.blue })]
+  }),
+  new Paragraph({
+    alignment: AlignmentType.CENTER, ...sp(120, 120),
+    border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: COL.blue } },
+    children: [new TextRun({ text: "", size: 10 })]
+  }),
+  new Paragraph({
+    alignment: AlignmentType.CENTER, ...sp(200, 60),
+    children: [new TextRun({ text: "Phase 0 through Phase 10", font: "Arial", size: 30, color: COL.gray, bold: true })]
+  }),
+  new Paragraph({
+    alignment: AlignmentType.CENTER, ...sp(0, 60),
+    children: [new TextRun({ text: "Concepts  |  Books  |  Unique Projects", font: "Arial", size: 26, color: COL.gray })]
+  }),
+  new Paragraph({
+    alignment: AlignmentType.CENTER, ...sp(60, 60),
+    children: [new TextRun({ text: "Python Foundations  to  AI Operating Systems", font: "Arial", size: 22, color: COL.teal, italics: true })]
+  }),
+  new Paragraph({
+    alignment: AlignmentType.CENTER, ...sp(800, 0),
+    children: [new TextRun({ text: "24 Unique Never-Before-Built Projects  |  100+ Book & Resource References", font: "Arial", size: 22, color: COL.navy, bold: true })]
+  }),
+  new Paragraph({
+    alignment: AlignmentType.CENTER, ...sp(40, 0),
+    children: [new TextRun({ text: "Shubh  |  2026 Edition", font: "Arial", size: 20, color: COL.gray })]
+  }),
+  pgBreak()
+);
+
+// ── INTRODUCTION ──────────────────────────────────────────────────────────────
+children.push(
+  h1("How to Use This Roadmap"),
+  body("This roadmap is a structured, project-driven curriculum for becoming a professional Agentic AI Engineer in 2026. It is organized into 11 phases — from Python Foundations to AI Operating Systems — each building on the previous.", { color: COL.black }),
+  body("Every phase contains three things:", { bold: true }),
+  bul("Core Concepts to Learn — the exact topics you must understand, not just know about"),
+  bul("Books to Master Each Concept — one curated reference per topic cluster, no filler"),
+  bul("Unique Projects to Build — each project has never been publicly built in this exact form"),
+  gap(),
+  body("Recommended pacing: spend 12-18 months on Phases 0-9, then treat Phase 10 as a continuous research practice. You do not need to complete every phase before moving to the next — build projects in each phase as you learn, then loop back.", { italic: true, color: COL.gray }),
+  divLine(),
+  pgBreak()
+);
+
+// ── PHASES ────────────────────────────────────────────────────────────────────
+for (const ph of PHASES) {
+  children.push(h1(ph.title, ph.color));
+  // Duration badge via styled paragraph
+  children.push(new Paragraph({
+    ...sp(0, 160),
+    children: [
+      new TextRun({ text: " DURATION: " + ph.duration + " ", font: "Arial", size: 20, bold: true, color: COL.white, shading: { fill: ph.color, type: ShadingType.CLEAR } })
+    ]
+  }));
+  children.push(body(ph.intro));
+  children.push(divLine());
+
+  children.push(h2("Core Concepts to Learn"));
+  ph.topics.forEach(t => children.push(bul(t)));
+  children.push(gap());
+
+  children.push(h2("Books to Master Each Concept"));
+  children.push(booksTable(ph.books));
+  children.push(gap());
+
+  children.push(h2("Unique Projects to Build"));
+  children.push(body("The following projects are uniquely designed — none have been publicly built in this exact combination of features. Each is portfolio-worthy and interview-ready.", { italic: true, color: COL.gray }));
+  children.push(gap());
+  ph.projects.forEach(proj => {
+    children.push(projItem(proj.name, proj.desc, ph.id));
+  });
+
+  if (ph.id < 10) {
+    children.push(pgBreak());
+  }
+}
+
+// ── CLOSING SECTION ───────────────────────────────────────────────────────────
+children.push(pgBreak());
+children.push(h1("Final Notes: What Separates Good from Great"));
+children.push(body("Technical skill is table stakes. Here is what actually differentiates senior Agentic AI Engineers in 2026:"));
+[
+  "Build in public — document every project on GitHub, write about what broke, what you learned, what you'd do differently",
+  "Read papers, not just tutorials — the engineers who understand the research have a 12-month lead on those who do not",
+  "Evaluate obsessively — every agent you build should have a benchmark. If you cannot measure it, you cannot improve it",
+  "Specialize within agents — pick one vertical (healthcare AI, legal AI, DevOps AI, finance AI) and go deeper than anyone else",
+  "Security mindset from Day 1 — treat every agent as a potential attack surface from the first line of code",
+  "Contribute to open-source — LangGraph, RAGAS, DeepEval, FastMCP all accept PRs. Your commit history is your portfolio",
+  "COGNARC is the right idea — a gamified AI learning platform with LLM tutoring is a real market need. Keep building it."
+].forEach(t => children.push(bul(t)));
+children.push(gap());
+children.push(body("The field is moving at extraordinary speed. The engineers who will lead it are not those who follow every trend, but those who have deep roots in fundamentals and can evaluate each new development with clear judgment.", { italic: true, color: COL.gray }));
+
+// ─── DOCUMENT CREATION ────────────────────────────────────────────────────────
+const doc = new Document({
+  numbering: numberingConfig,
+  styles: stylesConfig,
+  sections: [{
+    properties: {
+      page: {
+        size: { width: 12240, height: 15840 },
+        margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 }
+      }
+    },
+    headers: {
+      default: new Header({
+        children: [new Paragraph({
+          border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: COL.blue } },
+          children: [
+            new TextRun({ text: "2026 Agentic AI Engineer Roadmap", font: "Arial", size: 18, color: COL.navy, bold: true }),
+            new TextRun({ text: "   |   Shubh", font: "Arial", size: 18, color: COL.gray })
+          ]
+        })]
+      })
+    },
+    footers: {
+      default: new Footer({
+        children: [new Paragraph({
+          border: { top: { style: BorderStyle.SINGLE, size: 4, color: COL.mgray } },
+          alignment: AlignmentType.CENTER,
+          children: [
+            new TextRun({ text: "Page ", font: "Arial", size: 18, color: COL.gray }),
+            new TextRun({ children: [PageNumber.CURRENT], font: "Arial", size: 18, color: COL.gray }),
+            new TextRun({ text: " of ", font: "Arial", size: 18, color: COL.gray }),
+            new TextRun({ children: [PageNumber.TOTAL_PAGES], font: "Arial", size: 18, color: COL.gray })
+          ]
+        })]
+      })
+    },
+    children
+  }]
+});
+
+if (isNode) {
+  const path = require('path');
+  let outPath = '/mnt/user-data/outputs/2026_AgenticAI_Roadmap_Shubh.docx';
+  try {
+    const dir = path.dirname(outPath);
+    if (!fs.existsSync(dir)) {
+      outPath = path.join(process.cwd(), '2026_AgenticAI_Roadmap_Shubh.docx');
+    }
+  } catch (e) {
+    outPath = path.join(process.cwd(), '2026_AgenticAI_Roadmap_Shubh.docx');
+  }
+  Packer.toBuffer(doc).then(buf => {
+    fs.writeFileSync(outPath, buf);
+    console.log("SUCCESS — written to " + outPath);
+  }).catch(err => {
+    console.error("ERROR:", err.message);
+    process.exit(1);
+  });
+} else {
+  // Expose resources to browser window
+  window.ROADMAP_PHASES = PHASES;
+  window.ROADMAP_COL = COL;
+  
+  window.downloadRoadmapDocx = function(statusCallback) {
+    if (typeof statusCallback !== 'function') statusCallback = console.log;
+    statusCallback("Generating document layout...");
+    try {
+      statusCallback("Packing document into binary blob...");
+      Packer.toBlob(doc).then(blob => {
+        statusCallback("Triggering download...");
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = '2026_AgenticAI_Roadmap_Shubh.docx';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        statusCallback("SUCCESS - Document downloaded!");
+      }).catch(err => {
+        statusCallback("Error packing document: " + err.message);
+      });
+    } catch (err) {
+      statusCallback("Error building document: " + err.message);
+    }
+  };
+}

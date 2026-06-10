@@ -1,0 +1,1 @@
+This is not a CSV or spreadsheet file. It is just some random text to test uploading an invalid file format.

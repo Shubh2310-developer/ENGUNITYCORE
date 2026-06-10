@@ -46,24 +46,34 @@ NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
 | Database Model | **Functional** | [backend/app/models/decision.py](backend/app/models/decision.py) |
 | API Router | **Functional** | [backend/app/api/v1/decisions.py](backend/app/api/v1/decisions.py) |
 | Pydantic Schemas | **Functional** | [backend/app/schemas/decision.py](backend/app/schemas/decision.py) |
-| Frontend Page | **Prototype** | [frontend/src/app/(dashboard)/decisionvault/page.tsx](frontend/src/app/(dashboard)/decisionvault/page.tsx) |
+| Frontend Page | **Functional** | [frontend/src/app/(dashboard)/decisionvault/page.tsx](frontend/src/app/(dashboard)/decisionvault/page.tsx) |
 | API Service | **Functional** | [frontend/src/services/decision.ts](frontend/src/services/decision.ts) |
 | Init Script | **Ready** | [init_db_tables.py](init_db_tables.py) |
 
 ## 5. End-to-End Data Flow
 1. **Trigger**: User clicks "Convert to Decision" in Chat or "Log Decision" in Research.
-2. **Context Passing**: Query parameters (`?source=chat&title=...`) pre-fill the creation wizard.
-3. **Drafting**: Multi-step wizard (Identity -> Context -> Options -> Evidence -> Analysis).
-4. **AI Review**:
-   - Backend runs async tasks or frontend simulates "Adversarial AI" review.
-   - Checks for: Optimism Bias, Sunk Cost, Missing Options, Weak Evidence.
-5. **Persistence**:
-   - `POST /api/v1/decisions/` -> Metadata saved to Postgres.
-   - Reasoning trace saved to MongoDB `decision_traces` collection.
+2. **Context Passing**: Query parameters (`?source=chat&title=...&problem=...&context=...`) pre-fill the wizard (sanitized client-side before injection).
+3. **Drafting**: **7-step wizard** in `page.tsx`:
+   - Step 1 — Identity (Title, Category, Confidence)
+   - Step 2 — Context (Problem Statement)
+   - Step 3 — Options (min. 2 alternatives with effort & risk)
+   - Step 4 — Evidence (manual or simulated "Scan Project" — returns mock evidence in current implementation, so it must stay labeled as preview/demo mode unless a real scanner is added)
+   - Step 5 — Analysis (6-dimension Tradeoff Matrix sliders)
+   - Step 6 — AI Review (auto-triggered on Step 5 → 6 transition; calls `POST /api/v1/decisions/analyze`)
+   - Step 7 — Resolution (final option, rationale, privacy, status, revisit rule)
+4. **AI Review** (Step 6):
+   - Calls `decisionService.analyzeDecision()` → `POST /api/v1/decisions/analyze`.
+   - Returns JSON flags: `{ id, flag_type, severity, message, suggested_action }`.
+   - Checks for: Optimism Bias, Sunk Cost, Missing Options, Weak Evidence, Confidence Calibration.
+   - On failure, degrades gracefully: user sees error banner and can retry or skip.
+5. **Persistence** (Step 7 → "Initialize Decision"):
+   - `POST /api/v1/decisions/` → Metadata saved to PostgreSQL via SQLAlchemy.
+   - Reasoning trace intended for MongoDB `decision_traces` collection (requires `MONGODB_URL` env var).
 6. **Consumption**:
-   - Kanban board displays status.
-   - Analytics view processes distribution and velocity.
-   - Export tools generate ADR (Markdown) or STAR (Interview prep).
+   - Kanban board displays status columns (Tentative / Confirmed / Revisited / Deprecated).
+   - Analytics view computes Decision Velocity, Evidence Quality, and Reversal Rate from live data.
+   - **ADR Export**: Client-side Markdown template generation → copy-to-clipboard. No file download or GitHub commit in current implementation.
+   - **STAR Breakdown**: Client-side template interpolation from stored decision fields. Not a separate LLM call.
 
 ## 6. Implementation Roadmap (How to make it fully functional)
 
@@ -78,8 +88,8 @@ python init_db_tables.py
 - **AI Hook**: Implement a service in `backend/app/services/decision_ai.py` that uses Groq/Gemini to perform the "Adversarial Review" instead of frontend timeouts.
 
 ### Step 3: Frontend Feature Completion
-- **Real Data Sync**: Remove mock data in `page.tsx` once the backend is verified.
-- **Evidence Linking**: Implement the "Project Scan" logic to actually fetch recent files/chats via the backend.
+- **Real Data Sync**: Keep the existing data flow, but do not describe the scan step as live until a backend scanner exists.
+- **Evidence Linking**: Either keep the "Project Scan" flow explicitly in demo mode or replace it with a real backend-backed evidence collector.
 - **Export Utility**: Finalize the `exportADR` and `convertToSTAR` functions to allow file downloads or clipboard copies.
 
 ### Step 4: Cross-Module Integration

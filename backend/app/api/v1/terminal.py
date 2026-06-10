@@ -1,6 +1,9 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException, status
 from app.api.v1.auth import get_current_user
 from app.models.user import User
+from app.core.config import settings
+from app.core.security import ALGORITHM
+from jose import JWTError, jwt
 import asyncio
 import pty
 import os
@@ -162,19 +165,54 @@ class TerminalSession:
 # Store active sessions
 active_sessions: Dict[str, TerminalSession] = {}
 
+def _verify_ws_token(token: str) -> dict:
+    """
+    Decode and validate a JWT for WebSocket authentication.
+    Raises ValueError on invalid/expired tokens.
+    """
+    try:
+        # Try Supabase JWT first
+        if settings.SUPABASE_JWT_SECRET:
+            try:
+                payload = jwt.decode(
+                    token,
+                    settings.SUPABASE_JWT_SECRET,
+                    algorithms=["HS256"],
+                    audience="authenticated",
+                )
+                return payload
+            except JWTError:
+                pass  # Fall through to local JWT
+
+        # Try local JWT
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError as exc:
+        raise ValueError(f"Invalid token: {exc}") from exc
+
+
 @router.websocket("/{project_id}")
 async def terminal_endpoint(
     websocket: WebSocket,
     project_id: str,
-    # Note: WebSocket endpoints cannot use Header dependencies directly in the same way as HTTP
-    # Usually we pass token via query param or handle auth inside the websocket handler
-    # For now, we'll verify the user inside the connection flow if token is sent
 ):
-    await websocket.accept()
+    """
+    WebSocket PTY terminal.  JWT **must** be passed as ?token=<jwt> query param.
+    The connection is rejected (close code 4401) BEFORE accept() when auth fails,
+    preventing unauthenticated shell access (OWASP A07).
+    """
+    token = websocket.query_params.get("token")
+    if not token:
+        await websocket.close(code=4401, reason="Missing authentication token")
+        return
 
-    # In a real app, you would validate the token sent in the initial message or query param
-    # For now, we proceed assuming the connection is authorized for this MVP phase
-    # You might want to extract the token from query params: websocket.query_params.get("token")
+    try:
+        _verify_ws_token(token)
+    except ValueError:
+        await websocket.close(code=4401, reason="Invalid or expired token")
+        return
+
+    await websocket.accept()
 
     session_id = f"{project_id}_{id(websocket)}"
     session = TerminalSession(websocket, session_id)

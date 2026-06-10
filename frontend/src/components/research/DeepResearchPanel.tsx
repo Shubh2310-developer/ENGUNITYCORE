@@ -1,7 +1,10 @@
 'use client';
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { startDeepResearch, ResearchRequest, ResearchStreamEvent, ResearchReport } from '@/services/research';
+import { useAuthStore } from '@/stores/authStore';
 import styles from './DeepResearch.module.css';
 
 export default function DeepResearchPanel() {
@@ -23,8 +26,19 @@ export default function DeepResearchPanel() {
         }
     }, [events]);
 
+    const _hasHydrated = useAuthStore((state) => state._hasHydrated);
+    const token = useAuthStore((state) => state.token);
+
     const handleResearch = useCallback(async () => {
         if (!query.trim()) return;
+
+        // Read the latest token at call-time — avoids stale closure if store
+        // hydrated after this component first rendered.
+        const currentToken = useAuthStore.getState().token ?? '';
+        if (!currentToken) {
+            setError('Not authenticated. Please sign in again.');
+            return;
+        }
 
         setIsResearching(true);
         setProgress(0);
@@ -40,12 +54,9 @@ export default function DeepResearchPanel() {
             output_format: 'detailed',
         };
 
-        const token = localStorage.getItem('token') || '';
-        // In strict mode or production, better to use a hook or context for auth token.
-
         await startDeepResearch(
             request,
-            token,
+            currentToken,
             (event) => {
                 setProgress(event.progress_percent);
                 if (event.data && event.data.message) {
@@ -66,18 +77,7 @@ export default function DeepResearchPanel() {
         );
     }, [query, depth]);
 
-    const renderMarkdown = (text: string) => {
-        // Basic markdown rendering (replace with a proper library like react-markdown in production)
-        // This is a simple dangerous fallback for the prototype
-        let html = text
-            .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-            .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-            .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-            .replace(/\*\*(.*)\*\*/gim, '<b>$1</b>')
-            .replace(/\*(.*)\*/gim, '<i>$1</i>')
-            .replace(/\n/g, '<br/>');
-        return { __html: html };
-    };
+    // Markdown is rendered via react-markdown (remark-gfm) — no dangerouslySetInnerHTML.
 
     return (
         <div className={styles.container}>
@@ -110,7 +110,11 @@ export default function DeepResearchPanel() {
                         <option value="exhaustive">🧠 Exhaustive (10+ sources)</option>
                     </select>
 
-                    <button onClick={handleResearch} disabled={isResearching || !query.trim()} className={styles.researchBtn}>
+                    <button
+                        onClick={handleResearch}
+                        disabled={isResearching || !query.trim() || !_hasHydrated || !token}
+                        className={styles.researchBtn}
+                    >
                         {isResearching ? '🔄 Researching...' : '🚀 Start Research'}
                     </button>
                 </div>
@@ -140,7 +144,7 @@ export default function DeepResearchPanel() {
 
             {/* Report */}
             {report && (
-                <div className={styles.report}>
+                <div className={styles.report} data-testid="research-complete">
                     <div className={styles.reportHeader}>
                         <h3>📋 Research Report</h3>
                         <div className={styles.reportMeta}>
@@ -152,7 +156,11 @@ export default function DeepResearchPanel() {
 
                     <div className={styles.reportBody}>
                         {report.detailed_findings.map((f, i) => (
-                            <div key={i} dangerouslySetInnerHTML={renderMarkdown(f.full_report)} />
+                            <div key={i} className={styles.markdownBody}>
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                    {f.full_report}
+                                </ReactMarkdown>
+                            </div>
                         ))}
                     </div>
 

@@ -48,3 +48,4 @@ python-louvain==0.16
 networkx>=2.5
 dnspython==2.7.0
 debugpy==1.8.0
+bleach==6.4.0

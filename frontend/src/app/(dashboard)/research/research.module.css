@@ -1443,6 +1443,12 @@
     justify-content: center;
     z-index: 1000;
     animation: fadeIn 0.3s ease-out;
+    /* Prevent intercepting pointer events when overlay is not intentionally open */
+    pointer-events: none;
+}
+
+.shareOverlayOpen {
+    pointer-events: auto;
 }
 
 .shareModal {

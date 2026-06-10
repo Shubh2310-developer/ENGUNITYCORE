@@ -293,9 +293,8 @@ async def get_current_user(
         if "sub" in payload and "id" not in payload:
             payload["id"] = payload["sub"]
     except JWTError as exc:
-        logger.error(f"Supabase local JWT decode failed: {exc}")
-        
-        # Fallback to network validation if local decode fails (e.g., due to RS256 alg or rotated keys)
+        logger.warning(f"Supabase local JWT decode failed: {exc}. Trying network validation.")
+        # Fallback to network validation (e.g. RS256 or rotated keys)
         try:
             status_code, user_payload = await _supabase_request_json("GET", "/auth/v1/user", token=token)
             if status_code in (200, 201) and user_payload and "id" in user_payload:
@@ -305,6 +304,7 @@ async def get_current_user(
         except Exception as net_exc:
             logger.error(f"Supabase network validation failed: {net_exc}")
             try:
+                # Last resort: local DB user (all paths verify the signature)
                 return _local_user_from_token(db, token)
             except HTTPException as e:
                 logger.error(f"Local user from token failed: {e.detail}")
@@ -320,7 +320,6 @@ async def get_current_user(
         )
 
     current_user = _build_authenticated_user(payload)
-
     # Parallel: sync to MongoDB profile + upsert into postgres users table
     # The postgres upsert is critical — it ensures the user has a real DB row
     # so that FK references (e.g. chat_sessions.user_id) don't cause IntegrityErrors.

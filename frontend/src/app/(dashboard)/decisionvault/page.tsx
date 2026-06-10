@@ -85,6 +85,7 @@ function DecisionVaultContent() {
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -94,6 +95,8 @@ function DecisionVaultContent() {
   const [isGeneratingFlags, setIsGeneratingFlags] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [scanStep, setScanStep] = useState(0);
+  const scanIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const scanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const SCAN_MESSAGES = [
     'Initializing Engunity Mesh context...',
     'Analyzing repository structure...',
@@ -221,15 +224,25 @@ function DecisionVaultContent() {
 
   const loadDecisions = async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const data = await decisionService.getDecisions();
       setDecisions(data);
     } catch (error) {
       console.error('Failed to load decisions:', error);
+      setLoadError('Could not load decisions. Check your connection and try again.');
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Cleanup scan interval and timeout on unmount to prevent memory leak
+  useEffect(() => {
+    return () => {
+      if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
+      if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
+    };
+  }, []);
 
   const handleCreateDecision = async () => {
     if (isSubmitting) return;
@@ -249,13 +262,13 @@ function DecisionVaultContent() {
       });
       setDecisions(prev => [created, ...prev]);
       setShowCreateModal(false);
+      createRequestKeyRef.current = null;
       resetForm();
     } catch (error) {
       setSubmitError('Failed to initialize decision. Please retry.');
       console.error('Failed to process decision creation:', error);
     } finally {
       setIsSubmitting(false);
-      createRequestKeyRef.current = null;
     }
   };
 
@@ -265,6 +278,7 @@ function DecisionVaultContent() {
     setSubmitError(null);
     setAiReviewError(null);
     createRequestKeyRef.current = null;
+    handleCancelScan();
   };
 
   const filteredDecisions = decisions.filter(d =>
@@ -296,14 +310,36 @@ function DecisionVaultContent() {
     }
   };
 
+  const getStepValidationError = (): string | null => {
+    if (currentStep === 1) {
+      if (!newDecision.title?.trim()) return 'Decision title is required.';
+      if (newDecision.title.trim().length < 3) return 'Title must be at least 3 characters.';
+    }
+    if (currentStep === 2) {
+      if (!newDecision.problem_statement?.trim()) return 'Problem statement is required.';
+      if (newDecision.problem_statement.trim().length < 5) return 'Problem statement must be at least 5 characters.';
+    }
+    if (currentStep === 3) {
+      const opts = newDecision.options || [];
+      if (opts.length < 2) return 'At least 2 options are required.';
+      if (opts.some(o => !o.label?.trim())) return 'All options must have a label.';
+    }
+    return null;
+  };
+
+  const [stepError, setStepError] = useState<string | null>(null);
+
   const nextStep = () => {
+    const err = getStepValidationError();
+    if (err) { setStepError(err); return; }
+    setStepError(null);
     if (currentStep === 5) {
       generateAIFlags();
     }
     setCurrentStep(prev => Math.min(prev + 1, STEPS.length));
   };
 
-  const prevStep = () => setCurrentStep(prev => Math.max(prev - 1, 1));
+  const prevStep = () => { setStepError(null); setCurrentStep(prev => Math.max(prev - 1, 1)); };
 
   const generateAIFlags = async () => {
     setIsGeneratingFlags(true);
@@ -383,45 +419,78 @@ ${d.options.map(o => `#### ${o.label}\n${o.description}\n- Pros: ${o.pros.join('
     setAdrContent(adr);
   };
 
+  const handleCancelScan = () => {
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current);
+      scanIntervalRef.current = null;
+    }
+    if (scanTimeoutRef.current) {
+      clearTimeout(scanTimeoutRef.current);
+      scanTimeoutRef.current = null;
+    }
+    setIsScanning(false);
+  };
+
   const handleScanProject = () => {
     setIsScanning(true);
     setScanStep(0);
 
-    // Simulate progressive scanning
-    const interval = setInterval(() => {
+    // Simulate progressive scanning UI transitions
+    if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
+    if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
+
+    scanIntervalRef.current = setInterval(() => {
       setScanStep(prev => {
         if (prev >= SCAN_MESSAGES.length - 1) {
-          clearInterval(interval);
+          if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
           return prev;
         }
         return prev + 1;
       });
     }, 800);
 
-    setTimeout(() => {
-      const mockEvidence: Evidence[] = [
-        {
-          id: 'scan-1',
-          source_type: 'code_run',
-          source_id: 'internal',
-          excerpt: 'Analysis of current repository suggests 12 components are using legacy patterns.',
-          credibility: 'primary',
-          added_at: new Date().toISOString(),
-          relevance_score: 0.92
-        },
-        {
-          id: 'scan-2',
-          source_type: 'chat',
-          source_id: 'recent',
-          excerpt: 'Team discussion on 2026-01-05 highlighted concerns regarding scalability of current DB schema.',
-          credibility: 'secondary',
-          added_at: new Date().toISOString(),
-          relevance_score: 0.88
-        }
-      ];
-      setNewDecision(prev => ({ ...prev, evidence: [...(prev.evidence || []), ...mockEvidence] }));
-      setIsScanning(false);
-      clearInterval(interval);
+    scanTimeoutRef.current = setTimeout(async () => {
+      if (scanIntervalRef.current) {
+        clearInterval(scanIntervalRef.current);
+        scanIntervalRef.current = null;
+      }
+      scanTimeoutRef.current = null;
+
+      try {
+        const scanRes = await decisionService.scanWorkspace();
+        setNewDecision(prev => ({
+          ...prev,
+          evidence: [...(prev.evidence || []), ...scanRes.evidence]
+        }));
+      } catch (err) {
+        console.error('Failed real workspace scan, falling back to mock evidence:', err);
+        const fallbackEvidence: Evidence[] = [
+          {
+            id: 'scan-1',
+            source_type: 'code_run',
+            source_id: 'internal',
+            excerpt: 'Analysis of current repository suggests 12 components are using legacy patterns.',
+            credibility: 'primary',
+            added_at: new Date().toISOString(),
+            relevance_score: 0.92
+          },
+          {
+            id: 'scan-2',
+            source_type: 'chat',
+            source_id: 'recent',
+            excerpt: 'Team discussion on 2026-01-05 highlighted concerns regarding scalability of current DB schema.',
+            credibility: 'secondary',
+            added_at: new Date().toISOString(),
+            relevance_score: 0.88
+          }
+        ];
+        setNewDecision(prev => ({
+          ...prev,
+          evidence: [...(prev.evidence || []), ...fallbackEvidence]
+        }));
+      } finally {
+        setIsScanning(false);
+      }
     }, 4500);
   };
 
@@ -442,7 +511,7 @@ ${d.options.map(o => `#### ${o.label}\n${o.description}\n- Pros: ${o.pros.join('
         <div className={styles.headerRight}>
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100">
             <Activity className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
-            <span className="text-xs font-semibold text-blue-700">Decision Velocity: 4.2/wk</span>
+            <span className="text-xs font-semibold text-blue-700">Decision Velocity: {analytics.velocity}/mo</span>
           </div>
           <button onClick={() => setShowCreateModal(true)} className={styles.newDecisionBtn}>
             <Plus className="w-4 h-4" />
@@ -488,6 +557,12 @@ ${d.options.map(o => `#### ${o.label}\n${o.description}\n- Pros: ${o.pros.join('
         {isLoading ? (
           <div className="flex items-center justify-center h-64">
             <div className="animate-spin w-8 h-8 border-4 border-blue-100 border-t-blue-600 rounded-full" />
+          </div>
+        ) : loadError ? (
+          <div className="flex flex-col items-center justify-center h-64 gap-4">
+            <AlertCircle className="w-10 h-10 text-red-400" />
+            <p className="text-sm text-slate-600">{loadError}</p>
+            <button onClick={loadDecisions} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-all">Retry</button>
           </div>
         ) : viewMode === 'active' ? (
           <div className={styles.kanbanBoard}>
@@ -595,58 +670,120 @@ ${d.options.map(o => `#### ${o.label}\n${o.description}\n- Pros: ${o.pros.join('
               <h3 className="text-sm font-bold text-slate-700 uppercase mb-6 flex items-center gap-2">
                 <Target className="w-4 h-4 text-slate-400" /> Confidence Calibration
               </h3>
-              <div className="h-40 flex items-end gap-2 px-2 border-b border-l border-slate-100">
-                {[
-                  { label: 'Q1', val: 40, color: '#94a3b8' },
-                  { label: 'Q2', val: 55, color: '#94a3b8' },
-                  { label: 'Q3', val: 72, color: '#3b82f6' },
-                  { label: 'Q4', val: 85, color: '#2563eb' }
-                ].map(d => (
-                  <div key={d.label} className="flex-1 flex flex-col items-center gap-2 group">
-                    <div className="w-full relative">
-                      <div
-                        className="w-full rounded-t-lg transition-all duration-500 group-hover:brightness-110"
-                        style={{ height: `${d.val}%`, backgroundColor: d.color }}
-                      >
-                        <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {d.val}%
+              {analytics.calibrationData.length === 0 ? (
+                <div className="h-40 flex flex-col items-center justify-center text-slate-400 gap-2">
+                  <Target className="w-8 h-8 opacity-30" />
+                  <p className="text-xs">No decisions yet — calibration will appear here.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="h-40 flex items-end gap-2 px-2 border-b border-l border-slate-100">
+                    {analytics.calibrationData.slice(-5).map((d, i) => (
+                      <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
+                        <div className="w-full relative">
+                          <div
+                            className="w-full rounded-t-lg transition-all duration-500 group-hover:brightness-110"
+                            style={{
+                              height: `${d.confidence}%`,
+                              backgroundColor: d.outcome >= 75 ? '#2563eb' : d.outcome >= 40 ? '#3b82f6' : '#94a3b8'
+                            }}
+                          >
+                            <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {d.confidence}%
+                            </span>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">
+                          {new Date(d.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                         </span>
                       </div>
-                    </div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">{d.label}</span>
+                    ))}
                   </div>
-                ))}
-              </div>
-              <p className="text-[11px] text-slate-500 mt-4 leading-relaxed italic">
-                AI Insight: Your confidence scoring accuracy has improved by 25% this quarter.
-              </p>
+                  <p className="text-[11px] text-slate-500 mt-4 leading-relaxed">
+                    Showing confidence vs. outcome alignment for your last {analytics.calibrationData.slice(-5).length} decision{analytics.calibrationData.slice(-5).length !== 1 ? 's' : ''}.
+                    Bar height = your initial confidence; color = outcome (blue = confirmed, grey = pending/deprecated).
+                  </p>
+                </>
+              )}
             </div>
 
             <div className="col-span-full bg-white p-6 rounded-xl border border-slate-200">
               <h3 className="text-sm font-bold text-slate-700 uppercase mb-6">AI Pattern Insights</h3>
-              <div className="space-y-4">
-                <div className={styles.aiFlag}>
-                  <AlertTriangle className={styles.flagIcon} />
-                  <div>
-                    <h4 className={styles.flagTitle}>Decision Drift Detected</h4>
-                    <p className={styles.flagMessage}>You've reversed 3 architecture decisions related to "Scalability" this month. This suggests potential misalignment in long-term infrastructure goals.</p>
-                  </div>
+              {decisions.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-slate-400 gap-2">
+                  <Zap className="w-8 h-8 opacity-30" />
+                  <p className="text-xs text-center max-w-xs">
+                    Create your first decision to unlock AI pattern analysis of your reasoning habits.
+                  </p>
                 </div>
-                <div className="flex gap-4 p-4 bg-blue-50 border border-blue-100 rounded-lg">
-                  <Zap className="w-5 h-5 text-blue-600" />
-                  <div>
-                    <h4 className="text-sm font-bold text-blue-900">Optimism Bias Flagged</h4>
-                    <p className="text-sm text-blue-700">Your "Time to Implement" estimates are consistently 40% lower than actual outcomes. AI suggests adding a 1.5x multiplier to future estimates.</p>
+              ) : (
+                <div className="space-y-4">
+                  {/* Reversal / Decision Drift */}
+                  {analytics.reversalRate > 20 && (
+                    <div className={styles.aiFlag}>
+                      <AlertTriangle className={styles.flagIcon} />
+                      <div>
+                        <h4 className={styles.flagTitle}>Decision Drift Detected</h4>
+                        <p className={styles.flagMessage}>
+                          {analytics.reversalRate}% of your decisions have been revisited or deprecated. This is above the 20% threshold and may indicate misalignment in long-term goals.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {/* Weak Evidence Pattern */}
+                  {analytics.evidenceQuality < 50 && (
+                    <div className="flex gap-4 p-4 bg-amber-50 border border-amber-100 rounded-lg">
+                      <AlertTriangle className="w-5 h-5 text-amber-600" />
+                      <div>
+                        <h4 className="text-sm font-bold text-amber-900">Low Evidence Quality</h4>
+                        <p className="text-sm text-amber-700">
+                          Only {analytics.evidenceQuality}% of your decisions have primary-source evidence attached. Consider adding citations or code references before finalizing decisions.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {/* Calibration insight — only shown when calibration data is available */}
+                  {analytics.calibrationData.length > 0 && (() => {
+                    const confirmed = analytics.calibrationData.filter(d => d.outcome === 100).length;
+                    const total = analytics.calibrationData.length;
+                    const pct = Math.round((confirmed / total) * 100);
+                    return (
+                      <div className="flex gap-4 p-4 bg-blue-50 border border-blue-100 rounded-lg">
+                        <Zap className="w-5 h-5 text-blue-600" />
+                        <div>
+                          <h4 className="text-sm font-bold text-blue-900">Decision Outcome Rate</h4>
+                          <p className="text-sm text-blue-700">
+                            {pct}% of your decisions are currently in &quot;Confirmed&quot; status ({confirmed}/{total}). Review &quot;Tentative&quot; decisions regularly to improve outcome tracking.
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  {/* Stability score */}
+                  <div className="flex gap-4 p-4 bg-purple-50 border border-purple-100 rounded-lg">
+                    <CheckCircle2 className="w-5 h-5 text-purple-600" />
+                    <div>
+                      <h4 className="text-sm font-bold text-purple-900">Decision Stability Score</h4>
+                      <p className="text-sm text-purple-700">
+                        Your current stability score is <strong>{analytics.stabilityScore}%</strong> based on {decisions.length} total decision{decisions.length !== 1 ? 's' : ''}.
+                        {analytics.stabilityScore >= 80 ? ' High stability — your decisions are holding well.' : analytics.stabilityScore >= 60 ? ' Moderate stability — some decisions may need revisiting.' : ' Low stability — consider reviewing recent reversals.'}
+                      </p>
+                    </div>
                   </div>
+                  {/* All-clear when no warning conditions apply */}
+                  {analytics.reversalRate <= 20 && analytics.evidenceQuality >= 50 && (
+                    <div className="flex gap-4 p-4 bg-green-50 border border-green-100 rounded-lg">
+                      <CheckCircle2 className="w-5 h-5 text-green-600" />
+                      <div>
+                        <h4 className="text-sm font-bold text-green-900">Healthy Decision Patterns</h4>
+                        <p className="text-sm text-green-700">
+                          No bias patterns detected in your current decision history. Reversal rate ({analytics.reversalRate}%) and evidence quality ({analytics.evidenceQuality}%) are both within healthy ranges.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="flex gap-4 p-4 bg-purple-50 border border-purple-100 rounded-lg">
-                  <CheckCircle2 className="w-5 h-5 text-purple-600" />
-                  <div>
-                    <h4 className="text-sm font-bold text-purple-900">Calibration Improving</h4>
-                    <p className="text-sm text-purple-700">Your confidence scores now align 85% with decision outcomes, up from 60% last quarter. High-confidence decisions are showing higher stability.</p>
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         )}
@@ -791,7 +928,11 @@ ${d.options.map(o => `#### ${o.label}\n${o.description}\n- Pros: ${o.pros.join('
                   <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Author</p>
                   <div className="flex items-center gap-1.5 font-bold text-slate-700">
                     <User className="w-4 h-4" />
-                    <span>Researcher_01</span>
+                    <span className="truncate max-w-[120px]" title={selectedDecision.created_by || `user:${selectedDecision.user_id}`}>
+                      {selectedDecision.created_by
+                        ? selectedDecision.created_by.split('@')[0]
+                        : `user:${selectedDecision.user_id}`}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -915,8 +1056,11 @@ ${d.options.map(o => `#### ${o.label}\n${o.description}\n- Pros: ${o.pros.join('
             </div>
 
             <div className="p-6 bg-slate-50 border-t border-slate-200">
-               <button className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all">
-                 <Plus className="w-4 h-4" /> Log Implementation Review
+               <button
+                 onClick={() => { setSelectedDecision(null); setActiveAnalysis('none'); loadDecisions(); }}
+                 className="w-full py-3 bg-slate-100 text-slate-700 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-200 transition-all text-sm"
+               >
+                 Refresh &amp; Close
                </button>
             </div>
           </div>
@@ -1030,24 +1174,33 @@ ${d.options.map(o => `#### ${o.label}\n${o.description}\n- Pros: ${o.pros.join('
                       <div className="flex flex-col items-center">
                         <Activity className="w-8 h-8 text-blue-600 animate-pulse mb-4" />
                         <p className="text-sm font-bold text-slate-800 mb-2">{SCAN_MESSAGES[scanStep]}</p>
-                        <div className="w-full max-w-xs h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                        <div className="w-full max-w-xs h-1.5 bg-slate-200 rounded-full overflow-hidden mb-4">
                           <div
                             className="h-full bg-blue-600 transition-all duration-500 ease-out"
                             style={{ width: `${((scanStep + 1) / SCAN_MESSAGES.length) * 100}%` }}
                           />
                         </div>
+                        <button
+                          onClick={handleCancelScan}
+                          className="px-3 py-1.5 bg-white border border-red-200 text-red-600 rounded-lg text-xs font-bold hover:bg-red-50 transition-all shadow-sm"
+                        >
+                          Cancel Scan
+                        </button>
                       </div>
                     </div>
                   ) : (
                     <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl p-8 text-center mb-6">
                       <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm"><Zap className="w-6 h-6 text-blue-600" /></div>
-                      <h4 className="text-sm font-bold text-slate-800 mb-1">AI Context Linker</h4>
-                      <p className="text-xs text-slate-500 max-w-xs mx-auto mb-4">Automatically pull relevant context from your chats and code.</p>
+                      <h4 className="text-sm font-bold text-slate-800 mb-1">AI Context Linker (Simulated Preview)</h4>
+                      <p className="text-xs text-slate-500 max-w-xs mx-auto mb-1">Provides a preview of potential evidence generated through simulated project indexing.</p>
+                      <p className="text-[10px] text-amber-600 font-semibold mb-3 flex items-center justify-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> Preview Only — scan results are simulated.
+                      </p>
                       <button
                         onClick={handleScanProject}
                         className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm"
                       >
-                        Scan Project
+                        Run Simulated Scan
                       </button>
                     </div>
                   )}
@@ -1270,7 +1423,7 @@ ${d.options.map(o => `#### ${o.label}\n${o.description}\n- Pros: ${o.pros.join('
 
             <div className={styles.modalFooter}>
               <div className="flex-1">{currentStep > 1 && <button onClick={prevStep} className={`${styles.btn} ${styles.btnSecondary}`}>Back</button>}</div>
-              <button onClick={() => { setShowCreateModal(false); resetForm(); }} className={`${styles.btn} ${styles.btnSecondary}`}>Cancel</button>
+              <button onClick={() => { setShowCreateModal(false); resetForm(); setStepError(null); }} className={`${styles.btn} ${styles.btnSecondary}`}>Cancel</button>
               {currentStep < 7 ? (
                 <button onClick={nextStep} className={`${styles.btn} ${styles.btnPrimary}`}>Next Step</button>
               ) : (
@@ -1283,6 +1436,11 @@ ${d.options.map(o => `#### ${o.label}\n${o.description}\n- Pros: ${o.pros.join('
                 </button>
               )}
             </div>
+            {stepError && (
+              <div className="px-6 pb-3 text-xs font-medium text-amber-700 flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5" />{stepError}
+              </div>
+            )}
             {submitError && (
               <div className="px-6 pb-5 text-xs font-medium text-red-700">{submitError}</div>
             )}

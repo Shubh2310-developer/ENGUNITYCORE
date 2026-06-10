@@ -11,7 +11,6 @@ import {
   LayoutDashboard,
   MessageSquare,
   Code2,
-  BookOpen,
   Search,
   BarChart3,
   Settings,
@@ -21,7 +20,6 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Github,
   Briefcase,
   Shield
 } from 'lucide-react';
@@ -66,13 +64,11 @@ export default function DashboardLayout({
     { icon: LayoutDashboard, label: 'Overview', href: '/overview' },
     { icon: MessageSquare, label: 'Neural Chat', href: '/chat' },
     { icon: Code2, label: 'Code Lab', href: '/code' },
-    { icon: BookOpen, label: 'Notebook', href: '/notebook' },
     { icon: Search, label: 'Research', href: '/research' },
     { icon: FileText, label: 'Documents', href: '/documents' },
     { icon: BarChart3, label: 'Analytics', href: '/analytics' },
     { icon: Briefcase, label: 'Job Prep', href: '/jobprep' },
     { icon: Shield, label: 'Decision Vault', href: '/decisionvault' },
-    { icon: Github, label: 'Github Repos', href: '/githubrepos' },
   ];
 
   if (isEnteringWorkspace) {
@@ -173,7 +169,7 @@ export default function DashboardLayout({
       {/* Main Content */}
       <main className="flex-1 flex flex-col relative overflow-hidden transition-all duration-300">
         {/* Top Header - Hide on pages with their own headers */}
-        {pathname !== '/chat' && pathname !== '/decisionvault' && pathname !== '/analytics' && !pathname?.startsWith('/analytics/') && pathname !== '/code' && pathname !== '/overview' && pathname !== '/research' && pathname !== '/githubrepos' && pathname !== '/jobprep' && !pathname?.startsWith('/documents') && (
+        {pathname !== '/chat' && pathname !== '/decisionvault' && pathname !== '/analytics' && !pathname?.startsWith('/analytics/') && pathname !== '/code' && pathname !== '/overview' && pathname !== '/research' && pathname !== '/jobprep' && !pathname?.startsWith('/documents') && (
           <header className="h-20 border-b border-white/5 flex items-center justify-between px-10 bg-void-900/50 backdrop-blur-md z-20">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
@@ -195,11 +191,11 @@ export default function DashboardLayout({
         )}
 
         {/* Page Area */}
-        <section className={`flex-1 overflow-hidden ${pathname === '/chat' || pathname === '/decisionvault' || pathname === '/analytics' || pathname?.startsWith('/analytics/') || pathname === '/code' || pathname === '/overview' || pathname === '/research' || pathname === '/githubrepos' || pathname === '/jobprep' || pathname?.startsWith('/documents')
+        <section className={`flex-1 overflow-hidden ${pathname === '/chat' || pathname === '/decisionvault' || pathname === '/analytics' || pathname?.startsWith('/analytics/') || pathname === '/code' || pathname === '/overview' || pathname === '/research' || pathname === '/jobprep' || pathname?.startsWith('/documents')
           ? 'm-4 rounded-2xl overflow-hidden'
           : ''
           } ${pathname === '/overview' ? '' : 'bg-[radial-gradient(circle_at_top_right,rgba(45,212,191,0.03),transparent_40%)]'}`}>
-          <div className={`mx-auto h-full transition-all duration-300 ${pathname === '/code' || pathname === '/decisionvault' || pathname === '/chat' || pathname === '/analytics' || pathname?.startsWith('/analytics/') || pathname === '/overview' || pathname === '/research' || pathname === '/githubrepos' || pathname === '/jobprep' || pathname?.startsWith('/documents')
+          <div className={`mx-auto h-full transition-all duration-300 ${pathname === '/code' || pathname === '/decisionvault' || pathname === '/chat' || pathname === '/analytics' || pathname?.startsWith('/analytics/') || pathname === '/overview' || pathname === '/research' || pathname === '/jobprep' || pathname?.startsWith('/documents')
             ? 'p-0 max-w-full h-full'
             : 'p-10 max-w-[1720px]'
             }`}>
